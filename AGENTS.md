@@ -57,9 +57,9 @@ cd backend && pytest tests/ -v
 
 ## Design Documents (Read Before Implementing)
 
-- `项目设计文档-完整版.md` — full DB schema, 8 Agent code skeletons, API routes, frontend components, 15-day vertical slice plan. **Read the relevant section before writing any new feature; skeletons are already there.**
-- `中国软件杯-A3-赛题开发需求.md` — F1-F5 definitions, scoring rubric, pitfalls.
-- `开发流程文档.md` — 12-phase V1.0 flow (complements the vertical slice plan).
+- `docs/设计文档/项目设计文档-完整版.md` — full DB schema, 8 Agent code skeletons, API routes, frontend components, 15-day vertical slice plan. **Read the relevant section before writing any new feature; skeletons are already there.**
+- `docs/赛题需求/中国软件杯-A3-赛题开发需求.md` — F1-F5 definitions, scoring rubric, pitfalls.
+- `docs/开发流程/开发流程文档.md` — 12-phase V1.0 flow (complements the vertical slice plan).
 
 ## Scoring Priority
 
