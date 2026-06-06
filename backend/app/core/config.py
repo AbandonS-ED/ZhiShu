@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 from typing import List
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "智学(ZhiShu)"
+    PROJECT_NAME: str = "智枢(SmartHub)"
     VERSION: str = "1.0.0"
     
     DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/zhishu"

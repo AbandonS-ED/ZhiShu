@@ -1,4 +1,4 @@
-# 智学(ZhiShu) - 多智能体个性化学习资源生成系统
+# 智枢(SmartHub) - 多智能体个性化学习资源生成系统
 
 基于大模型的个性化学习资源生成与学习多智能体系统
 
@@ -14,7 +14,7 @@
 ## 项目结构
 
 ```
-ZhiShu/
+SmartHub/
 ├── frontend/          # Next.js前端
 │   ├── src/
 │   │   ├── app/       # App Router

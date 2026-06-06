@@ -97,7 +97,7 @@ export default function Sidebar() {
               color: 'var(--ink)',
             }}
           >
-            智学
+            智枢
           </div>
           <span
             style={{
@@ -108,7 +108,7 @@ export default function Sidebar() {
               letterSpacing: 0,
             }}
           >
-            ZhiShu · v1.0
+            SmartHub · v1.0
           </span>
         </div>
       </div>

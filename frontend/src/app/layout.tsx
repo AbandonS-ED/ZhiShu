@@ -18,7 +18,7 @@ const geistMono = localFont({
 })
 
 export const metadata: Metadata = {
-  title: '智学 ZhiShu',
+  title: '智枢 SmartHub',
   description: '多智能体学习资源生成系统',
 }
 

@@ -14,7 +14,7 @@ const pageTitles: Record<string, [string, string]> = {
 }
 
 function getPageInfo(pathname: string): [string, string] {
-  return pageTitles[pathname] || ['智学', '多智能体学习平台']
+  return pageTitles[pathname] || ['智枢', '多智能体学习平台']
 }
 
 export function Header() {

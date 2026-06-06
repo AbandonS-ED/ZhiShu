@@ -1,4 +1,4 @@
-# 智学 (ZhiShu) — AI Coding 工具使用说明
+# 智枢 (SmartHub) — AI Coding 工具使用说明
 
 > **竞赛**: 第十五届中国软件杯 A3 赛题  
 > **工具**: Claude Code (OpenCode)  
