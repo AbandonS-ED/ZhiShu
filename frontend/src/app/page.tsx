@@ -1,101 +1,105 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useEffect } from 'react'
+import { ProfileRadarChart } from '@/components/dashboard/RadarChart'
+import { ProgressCard } from '@/components/dashboard/ProgressCard'
+import { QuickActions } from '@/components/dashboard/QuickActions'
+import { useAppStore } from '@/stores/appStore'
+import { BookOpen, Clock, Target, TrendingUp } from 'lucide-react'
+
+// 模拟数据
+const mockProfile = {
+  knowledge_mastery: 0.65,
+  learning_style: 0.72,
+  cognitive_level: 0.58,
+  interest: 0.81,
+  weak_points: 0.45,
+  learning_pace: 0.68,
+}
+
+const mockStats = [
+  { title: '已学习知识点', value: 8, maxValue: 12, icon: <BookOpen size={20} />, color: 'bg-primary-500' },
+  { title: '学习时长', value: 24, maxValue: 40, icon: <Clock size={20} />, color: 'bg-emerald-500' },
+  { title: '练习完成率', value: 65, maxValue: 100, icon: <Target size={20} />, color: 'bg-amber-500' },
+  { title: '整体进度', value: 45, maxValue: 100, icon: <TrendingUp size={20} />, color: 'bg-purple-500' },
+]
+
+export default function DashboardPage() {
+  const { setStudent, setProfile } = useAppStore()
+
+  useEffect(() => {
+    // 模拟加载用户数据
+    setStudent({
+      id: '1',
+      student_no: '2024001',
+      name: '张三',
+      grade: '大二',
+      major: '计算机科学',
+    })
+    setProfile({
+      knowledge_mastery: { '搜索算法': 0.8, '机器学习': 0.3, '深度学习': 0.2 },
+      learning_style: { visual: 0.7, textual: 0.3, auditory: 0.5, kinesthetic: 0.4 },
+      cognitive_level: { memory: 0.9, understand: 0.7, apply: 0.5, analyze: 0.3 },
+      interest: { cv: 0.9, nlp: 0.4, rl: 0.6 },
+      weak_topics: ['深度学习', '强化学习'],
+      learning_pace: { daily_hours: 2.5, preferred_time: 'evening', focus_duration: 45 },
+    })
+  }, [setStudent, setProfile])
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="space-y-6">
+      {/* 欢迎横幅 */}
+      <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-2xl p-6 text-white">
+        <h1 className="text-2xl font-bold">👋 欢迎回来，张三！</h1>
+        <p className="mt-2 text-primary-100">
+          你已经连续学习 7 天了，继续保持！今天想学点什么？
+        </p>
+      </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      {/* 快捷操作 */}
+      <QuickActions />
+
+      {/* 统计卡片 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {mockStats.map((stat) => (
+          <ProgressCard
+            key={stat.title}
+            title={stat.title}
+            value={stat.value}
+            maxValue={stat.maxValue}
+            icon={stat.icon}
+            color={stat.color}
+          />
+        ))}
+      </div>
+
+      {/* 画像雷达图 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">📊 学习者画像</h2>
+        <ProfileRadarChart data={mockProfile} />
+      </div>
+
+      {/* 最近学习活动 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">📚 最近学习</h2>
+        <div className="space-y-3">
+          {[
+            { title: '搜索算法 - BFS/DFS', time: '2小时前', status: '已完成', color: 'text-emerald-600 bg-emerald-50' },
+            { title: 'A* 算法练习', time: '昨天', status: '进行中', color: 'text-amber-600 bg-amber-50' },
+            { title: '知识表示与推理', time: '3天前', status: '待学习', color: 'text-gray-600 bg-gray-50' },
+          ].map((activity, i) => (
+            <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-gray-900">{activity.title}</p>
+                <p className="text-xs text-gray-500">{activity.time}</p>
+              </div>
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${activity.color}`}>
+                {activity.status}
+              </span>
+            </div>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </div>
     </div>
-  );
+  )
 }
