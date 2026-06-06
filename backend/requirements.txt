@@ -1,3 +1,10 @@
+# ===== 国内 pip 镜像 =====
+# 装包时如果遇到超时/连接失败，加 -i 参数：
+#   pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+# 或者一次性配置到 ~/.pip/pip.conf（推荐，全局生效）：
+#   [global]
+#   index-url = https://pypi.tuna.tsinghua.edu.cn/simple
+# ===== 项目依赖 =====
 fastapi==0.136.3
 uvicorn[standard]==0.49.0
 sqlalchemy==2.0.50
