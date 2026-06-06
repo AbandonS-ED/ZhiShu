@@ -43,7 +43,7 @@ export default function Home() {
                 </div>
               </div>
               <div className="act-item">
-                <div className="act-dot" style={{ background: 'var(--warm)' }}></div>
+                <div className="act-dot" style={{ background: 'var(--accent)' }}></div>
                 <div className="act-body">
                   <p>
                     生成了 <strong>Transformer</strong> 思维导图
