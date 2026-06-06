@@ -1,7 +1,10 @@
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import './globals.css'
+import Sidebar from '@/components/layout/Sidebar'
+import { Header } from '@/components/layout/Header'
 
+// 本地字体（国内 Google Fonts 不可达）
 const geistSans = localFont({
   src: './fonts/GeistVF.woff',
   variable: '--font-geist-sans',
@@ -29,7 +32,15 @@ export default function RootLayout({
       lang="zh-CN"
       className={`${geistSans.variable} ${geistMono.variable}`}
     >
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans">
+        <div className="app">
+          <Sidebar />
+          <div className="main">
+            <Header />
+            <div className="content">{children}</div>
+          </div>
+        </div>
+      </body>
     </html>
   )
 }

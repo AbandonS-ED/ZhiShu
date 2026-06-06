@@ -1,0 +1,129 @@
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+
+type NavItem = {
+  href: string
+  label: string
+  tag?: string
+  active?: boolean
+  svg: React.ReactNode
+}
+
+const gridSvg = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1.5" />
+    <rect x="14" y="3" width="7" height="7" rx="1.5" />
+    <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    <rect x="3" y="14" width="7" height="7" rx="1.5" />
+  </svg>
+)
+const chatSvg = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+)
+const userSvg = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="8" r="4" />
+    <path d="M20 21a8 8 0 1 0-16 0" />
+  </svg>
+)
+const bookSvg = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+  </svg>
+)
+const pathSvg = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="6" cy="6" r="2.5" />
+    <circle cx="18" cy="18" r="2.5" />
+    <path d="M8.5 8.5a6 6 0 0 1 7 7" />
+  </svg>
+)
+const checkSvg = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 11l3 3L22 4" />
+    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+  </svg>
+)
+const evalSvg = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10" />
+    <line x1="12" y1="20" x2="12" y2="4" />
+    <line x1="6" y1="20" x2="6" y2="14" />
+  </svg>
+)
+
+const navGroups: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'Overview',
+    items: [
+      { href: '/', label: '仪表盘', svg: gridSvg },
+    ],
+  },
+  {
+    label: 'Learning',
+    items: [
+      { href: '/duihua', label: '智能对话', tag: 'AI', svg: chatSvg },
+      { href: '/profile', label: '学习画像', svg: userSvg },
+      { href: '/resources', label: '资源中心', svg: bookSvg },
+      { href: '/path', label: '学习路径', svg: pathSvg },
+      { href: '/tiku', label: '练习题库', svg: checkSvg },
+      { href: '/pinggu', label: '学习评估', svg: evalSvg },
+    ],
+  },
+]
+
+export default function Sidebar() {
+  const pathname = usePathname()
+
+  const isActive = (href: string) => {
+    return pathname === href || pathname.startsWith(href + '/')
+  }
+
+  return (
+    <aside className="sidebar">
+      <div className="sb-brand">
+        <div className="mark">S</div>
+        <div>
+          <div className="wordmark">智枢</div>
+          <span className="sub">SmartHub · v1.0</span>
+        </div>
+      </div>
+
+      <nav className="sb-nav">
+        {navGroups.map((group) => (
+          <div key={group.label}>
+            <div className="sb-label">{group.label}</div>
+            {group.items.map((item) => {
+              const active = isActive(item.href)
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`sb-item${active ? ' active' : ''}`}
+                >
+                  <div className="dot"></div>
+                  {item.svg}
+                  {item.label}
+                  {item.tag && <div className="sb-tag">{item.tag}</div>}
+                </Link>
+              )
+            })}
+          </div>
+        ))}
+      </nav>
+
+      <div className="sb-foot">
+        <div className="av">张</div>
+        <div className="info">
+          <div className="name">张明远</div>
+          <div className="role">计算机科学 · 大三</div>
+        </div>
+      </div>
+    </aside>
+  )
+}
