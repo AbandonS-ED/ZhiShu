@@ -1,63 +1,133 @@
 'use client'
 
-import { useAppStore } from '@/stores/appStore'
-import { Bell, Search, ChevronDown } from 'lucide-react'
-import * as Avatar from '@radix-ui/react-avatar'
+import { usePathname } from 'next/navigation'
+import { Bell, Settings, Search } from 'lucide-react'
+
+// 模板风格的页面标题映射（来自 code.html script titles）
+const pageTitles: Record<string, [string, string]> = {
+  '/': ['仪表盘', '欢迎回来'],
+  '/tutor': ['智能对话', 'AI 导论 · 智能辅导'],
+  '/profile': ['学习画像', '六维个性化分析'],
+  '/resources': ['资源中心', 'AI 导论 · 学习资源'],
+  '/mindmap': ['思维导图', '知识结构可视化'],
+  '/path': ['学习路径', '个性化路径规划'],
+}
+
+function getPageInfo(pathname: string): [string, string] {
+  return pageTitles[pathname] || ['智枢', '多智能体学习平台']
+}
 
 export function Header() {
-  const { student, sidebarOpen } = useAppStore()
+  const pathname = usePathname()
+  const [title, sub] = getPageInfo(pathname)
 
   return (
     <header
-      className={`fixed top-0 right-0 z-30 h-16 bg-white border-b border-gray-200 transition-all duration-300 ${
-        sidebarOpen ? 'left-64' : 'left-20'
-      }`}
+      style={{
+        height: 60,
+        background: 'var(--surface-glass)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderBottom: '1px solid var(--line)',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 32px',
+        gap: 14,
+        flexShrink: 0,
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}
     >
-      <div className="flex items-center justify-between h-full px-6">
-        {/* 左侧：课程选择器 */}
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 px-3 py-1.5 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100">
-            <span className="text-sm font-medium text-gray-700">人工智能导论</span>
-            <ChevronDown size={14} className="text-gray-400" />
-          </div>
-        </div>
+      <h2
+        style={{
+          fontSize: 19,
+          color: 'var(--ink)',
+          fontWeight: 400,
+          fontFamily: 'Newsreader, Georgia, serif',
+          letterSpacing: '-0.02em',
+        }}
+      >
+        {title}
+      </h2>
+      <div
+        style={{ width: 1, height: 18, background: 'var(--line)', margin: '0 2px' }}
+      />
+      <span style={{ fontSize: 12.5, color: 'var(--ink-3)', fontWeight: 400 }}>
+        {sub}
+      </span>
 
-        {/* 右侧：搜索、通知、用户头像 */}
-        <div className="flex items-center space-x-4">
-          {/* 搜索框 */}
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="搜索知识点..."
-              className="pl-9 pr-4 py-2 w-64 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
+      {/* 右侧操作 */}
+      <div
+        style={{
+          marginLeft: 'auto',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        {/* 搜索（模板中是图标按钮） */}
+        <button
+          className="hdr-btn"
+          aria-label="搜索"
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 'var(--r-xs)',
+            border: '1px solid var(--line)',
+            background: 'transparent',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s var(--ease)',
+            color: 'var(--ink-3)',
+          }}
+        >
+          <Search size={16} />
+        </button>
 
-          {/* 通知铃铛 */}
-          <button className="relative p-2 text-gray-500 hover:bg-gray-50 rounded-lg">
-            <Bell size={20} />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-          </button>
+        {/* 通知 */}
+        <button
+          className="hdr-btn"
+          aria-label="通知"
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 'var(--r-xs)',
+            border: '1px solid var(--line)',
+            background: 'transparent',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s var(--ease)',
+            color: 'var(--ink-3)',
+          }}
+        >
+          <Bell size={16} />
+        </button>
 
-          {/* 用户头像 */}
-          <div className="flex items-center space-x-3 cursor-pointer">
-            <Avatar.Root className="w-9 h-9 rounded-full overflow-hidden bg-primary-100">
-              <Avatar.Image
-                src={student?.avatar_url}
-                alt={student?.name}
-                className="w-full h-full object-cover"
-              />
-              <Avatar.Fallback className="flex items-center justify-center w-full h-full text-sm font-medium text-primary-700">
-                {student?.name?.charAt(0) || '张'}
-              </Avatar.Fallback>
-            </Avatar.Root>
-            <div className="hidden md:block">
-              <p className="text-sm font-medium text-gray-900">{student?.name || '张三'}</p>
-              <p className="text-xs text-gray-500">{student?.student_no || '2024001'}</p>
-            </div>
-          </div>
-        </div>
+        {/* 设置 */}
+        <button
+          className="hdr-btn"
+          aria-label="设置"
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 'var(--r-xs)',
+            border: '1px solid var(--line)',
+            background: 'transparent',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.2s var(--ease)',
+            color: 'var(--ink-3)',
+          }}
+        >
+          <Settings size={16} />
+        </button>
       </div>
     </header>
   )
