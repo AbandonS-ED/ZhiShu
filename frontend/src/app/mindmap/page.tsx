@@ -2,15 +2,15 @@
 
 import { useEffect, useRef } from 'react'
 import { ZoomIn, ZoomOut, Maximize, Download, RotateCcw } from 'lucide-react'
+import type { MermaidConfig } from 'mermaid'
 
 // Mermaid 配置
-const mermaidConfig = {
+const mermaidConfig: MermaidConfig = {
   startOnLoad: false,
   theme: 'default',
   securityLevel: 'loose',
   mindmap: {
     useMaxWidth: true,
-    htmlLabels: true,
   },
 }
 

@@ -48,7 +48,7 @@ ZhiShu/
 │       └── 用户手册.md
 ```
 
-**还没有**：.gitignore、所有 Agent 实现、所有前端业务代码、任何测试、Embedding 维度的修正。
+**还没有**：所有 Agent 实现、所有前端业务代码、任何测试、Embedding 维度的修正、讯飞 LLM 客户端替换。
 
 ## 关键设计文档
 
@@ -95,7 +95,7 @@ pytest tests/ -v
 pytest tests/test_X.py::test_name -v   # 跑单个测试
 ```
 
-**仓库根目前没有 .gitignore**，提交前需补（建议忽略 `backend/venv/`、`backend/.env`、`frontend/node_modules/`、`frontend/.next/`、`.DS_Store`、Python `__pycache__`）。
+**.gitignore 已配置**，覆盖 `backend/venv/`、`backend/.env`、`frontend/node_modules/`、`frontend/.next/`、Python `__pycache__`、`.claude/` 等。提交前确认 `git status` 干净即可。
 
 ## 当前代码里的已知问题（动手前先看一眼）
 

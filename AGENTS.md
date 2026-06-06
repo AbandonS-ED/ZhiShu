@@ -1,5 +1,7 @@
 # AGENTS.md
 
+> Companion doc: `CLAUDE.md` has more detailed repo state notes (as of 2026-06-05). Prefer this file for quick reference; consult CLAUDE.md for deeper context.
+
 ## Project Context
 
 Competition project: 第十五届中国软件杯 A3 赛题 — multi-agent personalized learning resource system. **Must use 讯飞星火 V4** as the LLM (硬约束, not optional). Course: 人工智能导论.
@@ -44,7 +46,7 @@ cd backend && pytest tests/ -v
 1. **`backend/app/models/document_chunk.py:13`** — `Vector(1536)` is wrong. 讯飞 Embedding is 1024-dim. Must fix schema + all references before any RAG work.
 2. **`backend/app/core/database.py:13`** — `await conn.execute("CREATE EXTENSION ...")` needs `text()` wrapper for SQLAlchemy async. Fix: `from sqlalchemy import text; await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))`.
 3. **设计文档里的 SparkLangchain `_stream`/`_generate`** — calls `asyncio.run()` inside an already-running event loop → deadlock in LangGraph. Must rewrite as async-native or use `asyncio.to_thread`.
-4. **No `.gitignore`** at repo root — must add before first real commit (ignore `backend/venv/`, `backend/.env`, `frontend/node_modules/`, `frontend/.next/`, `__pycache__/`).
+4. **`backend/app/services/minimax_*.py`** — entire MiniMax client/langchain files are the wrong LLM. Competition requires 讯飞星火 V4. Delete and rewrite as 讯飞-native when ready.
 5. **讯飞 HTTP auth** — use `Authorization: Bearer {api_key}` only. Do NOT concatenate `api_key:api_secret`.
 
 ## Architecture (Not Obvious From Filenames)
@@ -57,13 +59,19 @@ cd backend && pytest tests/ -v
 
 ## Design Documents (Read Before Implementing)
 
-- `docs/设计文档/项目设计文档-完整版.md` — full DB schema, 8 Agent code skeletons, API routes, frontend components, 15-day vertical slice plan. **Read the relevant section before writing any new feature; skeletons are already there.**
+- `docs/设计文档/项目设计文档-完整版.md` — full DB schema, 8 Agent code skeletons, API routes, frontend components, 15-day vertical slice plan. **Read the relevant section before writing any new feature; skeletons are already there — implement, don't rewrite.**
 - `docs/赛题需求/中国软件杯-A3-赛题开发需求.md` — F1-F5 definitions, scoring rubric, pitfalls.
 - `docs/开发流程/开发流程文档.md` — 12-phase V1.0 flow (complements the vertical slice plan).
+- `开发进度.md` — live task tracker with status of every component.
 
 ## Scoring Priority
 
 P0: F1 对话式画像 (35%) + F2 多智能体资源生成 (45%). P1: F3 路径 + N3 防幻觉/流式. P2: F4/F5 bonus. All F1-F5 done → demo video/PPT/open-source声明.
+
+## Stale Dependencies
+
+- `anthropic` in `backend/requirements.txt` — competition uses 讯飞, not Anthropic. Remove when cleaning up.
+- `minimax_client.py` / `minimax_langchain.py` in `backend/app/services/` — wrong LLM entirely, see bug #4 above.
 
 ## Commit Convention
 

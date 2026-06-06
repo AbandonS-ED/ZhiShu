@@ -1,10 +1,15 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import localFont from 'next/font/local'
 import './globals.css'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 
-const inter = Inter({ subsets: ['latin'] })
+// 使用项目自带的本地 Geist 字体（无需网络，避免 Google Fonts SSL 失败）
+const geistSans = localFont({
+  src: './fonts/GeistVF.woff',
+  variable: '--font-geist-sans',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: '智学 - 多智能体学习资源生成系统',
@@ -17,8 +22,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="zh-CN">
-      <body className={inter.className}>
+    <html lang="zh-CN" className={geistSans.variable}>
+      <body className="font-sans">
         <div className="min-h-screen bg-gray-50">
           <Sidebar />
           <Header />
