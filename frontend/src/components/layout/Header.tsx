@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation'
 
 // 模板页面标题映射（来自 7 个模板的 script titles + 标题）
-const pageTitles: Record<string, { title: string; sub: string; actions?: React.ReactNode }> = {
+const pageTitles: Record<string, { title: string; sub: string }> = {
   '/': { title: '仪表盘', sub: '欢迎回来' },
   '/duihua': {
     title: '智能对话',
@@ -11,7 +11,7 @@ const pageTitles: Record<string, { title: string; sub: string; actions?: React.R
   },
   '/profile': {
     title: '学习画像',
-    sub: '六维个性化分析',
+    sub: '六维个性化分析 · 画像驱动学习',
   },
   '/resources': {
     title: '资源中心',

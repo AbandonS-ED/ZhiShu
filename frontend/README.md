@@ -4,135 +4,53 @@
 
 ## 技术栈
 
-- **框架**: Next.js 14 + React 18
-- **样式**: Tailwind CSS + shadcn/ui
-- **状态管理**: Zustand
-- **数据获取**: SWR
-- **图表**: Recharts
-- **图可视化**: ReactFlow
-- **思维导图**: Mermaid
-- **Markdown**: react-markdown
+- **框架**: Next.js 14.2.5 (App Router) + React 18
+- **样式**: Tailwind CSS 3.4 + 自定义 CSS（模板 1:1 复刻）
+- **状态管理**: React useState（无全局状态库）
 
 ## 项目结构
 
 ```
-zhishu-frontend/
-├── src/
-│   ├── app/                    # Next.js 页面路由
-│   │   ├── layout.tsx          # 全局布局
-│   │   ├── page.tsx            # 仪表盘首页
-│   │   ├── profile/            # 学习者画像
-│   │   ├── path/               # 学习路径
-│   │   ├── resources/          # 学习资源
-│   │   ├── mindmap/            # 思维导图
-│   │   └── tutor/              # 智能问答
-│   ├── components/             # 组件
-│   │   ├── layout/             # 布局组件
-│   │   │   ├── Sidebar.tsx     # 侧边栏导航
-│   │   │   └── Header.tsx      # 顶部导航栏
-│   │   ├── dashboard/          # 仪表盘组件
-│   │   │   ├── RadarChart.tsx  # 雷达图
-│   │   │   ├── ProgressCard.tsx # 进度卡片
-│   │   │   └── QuickActions.tsx # 快捷操作
-│   │   ├── profile/            # 画像组件
-│   │   ├── path/               # 路径组件
-│   │   ├── resources/          # 资源组件
-│   │   ├── mindmap/            # 导图组件
-│   │   └── tutor/              # 问答组件
-│   ├── lib/                    # 工具函数
-│   │   └── utils.ts
-│   ├── stores/                 # Zustand 状态
-│   │   └── appStore.ts
-│   └── types/                  # TypeScript 类型
-│       └── index.ts
-├── package.json
-├── tsconfig.json
-├── tailwind.config.js
-└── postcss.config.js
+src/
+├── app/                    # 路由页面（7 个）
+│   ├── layout.tsx          # 全局布局（Sidebar + Header）
+│   ├── page.tsx            # / 仪表盘
+│   ├── duihua/page.tsx     # /duihua 智能对话
+│   ├── path/page.tsx       # /path 学习路径
+│   ├── pinggu/page.tsx     # /pinggu 学习评估
+│   ├── profile/page.tsx    # /profile 学习画像
+│   ├── resources/page.tsx  # /resources 资源中心
+│   └── tiku/page.tsx       # /tiku 练习题库
+├── components/layout/      # 共享布局组件
+│   ├── Sidebar.tsx         # 侧边栏导航
+│   └── Header.tsx          # 顶部导航栏
+└── fonts/                  # 本地字体（GeistVF, GeistMonoVF）
 ```
 
 ## 快速开始
 
-### 安装依赖
-
 ```bash
 npm install
-```
-
-### 启动开发服务器
-
-```bash
-npm run dev
-```
-
-访问 http://localhost:3000
-
-### 构建生产版本
-
-```bash
-npm run build
-npm start
+npm run dev       # http://localhost:3000
+npm run build     # 验证编译
+npm run lint      # ESLint 检查
 ```
 
 ## 页面说明
 
-### 1. 仪表盘 (Dashboard)
-- 欢迎横幅与学习 streak
-- 六维画像雷达图
-- 学习进度统计
-- 快捷操作按钮
-- 最近学习活动
-
-### 2. 学习画像 (Profile)
-- 六维画像详细展示
-- 各维度进度条
-- 薄弱环节标签
-
-### 3. 学习路径 (Learning Path)
-- ReactFlow 节点图
-- 拓扑排序展示
-- 节点状态（已完成/学习中/可学习/未解锁）
-- 点击查看详情
-
-### 4. 学习资源 (Resources)
-- 资源类型筛选
-- 卡片式展示
-- 难度标签
-- 学习状态
-
-### 5. 思维导图 (Mind Map)
-- Mermaid 渲染
-- 缩放/重置/下载/全屏
-- 知识掌握度环形图
-
-### 6. 智能问答 (Tutor)
-- Markdown 消息渲染
-- 代码高亮
-- 来源引用
-- 相关话题推荐
-- 流式响应支持
-
-## 后端 API 对接
-
-前端通过以下方式与后端通信：
-
-- **REST API**: SWR 数据获取
-- **SSE**: 流式响应（资源生成）
-- **WebSocket**: 实时任务进度
-
-API 基础路径: `/api/v1`
+| 路由 | 页面 | 功能 |
+|------|------|------|
+| `/` | 仪表盘 | 统计卡片 + 最近活动 + 快速开始 + 课程进度 |
+| `/duihua` | 智能对话 | 多轮对话 + Agent 进度展示 + 推荐问题 + 生成资源面板 |
+| `/profile` | 学习画像 | SVG 雷达图 + 知识点掌握度 + 薄弱环节 + 六维详情(可展开) + 问卷模态框 + 更新历史 |
+| `/resources` | 资源中心 | 10 资源卡片 + 搜索/筛选 + 网格/列表视图 + 收藏 + 详情模态框(含练习/代码/音频) |
+| `/path` | 学习路径 | 12 节点 DAG 图谱(SVG 边) + 概览统计 + 详情面板 + 5 天每日计划 |
+| `/tiku` | 练习题库 | 10 题(选择/判断/简答/编程) + 即时反馈 + 进度环形图 + 知识点分析 + 最近答题 |
+| `/pinggu` | 学习评估 | 评分环形动画 + 六维进度条 + 趋势折线图 + 正确率柱状图 + 评估报告 + 学习记录分页 |
 
 ## 开发规范
 
-- 使用 TypeScript 严格模式
-- 组件使用 `'use client'` 指令
-- 样式使用 Tailwind CSS
-- 状态使用 Zustand
-- 类型定义在 `types/` 目录
-
-## 相关文档
-
-- [项目设计文档](./设计文档.md)
-- [Next.js 文档](https://nextjs.org/docs)
-- [Tailwind CSS 文档](https://tailwindcss.com/docs)
-- [ReactFlow 文档](https://reactflow.dev/docs)
+- 所有页面（除仪表盘）加 `'use client'` 指令
+- CSS 集中在 `globals.css`（745 行，7 页面合并）
+- 静态数据写在 `page.tsx` 内，不拆分 data 文件
+- 每个页面独立管理 state，不共享全局状态
