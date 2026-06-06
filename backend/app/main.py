@@ -11,7 +11,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(
-    title="智学(ZhiShu) API",
+    title="智枢(SmartHub) API",
     description="多智能体个性化学习资源生成系统",
     version="1.0.0",
     lifespan=lifespan
@@ -33,7 +33,7 @@ app.include_router(chat.router, prefix="/api/v1/chat", tags=["聊天"])
 
 @app.get("/")
 async def root():
-    return {"message": "智学(ZhiShu) API 运行中"}
+    return {"message": "智枢(SmartHub) API 运行中"}
 
 @app.get("/health")
 async def health():

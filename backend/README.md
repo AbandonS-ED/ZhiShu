@@ -1,4 +1,4 @@
-# 智学(ZhiShu) Backend
+# 智枢(SmartHub) Backend
 
 基于 FastAPI + LangGraph 的多智能体学习资源生成系统后端。
 

@@ -1,4 +1,4 @@
-# 智学 (ZhiShu) 前端 API 集成文档
+# 智枢 (SmartHub) 前端 API 集成文档
 
 > **版本**: v1.0  
 > **日期**: 2026-06-06  
@@ -117,7 +117,7 @@ export const api = new ApiClient();
 NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 
 # 其他配置
-NEXT_PUBLIC_APP_NAME=智学 ZhiShu
+NEXT_PUBLIC_APP_NAME=智枢 SmartHub
 ```
 
 ---
@@ -1228,4 +1228,4 @@ describe("profileApi", () => {
 
 **文档版本**: v1.0  
 **最后更新**: 2026-06-06  
-**维护者**: ZhiShu 开发团队
+**维护者**: SmartHub 开发团队

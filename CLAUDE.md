@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目背景
 
-**智学 (ZhiShu)** —— 第十五届中国软件杯 A3 赛题参赛项目（2026/06 立项）。
+**智枢 (SmartHub)** —— 第十五届中国软件杯 A3 赛题参赛项目（2026/06 立项）。
 
 - **赛题**：基于大模型的个性化资源生成与学习多智能体系统开发
 - **出题方**：科大讯飞。**硬约束：必须使用讯飞星火 V4 / 讯飞 Embedding / 讯飞 TTS 等讯飞工具**
 - **评分占比**：F1 对话式画像 35% + F2 多智能体资源生成 45% + F3 路径规划 + F4/F5 加分
 - **课程切入点**：人工智能导论
-- **主仓库**：<https://github.com/AbandonS-ED/ZhiShu>
+- **主仓库**：<https://github.com/AbandonS-ED/SmartHub>
 
 > **跑题地图**：F1-F5 定义见 [docs/赛题需求/中国软件杯-A3-赛题开发需求.md](docs/赛题需求/中国软件杯-A3-赛题开发需求.md)；非功能项里**流式输出 / 防幻觉(RAG) / 开源合规**是技术门槛项。
 
@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```text
 
-ZhiShu/
+SmartHub/
 ├── backend/                        # FastAPI 骨架（5 router 全是占位返回，3 张表）
 │   ├── app/
 │   │   ├── api/        chat / path / profile / resource / tutor — 全部 stub
