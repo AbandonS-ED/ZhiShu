@@ -2,91 +2,235 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { cn } from '@/lib/utils'
-import { useAppStore } from '@/stores/appStore'
 import {
   LayoutDashboard,
+  MessageSquare,
   User,
-  Map,
   BookOpen,
   Network,
-  MessageCircle,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  GraduationCap,
+  ClipboardCheck,
 } from 'lucide-react'
 
-const navItems = [
-  { href: '/', label: '仪表盘', icon: LayoutDashboard },
-  { href: '/profile', label: '学习画像', icon: User },
-  { href: '/path', label: '学习路径', icon: Map },
-  { href: '/resources', label: '学习资源', icon: BookOpen },
-  { href: '/mindmap', label: '思维导图', icon: Network },
-  { href: '/tutor', label: '智能问答', icon: MessageCircle },
+type NavItem = {
+  href: string
+  label: string
+  icon: typeof LayoutDashboard
+  exact?: boolean
+  tag?: string
+}
+
+const navGroups: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'Overview',
+    items: [
+      { href: '/', label: '仪表盘', icon: LayoutDashboard, exact: true },
+    ],
+  },
+  {
+    label: 'Learning',
+    items: [
+      { href: '/tutor', label: '智能对话', icon: MessageSquare, tag: 'AI' },
+      { href: '/profile', label: '学习画像', icon: User },
+      { href: '/resources', label: '资源中心', icon: BookOpen },
+      { href: '/mindmap', label: '思维导图', icon: Network },
+      { href: '/path', label: '学习路径', icon: ClipboardCheck },
+    ],
+  },
 ]
 
-export function Sidebar() {
+export default function Sidebar() {
   const pathname = usePathname()
-  const { sidebarOpen, toggleSidebar } = useAppStore()
+
+  const isActive = (href: string, exact?: boolean) => {
+    if (exact) return pathname === href
+    return pathname === href || pathname.startsWith(href + '/')
+  }
 
   return (
     <aside
-      className={cn(
-        'fixed left-0 top-0 z-40 h-screen bg-white border-r border-gray-200 transition-all duration-300',
-        sidebarOpen ? 'w-64' : 'w-20'
-      )}
+      style={{
+        width: 240,
+        background: 'var(--surface)',
+        borderRight: '1px solid var(--line)',
+        display: 'flex',
+        flexDirection: 'column',
+        flexShrink: 0,
+        position: 'relative',
+        zIndex: 20,
+        height: '100vh',
+      }}
     >
-      {/* Logo */}
-      <div className="flex items-center h-16 px-4 border-b border-gray-200">
-        <GraduationCap className="w-8 h-8 text-primary-600 flex-shrink-0" />
-        {sidebarOpen && (
-          <span className="ml-3 text-xl font-bold text-gray-900">智学</span>
-        )}
-        <button
-          onClick={toggleSidebar}
-          className="ml-auto p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
+      {/* 品牌区 */}
+      <div
+        style={{
+          padding: '24px 22px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 11,
+        }}
+      >
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            background: 'var(--ink)',
+            borderRadius: 9,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--bg)',
+            fontFamily: 'Newsreader, Georgia, serif',
+            fontSize: 16,
+            fontStyle: 'italic',
+            transition: 'transform 0.3s var(--ease)',
+          }}
         >
-          {sidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
-        </button>
+          Z
+        </div>
+        <div>
+          <div
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontSize: 15,
+              fontWeight: 600,
+              letterSpacing: '-0.03em',
+              color: 'var(--ink)',
+            }}
+          >
+            智学
+          </div>
+          <span
+            style={{
+              fontSize: 10.5,
+              color: 'var(--ink-3)',
+              fontWeight: 400,
+              display: 'block',
+              letterSpacing: 0,
+            }}
+          >
+            ZhiShu · v1.0
+          </span>
+        </div>
       </div>
 
-      {/* 导航菜单 */}
-      <nav className="p-4 space-y-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              )}
+      {/* 导航 */}
+      <nav style={{ flex: 1, padding: '8px 10px', overflowY: 'auto' }}>
+        {navGroups.map((group) => (
+          <div key={group.label}>
+            <div
+              style={{
+                fontSize: 10,
+                textTransform: 'uppercase',
+                letterSpacing: '1.4px',
+                color: 'var(--ink-4)',
+                padding: '16px 14px 6px',
+                fontWeight: 600,
+              }}
             >
-              <item.icon
-                className={cn(
-                  'w-5 h-5 flex-shrink-0',
-                  isActive ? 'text-primary-600' : 'text-gray-400'
-                )}
-              />
-              {sidebarOpen && <span className="ml-3">{item.label}</span>}
-            </Link>
-          )
-        })}
+              {group.label}
+            </div>
+            {group.items.map((item) => {
+              const Icon = item.icon
+              const active = isActive(item.href, item.exact)
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 11,
+                    padding: '9px 14px',
+                    borderRadius: 'var(--r-xs)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s var(--ease)',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: active ? 'var(--ink)' : 'var(--ink-3)',
+                    background: active ? 'var(--accent-soft)' : 'transparent',
+                    marginBottom: 1,
+                    userSelect: 'none',
+                    position: 'relative',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <span
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: 3,
+                      height: active ? 16 : 0,
+                      borderRadius: 2,
+                      background: 'var(--ink)',
+                      transition: 'height 0.25s var(--ease)',
+                    }}
+                  />
+                  <Icon
+                    size={17}
+                    style={{ opacity: active ? 0.9 : 0.55, flexShrink: 0 }}
+                  />
+                  <span style={{ flex: 1 }}>{item.label}</span>
+                  {item.tag && (
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        padding: '1.5px 7px',
+                        borderRadius: 6,
+                        background: 'var(--warm-soft)',
+                        color: 'var(--warm)',
+                        letterSpacing: 0,
+                      }}
+                    >
+                      {item.tag}
+                    </span>
+                  )}
+                </Link>
+              )
+            })}
+          </div>
+        ))}
       </nav>
 
-      {/* 底部设置 */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-        <Link
-          href="/settings"
-          className="flex items-center px-3 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+      {/* 底部用户区 */}
+      <div
+        style={{
+          padding: '16px 20px',
+          borderTop: '1px solid var(--line)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}
+      >
+        <div
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: '50%',
+            background: 'var(--bg-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--ink-2)',
+            border: '1.5px solid var(--line)',
+          }}
         >
-          <Settings className="w-5 h-5 text-gray-400" />
-          {sidebarOpen && <span className="ml-3">设置</span>}
-        </Link>
+          张
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{ fontSize: 12.5, color: 'var(--ink)', fontWeight: 500 }}
+          >
+            张明远
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+            计算机科学 · 大三
+          </div>
+        </div>
       </div>
     </aside>
   )

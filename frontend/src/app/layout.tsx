@@ -1,19 +1,25 @@
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import './globals.css'
-import { Sidebar } from '@/components/layout/Sidebar'
+import Sidebar from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 
-// 使用项目自带的本地 Geist 字体（无需网络，避免 Google Fonts SSL 失败）
+// 使用项目自带的本地 Geist 字体（国内 Google Fonts 不可达）
 const geistSans = localFont({
   src: './fonts/GeistVF.woff',
   variable: '--font-geist-sans',
   display: 'swap',
 })
 
+const geistMono = localFont({
+  src: './fonts/GeistMonoVF.woff',
+  variable: '--font-geist-mono',
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
-  title: '智学 - 多智能体学习资源生成系统',
-  description: '基于多智能体协作的自适应学习资源生成平台',
+  title: '智学 ZhiShu',
+  description: '多智能体学习资源生成系统',
 }
 
 export default function RootLayout({
@@ -22,16 +28,39 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="zh-CN" className={geistSans.variable}>
+    <html
+      lang="zh-CN"
+      className={`${geistSans.variable} ${geistMono.variable}`}
+    >
       <body className="font-sans">
-        <div className="min-h-screen bg-gray-50">
+        <div
+          style={{
+            display: 'flex',
+            height: '100vh',
+            overflow: 'hidden',
+          }}
+        >
           <Sidebar />
-          <Header />
-          <main className="ml-64 pt-16">
-            <div className="p-6">
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+              minWidth: 0,
+            }}
+          >
+            <Header />
+            <main
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '28px 32px 40px',
+              }}
+            >
               {children}
-            </div>
-          </main>
+            </main>
+          </div>
         </div>
       </body>
     </html>
