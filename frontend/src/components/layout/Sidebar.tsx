@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 
 type NavItem = {
   href: string
@@ -79,19 +80,34 @@ const navGroups: { label: string; items: NavItem[] }[] = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const [collapsed, setCollapsed] = useState(false)
 
   const isActive = (href: string) => {
     return pathname === href || pathname.startsWith(href + '/')
   }
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
       <div className="sb-brand">
         <div className="mark">S</div>
-        <div>
+        <div className="sb-text">
           <div className="wordmark">智枢</div>
           <span className="sub">SmartHub · v1.0</span>
         </div>
+        <button
+          className="sb-toggle"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
+          title={collapsed ? '展开' : '收起'}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {collapsed ? (
+              <path d="M9 6l6 6-6 6" />
+            ) : (
+              <path d="M15 6l-6 6 6 6" />
+            )}
+          </svg>
+        </button>
       </div>
 
       <nav className="sb-nav">
@@ -105,11 +121,12 @@ export default function Sidebar() {
                   key={item.href}
                   href={item.href}
                   className={`sb-item${active ? ' active' : ''}`}
+                  title={collapsed ? item.label : undefined}
                 >
                   <div className="dot"></div>
                   {item.svg}
-                  {item.label}
-                  {item.tag && <div className="sb-tag">{item.tag}</div>}
+                  <span className="sb-text">{item.label}</span>
+                  {item.tag && <div className="sb-tag sb-text">{item.tag}</div>}
                 </Link>
               )
             })}
@@ -119,7 +136,7 @@ export default function Sidebar() {
 
       <div className="sb-foot">
         <div className="av">张</div>
-        <div className="info">
+        <div className="info sb-text">
           <div className="name">张明远</div>
           <div className="role">计算机科学 · 大三</div>
         </div>
