@@ -106,9 +106,17 @@ npx next lint         # ✅ 通过
 
 ### 多智能体协同（Master-Worker）
 
-`Master Agent` 接收请求 → 拆任务 → 派给 8 个子 Agent（并行）→ 汇总 → 流式返回。
+`Master Agent` 接收请求 → 拆任务 → 派给 6 个子 Agent（并行）→ 汇总 → 流式返回。
 
-8 个子 Agent：**Profile / Document / MindMap / Exercise / Code / Path / Tutor / Video**（Video 可降级为 TTS+幻灯片）。LangGraph `StateGraph` 编排，State 字段：`UserRequest / Profile / TaskPlan / ResourceGeneration / PathPlanning / Response`。
+6 个子 Agent：
+- **Profile Agent** — 对话式画像提取，输出 6 维结构化 JSON（35% 分值核心）
+- **Document Agent** — 知识讲解 + 代码示例 + 音频脚本生成（3 种输出格式）
+- **MindMap Agent** — 思维导图生成，输出 Mermaid 代码
+- **Exercise Agent** — 练习题生成（选择/判断/简答/编程），输出 JSON 题目列表
+- **Path Agent** — 学习路径规划，输出知识图谱节点 + 边 + 每日计划
+- **Tutor Agent** — RAG 问答 + 评估报告生成
+
+LangGraph `StateGraph` 编排，State 字段：`UserRequest / Profile / TaskPlan / ResourceGeneration / PathPlanning / Response`。
 
 ### 6 维学生画像（F1）
 
@@ -142,7 +150,7 @@ npx next lint         # ✅ 通过
 
 ## 写新功能前先看
 
-- [docs/设计文档/项目设计文档-完整版.md](docs/设计文档/项目设计文档-完整版.md) —— 9225 行设计圣经：DB schema + 8 Agent 骨架 + API + 15 天 Vertical Slice 计划
+- [docs/设计文档/项目设计文档-完整版.md](docs/设计文档/项目设计文档-完整版.md) —— 9225 行设计圣经：DB schema + 6 Agent 骨架 + API + 15 天 Vertical Slice 计划
 - [AGENTS.md](AGENTS.md) —— 团队协作文档，命令/锁定技术栈/已知 bug 清单
 - [开发进度.md](开发进度.md) —— 团队任务跟踪表
 

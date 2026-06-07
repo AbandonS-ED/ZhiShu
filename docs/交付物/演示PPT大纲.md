@@ -115,10 +115,10 @@
 | 类型 | Agent | 输出 |
 |------|-------|------|
 | 学习文档 | Document Agent | Markdown文档 |
+| 代码示例 | Document Agent | Python代码 |
+| 音频脚本 | Document Agent | 脚本文本 |
 | 思维导图 | MindMap Agent | Mermaid图 |
 | 练习题 | Exercise Agent | 多类型题目 |
-| 代码示例 | Code Agent | Python代码 |
-| 视频脚本 | Video Agent | 脚本+音频 |
 
 **技术亮点**：
 - 每个Agent有独立Prompt+工具+输出规范

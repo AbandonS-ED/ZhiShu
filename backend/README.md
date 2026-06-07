@@ -38,7 +38,7 @@ backend/
 │   ├── core/            # config.py + database.py
 │   ├── models/          # Student / StudentProfile(JSONB) / DocumentChunk(pgvector)
 │   ├── services/        # minimax_client.py + minimax_langchain.py（待替换为讯飞）
-│   └── agents/          # 空目录（待填 8 个子 Agent）
+│   └── agents/          # 6 个子 Agent：Profile / Document / MindMap / Exercise / Path / Tutor
 ├── tests/               # 空
 ├── Dockerfile
 └── requirements.txt

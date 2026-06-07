@@ -62,7 +62,14 @@ npm run lint
 
 ## 架构要点
 
-- **8 个子 Agent**：Profile / Document / MindMap / Exercise / Code / Path / Tutor / Video。Master Agent 用 LangGraph `StateGraph` 编排，State 字段传递数据。**不要写成 if-else 串 Prompt。**
+- **6 个子 Agent + Master Agent**：
+  - **Profile Agent** — 对话式画像提取，输出 6 维结构化 JSON
+  - **Document Agent** — 知识讲解 + 代码示例 + 音频脚本生成（3 种输出格式）
+  - **MindMap Agent** — 思维导图生成，输出 Mermaid 代码
+  - **Exercise Agent** — 练习题生成（选择/判断/简答/编程），输出 JSON 题目列表
+  - **Path Agent** — 学习路径规划，输出知识图谱节点 + 边 + 每日计划
+  - **Tutor Agent** — RAG 问答 + 评估报告生成
+- Master Agent 用 LangGraph `StateGraph` 编排，State 字段传递数据。**不要写成 if-else 串 Prompt。**
 - **6 维学生画像**（JSONB）：知识掌握 / 学习风格 / 认知水平 / 兴趣 / 薄弱点 / 学习节奏。
 - **RAG 流程**（N3 评分技术亮点）：文档解析 → 语义切片(800字/100重叠) → Embedding → pgvector HNSW → LLM 重排 → 来源引用 → SourceValidator 验证 → 失败重试。
 - **所有生成场景必须流式输出**。`/api/v1/chat/stream` SSE 骨架已有，长任务走 Celery + Redis Pub/Sub → WebSocket。
