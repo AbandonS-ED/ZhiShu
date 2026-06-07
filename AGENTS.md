@@ -52,16 +52,16 @@ backend/app/
 
 **Master Agent 编排**：用户消息 → LLM 路由判断意图 → 派给子 Agent → SSE 流式返回。State 用 `MasterState(TypedDict)` 传递。
 
-**前端**：Next.js 14 App Router + Tailwind。7 页面全部假数据，0 个 fetch 调用。CSS 集中在 `globals.css`，无 shadcn/ui。`types/index.ts` 和 `stores/appStore.ts` 已准备但未接入。
+**前端**：Next.js 14 App Router + Tailwind。**6 页已联调后端**（/profile /resources /tiku /path /pinggu /duihua），通过 `src/lib/api.ts` 统一调用，`/pinggu` 和 `/` 仍主要是模板数据。CSS 集中在 `globals.css`，无 shadcn/ui。`types/index.ts` 和 `stores/appStore.ts` 已准备但未接入。
 
 ## 评分优先级
 
 | 优先级 | 模块 | 占比 | 状态 |
 |--------|------|------|------|
-| P0 | F1 对话式画像 | 35% | ✅ 后端完成 |
-| P0 | F2 多智能体资源生成 | 45% | ⚠ 缺 MindMap Agent |
-| P1 | F3 路径 / N3 防幻觉+流式 | 必做 | ✅ 路径完成 |
-| P2 | F4 智能辅导 / F5 效果评估 | 加分 | ⚠ RAG 空 |
+| P0 | F1 对话式画像 | 35% | ✅ 后端+前端完成 |
+| P0 | F2 多智能体资源生成 | 45% | ⚠ 缺 MindMap Agent，前端已联调 |
+| P1 | F3 路径 / N3 防幻觉+流式 | 必做 | ✅ 路径完成，❌ 防幻觉未做 |
+| P2 | F4 智能辅导 / F5 效果评估 | 加分 | ⚠ Agent 有 RAG 空，前端已联调 |
 
 ## 提交规范
 
