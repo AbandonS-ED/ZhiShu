@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { exerciseApi } from '@/lib/api'
+import { getStudentId } from '@/lib/student'
 
 // ═══ TYPES ═══
 interface Exercise {
@@ -141,6 +143,23 @@ export default function TikuPage() {
   const [answers, setAnswers] = useState<Record<number, Answer>>({})
   const [recentLog, setRecentLog] = useState<RecentItem[]>([])
   const [revealed, setRevealed] = useState<Set<number>>(new Set())
+  const [genInput, setGenInput] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [genResult, setGenResult] = useState('')
+
+  const generateExercises = async () => {
+    if (!genInput.trim() || generating) return
+    setGenerating(true)
+    setGenResult('正在生成...')
+    try {
+      const r = await exerciseApi.generate(getStudentId(), genInput.trim(), 5)
+      setGenResult(`✅ 已生成 ${r.count} 道「${r.knowledge_point}」题目\nID: ${r.exercises.map(e => e.exercise_id.slice(0, 8)).join(', ')}\n刷新页面查看（开发中：暂未合并到题目列表）`)
+    } catch (e: any) {
+      setGenResult(`❌ 生成失败: ${e.message}`)
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   const filtered = tab === 'all' ? exercises : exercises.filter((e) => e.type === tab)
 
@@ -232,6 +251,27 @@ export default function TikuPage() {
 
   return (
     <>
+      {/* AI 生成面板 */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0', padding: 12, background: 'var(--brand-soft)', borderRadius: 8 }}>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>🤖 AI 出题：</span>
+        <input
+          value={genInput}
+          onChange={e => setGenInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && generateExercises()}
+          placeholder="输入知识点（如：反向传播、决策树）"
+          disabled={generating}
+          style={{ flex: 1, padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface)' }}
+        />
+        <button onClick={generateExercises} disabled={generating || !genInput.trim()} style={{ padding: '6px 16px', background: 'var(--brand)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          {generating ? '生成中...' : '出 5 题'}
+        </button>
+      </div>
+      {genResult && (
+        <div style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12, fontSize: 13, whiteSpace: 'pre-wrap' }}>
+          {genResult}
+        </div>
+      )}
+
       {/* Stats */}
       <div className="stats-strip">
         <div className="ss-item">

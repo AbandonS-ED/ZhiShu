@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { pathApi } from '@/lib/api'
+import { getStudentId } from '@/lib/student'
 
 // ═══ TYPES ═══
 interface Node {
@@ -115,6 +117,24 @@ function getStatusColor(status: string) {
 export default function PathPage() {
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
   const graphRef = useRef<HTMLDivElement>(null)
+  const [genInput, setGenInput] = useState('线性回归,逻辑回归,神经网络,决策树,CNN,RNN')
+  const [generating, setGenerating] = useState(false)
+  const [genResult, setGenResult] = useState('')
+
+  const generatePath = async () => {
+    if (!genInput.trim() || generating) return
+    setGenerating(true)
+    setGenResult('正在生成学习路径...')
+    try {
+      const topics = genInput.split(/[,，、\s]+/).filter(Boolean)
+      const r = await pathApi.generate(getStudentId(), topics, 14)
+      setGenResult(`✅ 已生成「${r.title}」\n共 ${r.total_days} 天，${r.nodes.length} 个知识点，${r.edges.length} 条依赖关系\nID: ${r.path_id.slice(0, 8)}...`)
+    } catch (e: any) {
+      setGenResult(`❌ 生成失败: ${e.message}`)
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   // Stats
   const done = nodes.filter((n) => n.status === 'done').length
@@ -140,6 +160,27 @@ export default function PathPage() {
 
   return (
     <>
+      {/* AI 生成面板 */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0', padding: 12, background: 'var(--brand-soft)', borderRadius: 8 }}>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>🤖 AI 生成路径：</span>
+        <input
+          value={genInput}
+          onChange={e => setGenInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && generatePath()}
+          placeholder="输入知识点（逗号分隔）"
+          disabled={generating}
+          style={{ flex: 1, padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface)' }}
+        />
+        <button onClick={generatePath} disabled={generating || !genInput.trim()} style={{ padding: '6px 16px', background: 'var(--brand)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          {generating ? '生成中...' : '生成 14 天路径'}
+        </button>
+      </div>
+      {genResult && (
+        <div style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12, fontSize: 13, whiteSpace: 'pre-wrap' }}>
+          {genResult}
+        </div>
+      )}
+
       {/* Overview strip */}
       <div className="overview-strip">
         <div className="ov-item">

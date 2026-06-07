@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { chatApi } from '@/lib/api'
+import { getStudentId } from '@/lib/student'
 
 const initialMessages = [
   {
@@ -124,6 +126,9 @@ const genResources = [
 export default function DuihuaPage() {
   const [messages, setMessages] = useState(initialMessages)
   const [input, setInput] = useState('')
+  const [streaming, setStreaming] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [status, setStatus] = useState('')
   const msgsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -133,9 +138,58 @@ export default function DuihuaPage() {
   }, [messages])
 
   const sendMessage = () => {
-    if (!input.trim()) return
-    setMessages((prev) => [...prev, { role: 'user', content: input }])
+    if (!input.trim() || streaming) return
+    const userMsg = input.trim()
+    setMessages((prev) => [...prev, { role: 'user', content: userMsg }, { role: 'assistant', content: '<i style="color:#999">思考中...</i>' }])
     setInput('')
+    setStreaming(true)
+    setStatus('正在分析请求...')
+
+    let resultData: any = null
+    chatApi.stream(
+      getStudentId(),
+      userMsg,
+      (e) => {
+        if (e.type === 'session') setSessionId(e.session_id || null)
+        if (e.type === 'progress' && e.message) setStatus(e.message)
+        if (e.type === 'result') resultData = e.data
+        if (e.type === 'done' || e.type === 'error') {
+          setStreaming(false)
+          setStatus('')
+          if (e.type === 'error') {
+            setMessages((prev) => {
+              const arr = [...prev]
+              arr[arr.length - 1] = { role: 'assistant', content: `<p style="color:red">❌ ${e.message || '调用失败'}</p>` }
+              return arr
+            })
+          } else if (resultData) {
+            // 把结果渲染成 HTML
+            const data = resultData.data || resultData
+            let html = ''
+            if (resultData.type === 'tutor' || data.answer) {
+              html = `<div><p>${data.answer || ''}</p>${data.suggestion ? `<div style="margin-top:8px;padding:8px;background:#f0f8e8;border-radius:6px;font-size:12px">💡 ${data.suggestion}</div>` : ''}</div>`
+            } else if (resultData.type === 'exercise' || data.exercises) {
+              const list = data.exercises || []
+              html = `<p>📝 为你生成了 <strong>${list.length}</strong> 道题：</p><ul>${list.map((e: any) => `<li>${e.question}</li>`).join('')}</ul>`
+            } else if (resultData.type === 'document' || data.knowledge) {
+              html = `<div>${data.knowledge || JSON.stringify(data)}</div>`
+            } else if (resultData.type === 'path') {
+              html = `<p>📚 路径: ${data.title || ''}</p><p>${data.description || ''}</p><p>共 ${data.nodes?.length || 0} 个知识点</p>`
+            } else if (resultData.type === 'chat' || data.answer) {
+              html = `<p>${data.answer || ''}</p>`
+            } else {
+              html = `<pre>${JSON.stringify(data, null, 2)}</pre>`
+            }
+            setMessages((prev) => {
+              const arr = [...prev]
+              arr[arr.length - 1] = { role: 'assistant', content: html }
+              return arr
+            })
+          }
+        }
+      },
+      { session_id: sessionId || undefined }
+    )
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

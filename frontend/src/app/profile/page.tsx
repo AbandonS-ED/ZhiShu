@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { profileApi, StudentProfile } from '@/lib/api'
+import { getStudentId } from '@/lib/student'
+import ChatModal from './ChatModal'
 
 // ═══ DATA ═══
 const knowledgeData = [
@@ -260,11 +263,22 @@ export default function ProfilePage() {
   const [sliderVal, setSliderVal] = useState(2.5)
   const [textInput, setTextInput] = useState('')
   const [animatedBars, setAnimatedBars] = useState(false)
+  const [showAiModal, setShowAiModal] = useState(false)
+  const [realProfile, setRealProfile] = useState<StudentProfile | null>(null)
+  const [profileLoading, setProfileLoading] = useState(false)
 
   // Animate knowledge bars on mount
   useEffect(() => {
     const timer = setTimeout(() => setAnimatedBars(true), 100)
     return () => clearTimeout(timer)
+  }, [])
+
+  // 加载真实画像（mount 时）
+  useEffect(() => {
+    const sid = getStudentId()
+    profileApi.get(sid)
+      .then((p) => setRealProfile(p))
+      .catch(() => {})
   }, [])
 
   const toggleDim = (i: number) => {
@@ -374,11 +388,11 @@ export default function ProfilePage() {
                   </svg>
                   问卷更新画像
                 </button>
-                <button className="btn" onClick={() => alert('跳转智能对话页，通过对话式交互更新画像')}>
+                <button className="btn" onClick={() => setShowAiModal(true)}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
-                  对话式完善
+                  🤖 AI 对话式画像
                 </button>
               </div>
             </div>
@@ -632,6 +646,17 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showAiModal && (
+        <ChatModal
+          onClose={() => setShowAiModal(false)}
+          onProfile={(p) => {
+            setRealProfile(p)
+            setShowAiModal(false)
+            alert(`✅ 画像已更新 v${p.version} (完整度 ${p.completeness_score.toFixed(0)}%)\n刷新页面查看最新数据`)
+          }}
+        />
       )}
     </>
   )

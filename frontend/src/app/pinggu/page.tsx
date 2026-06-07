@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { tutorApi } from '@/lib/api'
+import { getStudentId } from '@/lib/student'
 
 // ═══ DATA ═══
 const score = 78
@@ -164,6 +166,23 @@ export default function PingguPage() {
   const [recordPage, setRecordPage] = useState(1)
   const [animatedBars, setAnimatedBars] = useState(false)
   const recordsPerPage = 10
+  const [askInput, setAskInput] = useState('')
+  const [askLoading, setAskLoading] = useState(false)
+  const [askResult, setAskResult] = useState<{ question: string; answer: string; suggestion: string } | null>(null)
+
+  const askAi = async () => {
+    if (!askInput.trim() || askLoading) return
+    setAskLoading(true)
+    setAskResult(null)
+    try {
+      const r = await tutorApi.ask(getStudentId(), askInput.trim())
+      setAskResult({ question: r.question, answer: r.answer, suggestion: r.suggestion })
+    } catch (e: any) {
+      setAskResult({ question: askInput, answer: `❌ 调用失败: ${e.message}`, suggestion: '' })
+    } finally {
+      setAskLoading(false)
+    }
+  }
 
   // Animate score ring
   useEffect(() => {
@@ -211,6 +230,33 @@ export default function PingguPage() {
           导出报告
         </button>
       </div>
+
+      {/* AI 智能评估问答 */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0', padding: 12, background: 'var(--brand-soft)', borderRadius: 8 }}>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>🤖 AI 评估：</span>
+        <input
+          value={askInput}
+          onChange={e => setAskInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && askAi()}
+          placeholder="描述学习情况，AI 生成评估建议"
+          disabled={askLoading}
+          style={{ flex: 1, padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface)' }}
+        />
+        <button onClick={askAi} disabled={askLoading || !askInput.trim()} style={{ padding: '6px 16px', background: 'var(--brand)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          {askLoading ? '分析中...' : '提交'}
+        </button>
+      </div>
+      {askResult && (
+        <div style={{ padding: 16, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Q: {askResult.question}</div>
+          <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{askResult.answer}</div>
+          {askResult.suggestion && (
+            <div style={{ marginTop: 10, padding: 10, background: 'var(--success-soft)', borderRadius: 6, fontSize: 12 }}>
+              💡 <strong>建议：</strong>{askResult.suggestion}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Score Hero */}
       <div className="score-hero">

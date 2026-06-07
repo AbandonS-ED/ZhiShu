@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { resourceApi } from '@/lib/api'
+import { getStudentId } from '@/lib/student'
 
 // ═══ DATA ═══
 const resources: Resource[] = [
@@ -219,6 +221,25 @@ export default function ResourcesPage() {
   const [revealedAns, setRevealedAns] = useState<Set<string>>(new Set())
   const [audioBars] = useState(() => Array.from({ length: 24 }, () => Math.random() * 16 + 4))
   const [detailAudioBars] = useState(() => Array.from({ length: 40 }, () => Math.random() * 20 + 4))
+  const [generating, setGenerating] = useState(false)
+  const [genResult, setGenResult] = useState<string>('')
+  const [genInput, setGenInput] = useState('')
+
+  const generate = async () => {
+    if (!genInput.trim() || generating) return
+    setGenerating(true)
+    setGenResult('正在生成中...')
+    try {
+      const r = await resourceApi.generate(getStudentId(), genInput.trim())
+      const content = r.content
+      const knowledge = content.knowledge || ''
+      setGenResult(`✅ 已生成「${r.knowledge_point}」资源 (ID: ${r.resource_id.slice(0, 8)}...)\n\n${knowledge.slice(0, 500)}${knowledge.length > 500 ? '...' : ''}`)
+    } catch (e: any) {
+      setGenResult(`❌ 生成失败: ${e.message}`)
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   const toggleFav = useCallback((id: number) => {
     setFavorites((prev) => {
@@ -290,6 +311,27 @@ export default function ResourcesPage() {
           </button>
         </div>
       </div>
+
+      {/* AI 生成面板 */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0', padding: 12, background: 'var(--brand-soft)', borderRadius: 8 }}>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>🤖 AI 生成：</span>
+        <input
+          value={genInput}
+          onChange={e => setGenInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && generate()}
+          placeholder="输入知识点（如：线性回归、Transformer）"
+          disabled={generating}
+          style={{ flex: 1, padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface)' }}
+        />
+        <button onClick={generate} disabled={generating || !genInput.trim()} style={{ padding: '6px 16px', background: 'var(--brand)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          {generating ? '生成中...' : '生成'}
+        </button>
+      </div>
+      {genResult && (
+        <div style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12, fontSize: 13, whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>
+          {genResult}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="stats-bar">
