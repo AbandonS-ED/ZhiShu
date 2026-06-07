@@ -1,4 +1,4 @@
-from typing import Any, Iterator, Optional
+from typing import Any, AsyncIterator, Iterator, Optional
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
     AIMessage,
@@ -20,6 +20,22 @@ def _convert_message(msg: BaseMessage) -> MiniMaxMessage:
         return MiniMaxMessage(role="user", content=msg.content)
     else:
         return MiniMaxMessage(role="assistant", content=msg.content)
+
+
+def _prepare_messages(
+    messages: list[BaseMessage],
+) -> tuple[str, list[MiniMaxMessage]]:
+    """从 LangChain 消息列表提取 system prompt 和 minimax 消息"""
+    system = ""
+    minimax_msgs = []
+    for m in messages:
+        if isinstance(m, SystemMessage):
+            system = m.content
+        else:
+            minimax_msgs.append(_convert_message(m))
+    if not minimax_msgs:
+        minimax_msgs = [MiniMaxMessage(role="user", content="Hello")]
+    return system, minimax_msgs
 
 
 class MiniMaxChatModel(BaseChatModel):
@@ -52,44 +68,37 @@ class MiniMaxChatModel(BaseChatModel):
     ) -> ChatResult:
         import asyncio
 
-        client = self._get_client()
-        system = ""
-        minimax_msgs = []
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
 
-        for m in messages:
-            if isinstance(m, SystemMessage):
-                system = m.content
-            else:
-                minimax_msgs.append(_convert_message(m))
-
-        if not minimax_msgs:
-            minimax_msgs = [MiniMaxMessage(role="user", content="Hello")]
-
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
+        if loop and loop.is_running():
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(
-                    asyncio.run,
-                    client.chat(
-                        minimax_msgs,
-                        system=system,
-                        model=self.model_name,
-                        max_tokens=self.max_tokens,
-                        temperature=self.temperature,
-                    ),
-                )
-                response = future.result()
+                result = pool.submit(
+                    asyncio.run, self._agenerate(messages, stop, **kwargs)
+                ).result()
         else:
-            response = asyncio.run(
-                client.chat(
-                    minimax_msgs,
-                    system=system,
-                    model=self.model_name,
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature,
-                )
-            )
+            result = asyncio.run(self._agenerate(messages, stop, **kwargs))
+        return result
+
+    async def _agenerate(
+        self,
+        messages: list[BaseMessage],
+        stop: Optional[list[str]] = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        client = self._get_client()
+        system, minimax_msgs = _prepare_messages(messages)
+
+        response = await client.chat(
+            minimax_msgs,
+            system=system,
+            model=self.model_name,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+        )
 
         message = AIMessage(content=response.content)
         generation = ChatGeneration(message=message)
@@ -104,40 +113,44 @@ class MiniMaxChatModel(BaseChatModel):
     ) -> Iterator[AIMessageChunk]:
         import asyncio
 
-        client = self._get_client()
-        system = ""
-        minimax_msgs = []
-
-        for m in messages:
-            if isinstance(m, SystemMessage):
-                system = m.content
-            else:
-                minimax_msgs.append(_convert_message(m))
-
-        if not minimax_msgs:
-            minimax_msgs = [MiniMaxMessage(role="user", content="Hello")]
-
-        async def _stream_gen():
-            async for chunk in client.chat_stream(
-                minimax_msgs,
-                system=system,
-                model=self.model_name,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature,
-            ):
-                yield chunk
-
-        loop = asyncio.new_event_loop()
         try:
-            gen = _stream_gen()
-            while True:
-                try:
-                    chunk = loop.run_until_complete(gen.__anext__())
-                    yield AIMessageChunk(content=chunk)
-                except StopAsyncIteration:
-                    break
-        finally:
-            loop.close()
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            import concurrent.futures
+
+            async def _run():
+                chunks = []
+                async for chunk in self._astream(messages, stop, **kwargs):
+                    chunks.append(chunk)
+                return chunks
+
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                chunks = pool.submit(asyncio.run, _run()).result()
+            for chunk in chunks:
+                yield chunk
+        else:
+            yield from asyncio.run(self._astream(messages, stop, **kwargs))
+
+    async def _astream(
+        self,
+        messages: list[BaseMessage],
+        stop: Optional[list[str]] = None,
+        **kwargs: Any,
+    ) -> AsyncIterator[AIMessageChunk]:
+        client = self._get_client()
+        system, minimax_msgs = _prepare_messages(messages)
+
+        async for chunk in client.chat_stream(
+            minimax_msgs,
+            system=system,
+            model=self.model_name,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+        ):
+            yield AIMessageChunk(content=chunk)
 
     @property
     def _identifying_params(self) -> dict:

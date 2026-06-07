@@ -10,7 +10,7 @@ class DocumentChunk(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     course_id = Column(UUID(as_uuid=True), nullable=True)
     content = Column(Text, nullable=False)
-    embedding = Column(Vector(1536))
+    embedding = Column(Vector(1024))
     source_file = Column(String(500), nullable=True)
     page_number = Column(Integer, nullable=True)
     metadata_ = Column("metadata", JSONB, default={})
