@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
 // ═══ DATA ═══
-const resources = [
+const resources: Resource[] = [
   {
     id: 1, type: 'explanation', title: 'A* 搜索算法详解',
     kp: '搜索算法', desc: '从 Dijkstra 到 A* 的演进，启发函数的设计原则，可采纳性与一致性证明，附带完整 Python 实现与复杂度分析。',
@@ -229,9 +229,9 @@ export default function ResourcesPage() {
     })
   }, [])
 
-  const filtered = resources.filter((r) => {
+  const filtered: Resource[] = resources.filter((r) => {
     if (filter === 'favorites') return favorites.has(r.id)
-    if (filter !== 'all') return r.type === filter
+    if (filter !== 'all') return r.type === (filter as ResourceType)
     return true
   }).filter((r) => {
     if (!search) return true
@@ -310,7 +310,7 @@ export default function ResourcesPage() {
           </div>
         ) : (
           filtered.map((r, i) => {
-            const ti = typeIcons[r.type]
+            const ti = typeIcons[r.type as keyof typeof typeIcons]
             const isFav = favorites.has(r.id)
             const dc = getDiffClass(r.diff)
 
