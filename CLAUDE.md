@@ -96,7 +96,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 cd frontend
 npm install
 npx next dev          # http://localhost:3000
-npx next build        # ⚠ resources/page.tsx:313 TS 错误会失败
+npx next build        # ✅ 通过（7 路由：/ /duihua /path /pinggu /profile /resources /tiku）
 npx next lint         # ✅ 通过
 ```
 
@@ -104,7 +104,7 @@ npx next lint         # ✅ 通过
 
 ### P0 — 影响演示/安全的真实问题
 
-- **`duihua/page.tsx`** — 接入 SSE 后用 `dangerouslySetInnerHTML` 渲染 LLM 返回的 content，**XSS 漏洞**，需在 API 客户端层 escape HTML 或后端返回纯文本
+- **`duihua/page.tsx`** — 接入 SSE 后用 `dangerouslySetInnerHTML` 渲染 LLM 返回的 content，**XSS 漏洞**；此外 `setMessages` 把含 `<i>` 标签的"思考中…"提示和含 `<p style="color:red">` 的错误提示直接 push 到 state 再 innerHTML，**LLM 响应 + 错误信息都按 HTML 渲染**。需在 `lib/api.ts` 加 `escapeHtml()` 或后端返回纯文本
 - **`pinggu/page.tsx:169-180`** — `requestAnimationFrame` 递归链未 `cancelAnimationFrame` 清理，组件卸载后仍 setState，**内存泄漏 + 切页卡顿 3-5 秒**
 - **`resources/page.tsx:262`** — filter 数组缺 `'audio'`，**音频类型无法单独筛选**（数据里 id:5 type:audio 存在）
 - **`resources/page.tsx:234, 268, 313`** — 3 处多余 `as ResourceType` / `as keyof typeof` 断言，TS strict 已能自动收窄
