@@ -19,6 +19,8 @@ backend/*.egg
 backend/.env
 backend/.env.*
 !.env.example
+backend/server.log
+backend/server_err.log
 
 # ===== Node / Next.js / Frontend =====
 frontend/node_modules/

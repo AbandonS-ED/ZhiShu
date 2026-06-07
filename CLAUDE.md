@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **课程切入点**：人工智能导论
 - **主仓库**：<https://github.com/AbandonS-ED/ZhiShu>
 
-## 仓库现状（2026-06-07）
+## 仓库现状（2026-06-08）
 
 ```
 SmartHub/
@@ -26,29 +26,32 @@ SmartHub/
 │   │   ├── Sidebar.tsx              # 7 项菜单（仪表盘 + 智能对话 + 学习画像 + 资源 + 路径 + 题库 + 评估），可折叠
 │   │   └── Header.tsx               # 60px 玻璃拟态 + 动态页面标题
 │   ├── src/stores/appStore.ts       # Zustand store（暂未使用）
-│   ├── src/types/index.ts           # TS 类型契约
+│   ├── src/types/index.ts           # TS 类型契约（暂未使用）
 │   ├── src/lib/utils.ts             # cn() 工具
 │   ├── src/app/fonts/               # GeistVF.woff / GeistMonoVF.woff（本地字体）
 │   └── .npmrc                       # npmmirror 国内镜像
-├── backend/                         # FastAPI 骨架
-│   ├── app/main.py                  # 5 router 注册
-│   ├── app/api/                     # 5 router 全是占位
+├── backend/                         # FastAPI + 8 表 + 6 Agent + 16 API
+│   ├── app/main.py                  # 5 router 注册 + lifespan 初始化
+│   ├── app/api/                     # 5 router：profile / resource / path / tutor / chat
 │   ├── app/core/{config,database}.py
-│   ├── app/models/                  # Student / StudentProfile / DocumentChunk
-│   ├── app/services/                # ⚠️ minimax_client.py + minimax_langchain.py（错的 LLM）
+│   ├── app/models/                  # 8 个 Model（Student / Profile / DocumentChunk / Resource / LearningPath / Exercise / ChatSession / ChatMessage）
+│   ├── app/agents/                  # 6 个 Agent（Profile / Document / Exercise / Path / Tutor / Master）
+│   ├── app/services/                # minimax_client.py + minimax_langchain.py（OpenAI 兼容格式）
 │   └── tests/                       # __init__.py 空
 ├── docs/                            # 已分类：赛题需求 / 设计文档 / 开发流程 / 运维测试 / 交付物
-├── 开发进度.md                       # chl 维护的任务表
+├── 开发进度.md                       # 实时进度跟踪
 ├── AGENTS.md                        # 团队协作文档
 └── docker-compose.yml               # postgres+pgvector / redis / minio（不含 backend）
 ```
 
 **实际状态**：
 
-- ✅ 前端 7 页面 **1:1 复刻模板** + `npm run build` 通过
-- ⚠️ 后端是骨架——5 个 router 全是占位返回，3 张表，0 个 Agent
-- ⚠️ MiniMax LLM 客户端是错的，必须替换为讯飞星火
-- ⚠️ 5 个已知 bug（见下方"已知 bug"段）
+- ✅ 前端 7 页面 **1:1 复刻模板**（全部假数据，未联调）
+- ✅ 后端完整：8 表 + 6 Agent + 16 API 端点，全部测试通过
+- ✅ MiniMax-M3 LLM 端到端验证通过（Profile Agent 验证）
+- ⚠️ 缺 MindMap Agent（F2 评分项）
+- ⚠️ RAG / 防幻觉 / 流式输出 / F5 效果评估未实现
+- ⚠️ 前端 7 页全是假数据，0 个 fetch 调用
 
 ## 技术栈（已锁定，不要换）
 
@@ -56,10 +59,10 @@ SmartHub/
 |---|---|---|
 | 前端 | Next.js 14.2.5 (App Router) + Tailwind 3.4 + TypeScript | 无 shadcn/ui，纯自定义 CSS |
 | 后端 | FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg | Python 3.11 |
-| Agent | LangGraph + LangChain | 待搭建 |
-| LLM | 讯飞星火 V4 | **勿用 OpenAI/Claude/MiniMax** |
-| 向量库 | pgvector | **实际维度 1024** |
-| 数据库 | PostgreSQL 16 + Redis 7 + MinIO | MinIO 是 AGPL-3.0，需仓库带 LICENSE |
+| Agent | LangGraph + LangChain（已安装，未使用 StateGraph） | 直接调用 LLM |
+| LLM | MiniMax-M3（开发）→ 讯飞星火 V4（上线前切换） | OpenAI 兼容格式 |
+| 向量库 | pgvector（Python 包已装，PG 扩展未装） | embedding 用 JSONB 占位 |
+| 数据库 | PostgreSQL 18 + Redis（本地安装，无 Docker） | MinIO AGPL-3.0 需 LICENSE |
 
 ## 中国网络约束（必读）
 
@@ -67,16 +70,13 @@ SmartHub/
 
 - **字体**：用 `frontend/src/app/fonts/` 本地 woff + `next/font/local`（**勿用** `next/font/google`）
 - **npm registry**：`frontend/.npmrc` 已配 `registry.npmmirror.com`，全队自动生效
-- **PyPI**：`pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt`（注释已写在 requirements.txt 顶部）
+- **PyPI**：`pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt`
 - **讯飞鉴权**：HTTP 只做 `Authorization: Bearer {api_key}`，**不要拼 api_secret**
 - **`requirements.txt` 末尾的 `anthropic` 依赖已不用**，首次装包后删除
 
 ## 命令
 
 ```bash
-# 基础设施
-docker-compose up -d
-
 # 后端
 cd backend
 python -m venv venv; venv\Scripts\activate
@@ -84,69 +84,63 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 # Swagger: http://localhost:8000/docs
 
-# 前端（注意：用 npx next 而非 npm run dev，因为 next 可能不在 PATH）
+# 前端
 cd frontend
 npm install
 npx next dev          # http://localhost:3000
-npx next build        # ✅ 已验证通过
+npx next build        # ⚠ resources/page.tsx:313 TS 错误会失败
 npx next lint         # ✅ 通过
 ```
 
-⚠️ **`npx next dev`** 比 `npm run dev` 可靠——后者依赖 `node_modules/.bin` 必须在 PATH，前者在 npm 配置下会下载最新版本（可能导致版本不匹配）。
-
 ## 已知 bug（动手前必读）
 
-1. **`backend/app/core/database.py:13`** —— `await conn.execute("CREATE EXTENSION ...")` 缺 `text()` 包装。修：`from sqlalchemy import text; await conn.execute(text(...))`
-2. **`backend/app/models/document_chunk.py:13`** —— `Vector(1536)` 应改为 `Vector(1024)`（讯飞 Embedding 实际维度）
-3. **`backend/app/services/minimax_*.py`** —— 整个 MiniMax 客户端是错的 LLM。删除，替换为 `spark_client.py` + `spark_langchain.py`
-4. **`backend/app/core/config.py`** —— `MINIMAX_*` 配置应改为 `SPARK_*`（讯飞星火）
-5. **`backend/app/services/minimax_langchain.py:702-712`** —— `_stream`/`_generate` 中 `asyncio.run()` 在已有事件循环里死锁，须重写为 async-native 或 `asyncio.to_thread`
+1. **`resources/page.tsx:313`** — `r.type` 索引 TS 错误，`npm run build` 失败但 `npm run dev` 不影响
+2. **pgvector 未安装** — Python 包已装，PostgreSQL 扩展未装，embedding 暂用 JSONB
+3. **`echo=True`** — database.py SQL 日志输出，生产需关闭
+4. **`tutor.py /generate` 与 `resource.py /generate` 重复** — 待清理
 
 ## 架构与功能要点
 
 ### 多智能体协同（Master-Worker）
 
-`Master Agent` 接收请求 → 拆任务 → 派给 6 个子 Agent（并行）→ 汇总 → 流式返回。
+`Master Agent` 接收请求 → LLM 路由判断意图 → 派给对应子 Agent → 汇总 → SSE 流式返回。
 
 6 个子 Agent：
-- **Profile Agent** — 对话式画像提取，输出 6 维结构化 JSON（35% 分值核心）
-- **Document Agent** — 知识讲解 + 代码示例 + 音频脚本生成（3 种输出格式）
-- **MindMap Agent** — 思维导图生成，输出 Mermaid 代码
-- **Exercise Agent** — 练习题生成（选择/判断/简答/编程），输出 JSON 题目列表
-- **Path Agent** — 学习路径规划，输出知识图谱节点 + 边 + 每日计划
-- **Tutor Agent** — RAG 问答 + 评估报告生成
-
-LangGraph `StateGraph` 编排，State 字段：`UserRequest / Profile / TaskPlan / ResourceGeneration / PathPlanning / Response`。
+- **Profile Agent** — 对话式画像提取，输出 6 维结构化 JSON（✅ 已实现）
+- **Document Agent** — 知识讲解 + 代码示例 + 音频脚本生成（✅ 已实现）
+- **MindMap Agent** — 思维导图生成，输出 Mermaid 代码（❌ 未实现）
+- **Exercise Agent** — 练习题生成（选择/判断/简答/编程）（✅ 已实现）
+- **Path Agent** — 学习路径规划，输出知识图谱节点 + 边 + 每日计划（✅ 已实现）
+- **Tutor Agent** — RAG 问答 + 评估报告生成（✅ 已实现，RAG 检索 TODO）
 
 ### 6 维学生画像（F1）
 
 `student_profiles.dimensions` 用 JSONB 存：`knowledge_mastery / learning_style / cognitive_level / interests / weak_topics / learning_pace`。
 
-### RAG + 防幻觉（N3 评分项）
+### RAG + 防幻觉（N3 评分项）— 未实现
 
 文档解析 → 语义切片（800字/100重叠）→ Embedding → pgvector HNSW 检索 → LLM 重排 → **来源引用标注** → SourceValidator 验证（抓"年份+期刊+百分比"类捏造）→ 失败重生成。**这是答辩技术亮点，不可省。**
 
-### 流式输出（N1/N4）
+### 流式输出（N1/N4）— 仅 chat/stream 实现
 
-`/api/v1/chat/stream` SSE 骨架已在 [backend/app/api/chat.py](backend/app/api/chat.py)。所有生成场景必须接 `StreamingResponse`。长任务用 Celery + Redis Pub/Sub 推 WebSocket 进度。
+`/api/v1/chat/stream` SSE 已实现。资源/练习/路径生成接口暂未接 SSE。所有生成场景必须接 `StreamingResponse`。
 
 ## 前端约定
 
 - **页面（除 `/`）必须加 `'use client'`**——模板 HTML 含 onClick / useState 等运行时逻辑
 - **CSS 集中在 `globals.css`**——不动 `tailwind.config.js`（用模板 CSS 变量比 Tailwind 更准）
-- **静态数据写在 page.tsx 内**——不拆分 data 文件
+- **静态数据写在 page.tsx 内**——不拆分 data 文件（联调后改为 API 调用）
 - **Sidebar.tsx** 有折叠功能（`useState` + `.collapsed` class），CSS 里有 `.sidebar.collapsed` 样式定义
-- **页面带动态内容（Python 代码块、JSON 模板字符串）**用 `dangerouslySetInnerHTML` 包裹，否则 JSX 解析 `{...}` 会失败——见 [duihua/page.tsx](frontend/src/app/duihua/page.tsx) 例子
 - **`.next` 缓存损坏**：每次 `npm run build` 后切回 `npm run dev` 常报 `Cannot find module './<id>.js'`。解法：杀掉 node 进程 → `Remove-Item frontend/.next -Recurse` → 重启 dev server。**不是代码 bug**。
 
 ## 评分优先级
 
-| 优先级 | 模块 | 占比 |
-|--------|------|------|
-| P0 | F1 对话式画像 | 35% |
-| P0 | F2 多智能体资源生成 | 45% |
-| P1 | F3 学习路径 / N3 防幻觉+流式 | 必做 |
-| P2 | F4 智能辅导 / F5 效果评估 | 加分 |
+| 优先级 | 模块 | 占比 | 当前状态 |
+|--------|------|------|----------|
+| P0 | F1 对话式画像 | 35% | ✅ 后端完成 |
+| P0 | F2 多智能体资源生成 | 45% | ⚠️ 缺 MindMap Agent |
+| P1 | F3 学习路径 / N3 防幻觉+流式 | 必做 | ✅ 路径完成，❌ 防幻觉+流式 |
+| P2 | F4 智能辅导 / F5 效果评估 | 加分 | ⚠️ Agent 有 RAG 空 |
 
 ## 写新功能前先看
 

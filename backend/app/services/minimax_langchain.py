@@ -1,3 +1,9 @@
+"""LangChain 兼容的 MiniMax-M3 Chat Model
+
+使用 httpx 调用 MiniMax-M3 (OpenAI 兼容格式)，输出 LangChain 兼容格式。
+开发阶段临时使用，上线前替换为讯飞星火 V4。
+"""
+
 from typing import Any, AsyncIterator, Iterator, Optional
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
@@ -9,37 +15,31 @@ from langchain_core.messages import (
 )
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from app.services.minimax_client import MiniMaxClient, MiniMaxMessage
-
-
-def _convert_message(msg: BaseMessage) -> MiniMaxMessage:
-    """LangChain Message -> MiniMaxMessage"""
-    if isinstance(msg, SystemMessage):
-        return MiniMaxMessage(role="user", content=f"[System] {msg.content}")
-    elif isinstance(msg, HumanMessage):
-        return MiniMaxMessage(role="user", content=msg.content)
-    else:
-        return MiniMaxMessage(role="assistant", content=msg.content)
+from app.services.minimax_client import MiniMaxClient
 
 
 def _prepare_messages(
     messages: list[BaseMessage],
-) -> tuple[str, list[MiniMaxMessage]]:
-    """从 LangChain 消息列表提取 system prompt 和 minimax 消息"""
+) -> tuple[str, list[dict]]:
+    """从 LangChain 消息列表提取 system prompt 和 OpenAI 格式消息"""
     system = ""
-    minimax_msgs = []
+    openai_msgs: list[dict] = []
     for m in messages:
         if isinstance(m, SystemMessage):
             system = m.content
+        elif isinstance(m, HumanMessage):
+            openai_msgs.append({"role": "user", "content": m.content})
+        elif isinstance(m, AIMessage):
+            openai_msgs.append({"role": "assistant", "content": m.content})
         else:
-            minimax_msgs.append(_convert_message(m))
-    if not minimax_msgs:
-        minimax_msgs = [MiniMaxMessage(role="user", content="Hello")]
-    return system, minimax_msgs
+            openai_msgs.append({"role": "user", "content": m.content})
+    if not openai_msgs:
+        openai_msgs = [{"role": "user", "content": "Hello"}]
+    return system, openai_msgs
 
 
 class MiniMaxChatModel(BaseChatModel):
-    """LangChain 兼容的 MiniMax Chat Model"""
+    """LangChain 兼容的 MiniMax-M3 Chat Model (OpenAI 格式)"""
 
     client: Optional[MiniMaxClient] = None
     model_name: str = "MiniMax-M3"
@@ -66,8 +66,8 @@ class MiniMaxChatModel(BaseChatModel):
         run_manager: Optional[Any] = None,
         **kwargs: Any,
     ) -> ChatResult:
+        """同步生成"""
         import asyncio
-
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -75,10 +75,12 @@ class MiniMaxChatModel(BaseChatModel):
 
         if loop and loop.is_running():
             import concurrent.futures
+
+            async def _run():
+                return await self._agenerate(messages, stop, **kwargs)
+
             with concurrent.futures.ThreadPoolExecutor() as pool:
-                result = pool.submit(
-                    asyncio.run, self._agenerate(messages, stop, **kwargs)
-                ).result()
+                result = pool.submit(asyncio.run, _run()).result()
         else:
             result = asyncio.run(self._agenerate(messages, stop, **kwargs))
         return result
@@ -90,17 +92,17 @@ class MiniMaxChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         client = self._get_client()
-        system, minimax_msgs = _prepare_messages(messages)
+        system, openai_msgs = _prepare_messages(messages)
 
         response = await client.chat(
-            minimax_msgs,
+            openai_msgs,
             system=system,
             model=self.model_name,
             max_tokens=self.max_tokens,
             temperature=self.temperature,
         )
 
-        message = AIMessage(content=response.content)
+        message = AIMessage(content=response["content"])
         generation = ChatGeneration(message=message)
         return ChatResult(generations=[generation])
 
@@ -111,8 +113,8 @@ class MiniMaxChatModel(BaseChatModel):
         run_manager: Optional[Any] = None,
         **kwargs: Any,
     ) -> Iterator[AIMessageChunk]:
+        """同步流式"""
         import asyncio
-
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -121,14 +123,14 @@ class MiniMaxChatModel(BaseChatModel):
         if loop and loop.is_running():
             import concurrent.futures
 
-            async def _run():
+            async def _collect():
                 chunks = []
                 async for chunk in self._astream(messages, stop, **kwargs):
                     chunks.append(chunk)
                 return chunks
 
             with concurrent.futures.ThreadPoolExecutor() as pool:
-                chunks = pool.submit(asyncio.run, _run()).result()
+                chunks = pool.submit(asyncio.run, _collect()).result()
             for chunk in chunks:
                 yield chunk
         else:
@@ -141,10 +143,10 @@ class MiniMaxChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> AsyncIterator[AIMessageChunk]:
         client = self._get_client()
-        system, minimax_msgs = _prepare_messages(messages)
+        system, openai_msgs = _prepare_messages(messages)
 
         async for chunk in client.chat_stream(
-            minimax_msgs,
+            openai_msgs,
             system=system,
             model=self.model_name,
             max_tokens=self.max_tokens,

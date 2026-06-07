@@ -10,8 +10,15 @@ class Base(DeclarativeBase):
     pass
 
 async def init_db():
+    # 先尝试安装 pgvector 扩展（用独立事务，失败不影响后续）
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    except Exception:
+        print("WARNING: pgvector 扩展未安装，向量检索功能不可用")
+
+    # 建表
     async with engine.begin() as conn:
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
 
 async def get_db():

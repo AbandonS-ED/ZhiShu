@@ -4,9 +4,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import profile, resource, path, tutor, chat
 from app.core.config import settings
 from app.core.database import init_db
+from app.services.minimax_client import init_minimax_client
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 初始化 LLM 客户端
+    init_minimax_client(
+        api_key=settings.MINIMAX_API_KEY,
+        base_url=settings.MINIMAX_BASE_URL,
+    )
+    # 初始化数据库
     await init_db()
     yield
 
