@@ -27,7 +27,11 @@ SmartHub/
 │   │   └── Header.tsx               # 60px 玻璃拟态 + 动态页面标题
 │   ├── src/stores/appStore.ts       # Zustand store（暂未使用）
 │   ├── src/types/index.ts           # TS 类型契约（暂未使用）
-│   ├── src/lib/utils.ts             # cn() 工具
+│   ├── src/lib/
+│   │   ├── api.ts                   # API 客户端（6 模块：profile/chat/resource/exercise/path/tutor）
+│   │   ├── student.ts               # student_id 本地存储（localStorage）
+│   │   └── utils.ts                 # cn() 工具
+│   ├── src/app/profile/ChatModal.tsx  # 对话式画像提取弹窗
 │   ├── src/app/fonts/               # GeistVF.woff / GeistMonoVF.woff（本地字体）
 │   └── .npmrc                       # npmmirror 国内镜像
 ├── backend/                         # FastAPI + 8 表 + 6 Agent + 16 API
@@ -35,8 +39,9 @@ SmartHub/
 │   ├── app/api/                     # 5 router：profile / resource / path / tutor / chat
 │   ├── app/core/{config,database}.py
 │   ├── app/models/                  # 8 个 Model（Student / Profile / DocumentChunk / Resource / LearningPath / Exercise / ChatSession / ChatMessage）
-│   ├── app/agents/                  # 6 个 Agent（Profile / Document / Exercise / Path / Tutor / Master）
+│   ├── app/agents/                  # 6 个 Agent（Profile / Document / Exercise / Path / Tutor / Master，缺 MindMap）
 │   ├── app/services/                # minimax_client.py + minimax_langchain.py（OpenAI 兼容格式）
+│   ├── scripts/init_db.sql          # 手动建库 + 建表脚本
 │   └── tests/                       # __init__.py 空
 ├── docs/                            # 已分类：赛题需求 / 设计文档 / 开发流程 / 运维测试 / 交付物
 ├── 开发进度.md                       # 实时进度跟踪
@@ -44,14 +49,14 @@ SmartHub/
 └── docker-compose.yml               # postgres+pgvector / redis / minio（不含 backend）
 ```
 
-**实际状态**：
+**实际状态（2026-06-08）**：
 
-- ✅ 前端 7 页面 **1:1 复刻模板**（全部假数据，未联调）
+- ✅ 前端 7 页面 **1:1 复刻模板**
+- ✅ **前端联调**：6/7 页接入后端 API（`/duihua` SSE + `/profile` AI 弹窗 + `/resources` 实时生成 + `/path` 路径生成 + `/tiku` AI 出题 + `/pinggu` AI 评估）
 - ✅ 后端完整：8 表 + 6 Agent + 16 API 端点，全部测试通过
-- ✅ MiniMax-M3 LLM 端到端验证通过（Profile Agent 验证）
+- ✅ MiniMax-M3 LLM 端到端验证通过
 - ⚠️ 缺 MindMap Agent（F2 评分项）
-- ⚠️ RAG / 防幻觉 / 流式输出 / F5 效果评估未实现
-- ⚠️ 前端 7 页全是假数据，0 个 fetch 调用
+- ⚠️ RAG / 防幻觉未实现；流式仅 chat/stream 实现（其他生成接口为同步）
 
 ## 技术栈（已锁定，不要换）
 
@@ -77,6 +82,9 @@ SmartHub/
 ## 命令
 
 ```bash
+# 数据库初始化（只需一次）
+psql -U postgres -f backend/scripts/init_db.sql
+
 # 后端
 cd backend
 python -m venv venv; venv\Scripts\activate
@@ -88,7 +96,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 cd frontend
 npm install
 npx next dev          # http://localhost:3000
-npx next build        # ✅ 通过（7 路由：/ /duihua /path /pinggu /profile /resources /tiku）
+npx next build        # ⚠ resources/page.tsx:313 TS 错误会失败
 npx next lint         # ✅ 通过
 ```
 
@@ -96,7 +104,7 @@ npx next lint         # ✅ 通过
 
 ### P0 — 影响演示/安全的真实问题
 
-- **`duihua/page.tsx:187`** — `dangerouslySetInnerHTML={{ __html: msg.content }}`，**XSS 漏洞**，接通后端后用户输入 `<script>` 直接执行
+- **`duihua/page.tsx`** — 接入 SSE 后用 `dangerouslySetInnerHTML` 渲染 LLM 返回的 content，**XSS 漏洞**，需在 API 客户端层 escape HTML 或后端返回纯文本
 - **`pinggu/page.tsx:169-180`** — `requestAnimationFrame` 递归链未 `cancelAnimationFrame` 清理，组件卸载后仍 setState，**内存泄漏 + 切页卡顿 3-5 秒**
 - **`resources/page.tsx:262`** — filter 数组缺 `'audio'`，**音频类型无法单独筛选**（数据里 id:5 type:audio 存在）
 - **`resources/page.tsx:234, 268, 313`** — 3 处多余 `as ResourceType` / `as keyof typeof` 断言，TS strict 已能自动收窄
@@ -164,10 +172,10 @@ npx next lint         # ✅ 通过
 
 | 优先级 | 模块 | 占比 | 当前状态 |
 |--------|------|------|----------|
-| P0 | F1 对话式画像 | 35% | ✅ 后端完成 |
-| P0 | F2 多智能体资源生成 | 45% | ⚠️ 缺 MindMap Agent |
-| P1 | F3 学习路径 / N3 防幻觉+流式 | 必做 | ✅ 路径完成，❌ 防幻觉+流式 |
-| P2 | F4 智能辅导 / F5 效果评估 | 加分 | ⚠️ Agent 有 RAG 空 |
+| P0 | F1 对话式画像 | 35% | ✅ 后端+前端完成 |
+| P0 | F2 多智能体资源生成 | 45% | ⚠️ 缺 MindMap Agent，前端已联调 |
+| P1 | F3 路径 / N3 防幻觉+流式 | 必做 | ✅ 路径完成，❌ 防幻觉未做 |
+| P2 | F4 智能辅导 / F5 效果评估 | 加分 | ⚠️ Agent 有 RAG 空，前端已联调 |
 
 ## 写新功能前先看
 

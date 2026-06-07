@@ -12,7 +12,10 @@
 ## 快速开始
 
 ```bash
-# 本地开发
+# 1. 初始化数据库（只需一次）
+psql -U postgres -f backend/scripts/init_db.sql
+
+# 2. 本地开发
 cd backend
 python -m venv venv
 venv\Scripts\activate
@@ -52,6 +55,7 @@ backend/
 │   └── services/
 │       ├── minimax_client.py     # httpx OpenAI 兼容格式客户端
 │       └── minimax_langchain.py  # LangChain BaseChatModel 封装
+├── scripts/init_db.sql      # 手动建库 + 建表 SQL 脚本
 ├── tests/                   # 空
 ├── Dockerfile
 ├── requirements.txt
