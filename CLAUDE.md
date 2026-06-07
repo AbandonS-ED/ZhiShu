@@ -88,16 +88,43 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 cd frontend
 npm install
 npx next dev          # http://localhost:3000
-npx next build        # ⚠ resources/page.tsx:313 TS 错误会失败
+npx next build        # ✅ 通过（7 路由：/ /duihua /path /pinggu /profile /resources /tiku）
 npx next lint         # ✅ 通过
 ```
 
-## 已知 bug（动手前必读）
+## 已知 bug / 隐患（动手前必读）
 
-1. **`resources/page.tsx:313`** — `r.type` 索引 TS 错误，`npm run build` 失败但 `npm run dev` 不影响
-2. **pgvector 未安装** — Python 包已装，PostgreSQL 扩展未装，embedding 暂用 JSONB
-3. **`echo=True`** — database.py SQL 日志输出，生产需关闭
-4. **`tutor.py /generate` 与 `resource.py /generate` 重复** — 待清理
+### P0 — 影响演示/安全的真实问题
+
+- **`duihua/page.tsx:187`** — `dangerouslySetInnerHTML={{ __html: msg.content }}`，**XSS 漏洞**，接通后端后用户输入 `<script>` 直接执行
+- **`pinggu/page.tsx:169-180`** — `requestAnimationFrame` 递归链未 `cancelAnimationFrame` 清理，组件卸载后仍 setState，**内存泄漏 + 切页卡顿 3-5 秒**
+- **`resources/page.tsx:262`** — filter 数组缺 `'audio'`，**音频类型无法单独筛选**（数据里 id:5 type:audio 存在）
+- **`resources/page.tsx:234, 268, 313`** — 3 处多余 `as ResourceType` / `as keyof typeof` 断言，TS strict 已能自动收窄
+- **`globals.css:11-43`** — 11 个 CSS 变量偏离"米色/墨黑/琥珀"调色板，`--warm: #c47a3a`(琥珀) 被改成了 `#a09080`(米褐)，设计系统失效
+
+### P1 — 死代码 / 冗余
+
+- **`types/index.ts` + `stores/appStore.ts`** — 9 个 interface + Zustand store 0 引用，和 page 内 local interface 互相漂移，等接 API 时再启用或重写
+- **`lib/utils.ts`** — `cn()` 全工程 0 引用
+- **`package.json`** — 9 个重量级依赖未用（@radix-ui ×5、reactflow、mermaid、react-syntax-highlighter、recharts、swr）
+- **`profile/page.tsx:164-244`** — 雷达图用 `svg.innerHTML = html` 字符串拼接，应改为声明式 JSX
+- **`{duihua,resources,pinggu}/page.tsx`** 共 7 处 `key={i}` 配排序/前置插入的列表——会触发 React diff 动画重跑
+
+### P2 — 已知老问题
+
+- **pgvector 扩展未装** — Python 包已装，PostgreSQL 扩展未装，embedding 用 JSONB 占位
+- **`echo=True`** — database.py SQL 日志硬编码，生产需改为 `echo=settings.DEBUG`
+- **`tutor.py /generate` 与 `resource.py /generate` 重复** — 待清理
+- **router 入参未校验** — `{profile,path,resource,tutor}.py` 全用 query string 接收 `student_id: str`，没 UUID 校验，接库前必须改
+- **无 Docker 环境** — PostgreSQL/Redis 需本地安装（D:\2026test\）
+
+### 已修复（不必再查）
+
+- ✅ `database.py:16` 缺 `text()` → commit `c837fe3` 加了
+- ✅ `anthropic` 依赖 → 已删
+- ✅ `Vector(1536)` → 实际代码用 JSONB 占位（无需改）
+- ✅ `minimax_langchain.py` `asyncio.get_event_loop()` → `c837fe3` 改 `get_running_loop()`
+- ✅ `resources/page.tsx:313` TS 错误 → `4e4ef25` 已修
 
 ## 架构与功能要点
 
