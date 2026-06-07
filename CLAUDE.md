@@ -68,6 +68,8 @@ SmartHub/
 - **字体**：用 `frontend/src/app/fonts/` 本地 woff + `next/font/local`（**勿用** `next/font/google`）
 - **npm registry**：`frontend/.npmrc` 已配 `registry.npmmirror.com`，全队自动生效
 - **PyPI**：`pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt`（注释已写在 requirements.txt 顶部）
+- **讯飞鉴权**：HTTP 只做 `Authorization: Bearer {api_key}`，**不要拼 api_secret**
+- **`requirements.txt` 末尾的 `anthropic` 依赖已不用**，首次装包后删除
 
 ## 命令
 
@@ -127,6 +129,7 @@ npx next lint         # ✅ 通过
 - **静态数据写在 page.tsx 内**——不拆分 data 文件
 - **Sidebar.tsx** 有折叠功能（`useState` + `.collapsed` class），CSS 里有 `.sidebar.collapsed` 样式定义
 - **页面带动态内容（Python 代码块、JSON 模板字符串）**用 `dangerouslySetInnerHTML` 包裹，否则 JSX 解析 `{...}` 会失败——见 [duihua/page.tsx](frontend/src/app/duihua/page.tsx) 例子
+- **`.next` 缓存损坏**：每次 `npm run build` 后切回 `npm run dev` 常报 `Cannot find module './<id>.js'`。解法：杀掉 node 进程 → `Remove-Item frontend/.next -Recurse` → 重启 dev server。**不是代码 bug**。
 
 ## 评分优先级
 
