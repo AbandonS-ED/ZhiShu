@@ -5,7 +5,7 @@
 ## 技术栈
 
 - **框架**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg
-- **Agent**: 7 个子 Agent + Master Agent 编排器（直接调用 LLM）
+- **Agent**: 7 个子 Agent + Master Agent 编排器（直接调用 LLM，不走 LangGraph StateGraph）
 - **LLM**: MiniMax-M3（开发）→ 讯飞星火 V4（上线前切换）
 - **数据库**: PostgreSQL 18 + Redis
 
@@ -18,13 +18,15 @@ psql -U postgres -f backend/scripts/init_db.sql
 # 2. 本地开发
 cd backend
 python -m venv venv
-venv\Scripts\activate
+venv/Scripts/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 8001
 
 # API 文档
-# http://localhost:8000/docs
+# http://localhost:8001/docs
 ```
+
+> 端口说明：默认 8001。`frontend/src/lib/api.ts:5` 的 `BASE_URL` 已配置 `http://localhost:8001/api/v1`。`8000` 在 Windows 上有"僵尸 socket"问题（任务停了但端口还占着，`taskkill` / `Get-NetTCPConnection` 都看不到 PID），多数情况下需用 8001 绕开。
 
 ## 项目结构
 
@@ -68,8 +70,8 @@ backend/
 │       ├── text_chunker.py       # 语义切片器
 │       └── vector_store.py       # pgvector 检索 + JSONB 降级方案
 ├── scripts/init_db.sql      # 手动建库 + 建表 SQL 脚本
-├── tests/                   # 空
-├── Dockerfile
+├── tests/                   # smoke_test.py（端到端）+ debug_*.py（单接口调试）+ test_api.py（最小集成）
+├── Dockerfile               # ⚠️ 未实际使用，后端本地裸跑
 ├── requirements.txt
 └── .env                     # API Key（已 gitignore）
 ```
@@ -129,7 +131,7 @@ backend/
 |------|------|
 | `students` | 学生账户 |
 | `student_profiles` | 6 维 JSONB 画像 + 版本控制 |
-| `document_chunks` | RAG 文档分块 |
+| `document_chunks` | RAG 文档分块（embedding JSONB 占位） |
 | `resources` | 生成的学习资源 |
 | `learning_paths` | DAG 学习路径 |
 | `exercises` | 练习题 |
@@ -142,10 +144,26 @@ backend/
 - pgvector PostgreSQL 扩展未安装（Python 包已装），embedding 暂用 JSONB
 - `tutor.py /generate` 与 `resource.py /generate` 重复
 - `echo=True` 在 database.py，生产需关闭
+- 后端无 Dockerfile，docker-compose.yml 只配了 postgres/redis/minio，**实际后端本地裸跑**
+- Celery 异步任务未启用（开发进度写"已完成"是早期计划，实际 `app/core/celery_config.py` 已存在但未跑 worker）
 
 ## 测试
 
 ```bash
 cd backend
+
+# 端到端冒烟测试 (9 API 验证，2026-06-09 9/9 PASS)
+python -m tests.smoke_test
+
+# 单元 + 集成（待补全）
 pytest tests/ -v
+# 实际：1 个 test_api.py + 4 个 debug_*.py + 1 个 smoke_test.py，没有完整测试套件
 ```
+
+最新测试报告见 `../SMOKE_TEST_REPORT.md`。
+
+## 端口与前端联调
+
+- 后端默认 `8001`（匹配 `frontend/src/lib/api.ts:5` 的 `BASE_URL`）
+- 8000 在 Windows 上有"僵尸 socket"问题（任务停了但端口还占着）
+- 改了后端端口要**同步**改前端 `api.ts:5`
