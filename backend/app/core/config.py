@@ -16,12 +16,14 @@ class Settings(BaseSettings):
     # 讯飞星火 V4 (上线前切换)
     SPARK_API_KEY: str = ""
     SPARK_BASE_URL: str = "https://spark-api-open.xf-yun.com/v1"
-    SPARK_MODEL: str = "generalv3.5"
+    SPARK_MODEL: str = "Spark-V4"
     
     # LLM 选择: "minimax" 或 "spark"
     LLM_PROVIDER: str = "minimax"
     
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+    
+    DEBUG: bool = False
     
     class Config:
         env_file = ".env"
