@@ -121,40 +121,14 @@ class ProfileAgent:
 
     def _parse_profile(self, content: str) -> dict:
         """从 LLM 响应中解析 JSON 画像"""
-        # 尝试直接解析
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            pass
-
-        # 尝试从 markdown code block 中提取
-        if "```json" in content:
-            start = content.index("```json") + 7
-            end = content.index("```", start)
-            try:
-                return json.loads(content[start:end].strip())
-            except (json.JSONDecodeError, ValueError):
-                pass
-
-        if "```" in content:
-            start = content.index("```") + 3
-            end = content.index("```", start)
-            try:
-                return json.loads(content[start:end].strip())
-            except (json.JSONDecodeError, ValueError):
-                pass
-
-        # 尝试找到第一个 { 和最后一个 }
-        start = content.find("{")
-        end = content.rfind("}") + 1
-        if start != -1 and end > start:
-            try:
-                return json.loads(content[start:end])
-            except json.JSONDecodeError:
-                pass
-
-        # 全部失败，返回默认画像
-        return self._default_profile()
+        from app.services.json_parser import parse_json_response
+        result = parse_json_response(content, self._default_profile())
+        # 确保所有必需字段存在
+        default = self._default_profile()
+        for key in default:
+            if key not in result:
+                result[key] = default[key]
+        return result
 
     def _default_profile(self) -> dict:
         """返回默认的空画像"""

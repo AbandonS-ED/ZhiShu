@@ -32,6 +32,19 @@ class TutorAgent:
 
 只返回 JSON，不要其他文字。"""
 
+    STREAM_PROMPT = """你是一位耐心、专业的 AI 学习辅导老师。你的任务是回答学生的学习问题，并提供详细、准确的解答。
+
+## 回答原则
+1. 基于提供的参考资料回答问题
+2. 如果参考资料不足以回答，坦诚说明并给出建议
+3. 回答要循序渐进，符合学生的认知水平
+4. 适当举例子帮助理解
+5. 在回答末尾标注参考来源（如果有）
+
+## 回答格式
+请用 Markdown 格式回答，适当使用标题、表格、列表等格式使回答结构清晰。
+直接输出回答内容，不要使用 JSON 格式。"""
+
     async def answer(
         self,
         question: str,
@@ -59,28 +72,12 @@ class TutorAgent:
 
         return self._parse_response(response["content"])
 
-    async def answer_stream(
-        self,
-        question: str,
-        context_chunks: list[dict] | None = None,
-        student_profile: dict | None = None,
-    ):
-        """流式回答学生问题"""
-        user_prompt = self._build_prompt(question, context_chunks, student_profile)
-
-        async for token in mc_module.minimax_client.chat_stream(
-            messages=[{"role": "user", "content": user_prompt}],
-            system=self.SYSTEM_PROMPT,
-            max_tokens=4096,
-            temperature=0.5,
-        ):
-            yield token
-
     def _build_prompt(
         self,
         question: str,
         context_chunks: list[dict] | None,
         student_profile: dict | None,
+        output_format: str = "json",
     ) -> str:
         parts = []
 
@@ -100,40 +97,22 @@ class TutorAgent:
             parts.append("")
 
         parts.append(f"## 学生提问\n{question}")
-        parts.append("\n请根据以上信息回答学生的问题。返回 JSON 格式。只返回 JSON。")
+        if output_format == "json":
+            parts.append("\n请根据以上信息回答学生的问题。返回 JSON 格式。只返回 JSON。")
+        else:
+            parts.append("\n请根据以上信息回答学生的问题。直接输出回答内容，不要使用 JSON 格式。")
 
         return "\n".join(parts)
 
     def _parse_response(self, content: str) -> dict:
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            pass
-
-        for marker in ["```json", "```"]:
-            if marker in content:
-                start = content.index(marker) + len(marker)
-                end = content.index("```", start)
-                try:
-                    return json.loads(content[start:end].strip())
-                except (json.JSONDecodeError, ValueError):
-                    continue
-
-        start = content.find("{")
-        end = content.rfind("}") + 1
-        if start != -1 and end > start:
-            try:
-                return json.loads(content[start:end])
-            except json.JSONDecodeError:
-                pass
-
-        return {
+        from app.services.json_parser import parse_json_response
+        return parse_json_response(content, {
             "answer": content,
             "confidence": 0.5,
             "sources": [],
             "related_topics": [],
             "suggestion": "",
-        }
+        })
 
 
 tutor_agent = TutorAgent()

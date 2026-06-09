@@ -4,14 +4,15 @@
 State 字段在节点间传递数据。
 """
 
-import json
-from typing import TypedDict, Annotated, Literal
+from typing import TypedDict
 from app.services import minimax_client as mc_module
+from app.services.json_parser import parse_json_response
 from app.agents.profile_agent import profile_agent
 from app.agents.document_agent import document_agent
 from app.agents.exercise_agent import exercise_agent
 from app.agents.path_agent import path_agent
 from app.agents.tutor_agent import tutor_agent
+from app.agents.mindmap_agent import mindmap_agent
 
 
 class MasterState(TypedDict):
@@ -38,6 +39,7 @@ class MasterAgent:
 - exercise: 生成练习题（关键词：练习、题目、测试、考核）
 - path: 规划学习路径（关键词：路径、规划、计划、学习安排）
 - tutor: 回答学习问题（关键词：为什么、怎么、是什么、解释、问题）
+- mindmap: 生成思维导图（关键词：思维导图、脑图、知识结构、导图、结构图）
 - chat: 普通对话
 
 返回 JSON: {"agent": "agent_name", "knowledge_point": "提取到的知识点或null"}
@@ -113,6 +115,14 @@ class MasterAgent:
                 )
                 state["result"] = {"type": "tutor", "data": result}
 
+            elif request_type == "mindmap":
+                kp = state.get("knowledge_point", "通用知识")
+                result = await mindmap_agent.generate(
+                    knowledge_point=kp,
+                    student_profile=state.get("student_profile"),
+                )
+                state["result"] = {"type": "mindmap", "data": result}
+
             else:
                 # 普通对话，直接回复
                 response = await mc_module.minimax_client.chat(
@@ -135,29 +145,7 @@ class MasterAgent:
         return state
 
     def _parse_route(self, content: str) -> dict:
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            pass
-
-        for marker in ["```json", "```"]:
-            if marker in content:
-                start = content.index(marker) + len(marker)
-                end = content.index("```", start)
-                try:
-                    return json.loads(content[start:end].strip())
-                except (json.JSONDecodeError, ValueError):
-                    continue
-
-        start = content.find("{")
-        end = content.rfind("}") + 1
-        if start != -1 and end > start:
-            try:
-                return json.loads(content[start:end])
-            except json.JSONDecodeError:
-                pass
-
-        return {"agent": "chat"}
+        return parse_json_response(content, {"agent": "chat"})
 
 
 master_agent = MasterAgent()

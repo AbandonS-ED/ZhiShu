@@ -104,29 +104,8 @@ class PathAgent:
         return "\n".join(parts)
 
     def _parse_response(self, content: str) -> dict:
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            pass
-
-        for marker in ["```json", "```"]:
-            if marker in content:
-                start = content.index(marker) + len(marker)
-                end = content.index("```", start)
-                try:
-                    return json.loads(content[start:end].strip())
-                except (json.JSONDecodeError, ValueError):
-                    continue
-
-        start = content.find("{")
-        end = content.rfind("}") + 1
-        if start != -1 and end > start:
-            try:
-                return json.loads(content[start:end])
-            except json.JSONDecodeError:
-                pass
-
-        return {"title": "", "nodes": [], "edges": [], "daily_plan": []}
+        from app.services.json_parser import parse_json_response
+        return parse_json_response(content, {"title": "", "nodes": [], "edges": [], "daily_plan": []})
 
 
 path_agent = PathAgent()

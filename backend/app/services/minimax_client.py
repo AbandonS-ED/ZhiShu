@@ -112,11 +112,15 @@ class MiniMaxClient:
                     break
                 try:
                     event = json.loads(data_str)
-                    delta = event.get("choices", [{}])[0].get("delta", {})
-                    token = delta.get("content", "")
+                    choice = event.get("choices", [{}])[0]
+                    delta = choice.get("delta", {})
+                    token = delta.get("content") or delta.get("reasoning_content") or ""
+                    if not token:
+                        print(f"[chat_stream] 空 token, delta keys={list(delta.keys())}")
                     if token:
                         yield token
-                except (json.JSONDecodeError, IndexError, KeyError):
+                except (json.JSONDecodeError, IndexError, KeyError) as e:
+                    print(f"[chat_stream] 解析跳过: {e}, raw={data_str[:200]}")
                     continue
 
 

@@ -1,0 +1,61 @@
+"""效果评估 API — F5"""
+
+import uuid
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.database import get_db
+from app.services.evaluation_service import evaluation_service
+
+router = APIRouter()
+
+
+class RecordActionRequest(BaseModel):
+    student_id: str
+    action: str  # view/complete/exercise/chat/generate
+    resource_type: str | None = None
+    resource_id: str | None = None
+    knowledge_point: str | None = None
+    score: float | None = None
+    duration_seconds: int | None = None
+    detail: dict | None = None
+    course_id: str | None = None
+
+
+@router.post("/record")
+async def record_action(req: RecordActionRequest, db: AsyncSession = Depends(get_db)):
+    """记录学习行为"""
+    record = await evaluation_service.record_action(
+        db=db,
+        student_id=req.student_id,
+        action=req.action,
+        resource_type=req.resource_type,
+        resource_id=req.resource_id,
+        knowledge_point=req.knowledge_point,
+        score=req.score,
+        duration_seconds=req.duration_seconds,
+        detail=req.detail,
+        course_id=req.course_id,
+    )
+    return {"record_id": str(record.id), "status": "recorded"}
+
+
+@router.get("/stats/{student_id}")
+async def get_statistics(
+    student_id: str,
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取学习统计"""
+    stats = await evaluation_service.get_statistics(db, student_id, days)
+    return stats
+
+
+@router.get("/report/{student_id}")
+async def get_evaluation_report(
+    student_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """生成学习评估报告"""
+    report = await evaluation_service.get_evaluation_report(db, student_id)
+    return report

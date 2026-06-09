@@ -5,10 +5,13 @@
 - judge: 判断题
 - short_answer: 简答题
 - coding: 编程题
+
+包含防幻觉验证（N3 评分项）。
 """
 
-import json
 from app.services import minimax_client as mc_module
+from app.services.anti_hallucination import anti_hallucination
+from app.services.json_parser import parse_json_response
 
 
 class ExerciseAgent:
@@ -55,7 +58,7 @@ class ExerciseAgent:
             count: 生成数量
 
         Returns:
-            {exercises: [...]}
+            {exercises: [...], validation: dict}
         """
         user_prompt = self._build_prompt(knowledge_point, student_profile, exercise_type, count)
 
@@ -66,7 +69,26 @@ class ExerciseAgent:
             temperature=0.7,
         )
 
-        return self._parse_response(response["content"])
+        result = self._parse_response(response["content"])
+
+        # 防幻觉验证（检查题目内容）
+        exercises_text = "\n".join(
+            ex.get("question", "") + "\n" + ex.get("explanation", "")
+            for ex in result.get("exercises", [])
+        )
+        if exercises_text:
+            validation = await anti_hallucination.validate(
+                content=exercises_text,
+                knowledge_point=knowledge_point,
+                skip_llm=True,  # 练习题跳过 LLM 校验
+            )
+            result["validation"] = {
+                "passed": validation.passed,
+                "issues": validation.issues,
+                "confidence": validation.confidence,
+            }
+
+        return result
 
     def _build_prompt(
         self,
@@ -107,29 +129,7 @@ class ExerciseAgent:
         return "\n".join(parts)
 
     def _parse_response(self, content: str) -> dict:
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            pass
-
-        for marker in ["```json", "```"]:
-            if marker in content:
-                start = content.index(marker) + len(marker)
-                end = content.index("```", start)
-                try:
-                    return json.loads(content[start:end].strip())
-                except (json.JSONDecodeError, ValueError):
-                    continue
-
-        start = content.find("{")
-        end = content.rfind("}") + 1
-        if start != -1 and end > start:
-            try:
-                return json.loads(content[start:end])
-            except json.JSONDecodeError:
-                pass
-
-        return {"exercises": []}
+        return parse_json_response(content, {"exercises": []})
 
 
 exercise_agent = ExerciseAgent()

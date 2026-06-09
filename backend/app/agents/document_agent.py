@@ -4,11 +4,14 @@
 1. knowledge: 结构化知识讲解 (Markdown)
 2. code: 代码示例 + 逐行注释
 3. audio_script: 口语化音频脚本
+
+包含防幻觉验证（N3 评分项）。
 """
 
 import json
 from app.services import minimax_client as mc_module
-from app.agents.profile_agent import profile_agent
+from app.services.anti_hallucination import anti_hallucination
+from app.services.json_parser import parse_json_response
 
 
 class DocumentAgent:
@@ -44,7 +47,7 @@ class DocumentAgent:
             resource_type: all/knowledge/code/audio
 
         Returns:
-            {knowledge: str, code: str, audio_script: str}
+            {knowledge: str, code: str, audio_script: str, validation: dict}
         """
         user_prompt = self._build_prompt(knowledge_point, student_profile, resource_type)
 
@@ -55,7 +58,20 @@ class DocumentAgent:
             temperature=0.7,
         )
 
-        return self._parse_response(response["content"])
+        result = self._parse_response(response["content"])
+
+        # 防幻觉验证
+        validation = await anti_hallucination.validate(
+            content=result.get("knowledge", ""),
+            knowledge_point=knowledge_point,
+        )
+        result["validation"] = {
+            "passed": validation.passed,
+            "issues": validation.issues,
+            "confidence": validation.confidence,
+        }
+
+        return result
 
     def _build_prompt(
         self,
@@ -93,32 +109,7 @@ class DocumentAgent:
         return "\n".join(parts)
 
     def _parse_response(self, content: str) -> dict:
-        # 尝试直接解析
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            pass
-
-        # 从 markdown code block 提取
-        for marker in ["```json", "```"]:
-            if marker in content:
-                start = content.index(marker) + len(marker)
-                end = content.index("```", start)
-                try:
-                    return json.loads(content[start:end].strip())
-                except (json.JSONDecodeError, ValueError):
-                    continue
-
-        # 找 JSON 对象
-        start = content.find("{")
-        end = content.rfind("}") + 1
-        if start != -1 and end > start:
-            try:
-                return json.loads(content[start:end])
-            except json.JSONDecodeError:
-                pass
-
-        return {"knowledge": content, "code": "", "audio_script": ""}
+        return parse_json_response(content, {"knowledge": content, "code": "", "audio_script": ""})
 
 
 document_agent = DocumentAgent()

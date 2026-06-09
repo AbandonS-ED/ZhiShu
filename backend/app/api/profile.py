@@ -85,15 +85,27 @@ async def build_profile(req: BuildProfileRequest, db: AsyncSession = Depends(get
     }
 
 
+_EMPTY_DIMENSIONS = {
+    "knowledge_mastery": {},
+    "learning_style": {"visual": 50, "textual": 50, "auditory": 50, "kinesthetic": 50},
+    "cognitive_level": {"memory": 50, "understand": 50, "apply": 50, "analyze": 50},
+    "interest": {},
+    "weak_topics": [],
+    "learning_pace": {"daily_hours": 0, "preferred_time": "", "focus_duration": 0},
+}
+
+
 @router.get("/{student_id}")
 async def get_profile(student_id: str, db: AsyncSession = Depends(get_db)):
-    """获取学生当前画像"""
+    """获取学生当前画像，不存在时返回空画像"""
     result = await db.execute(
         select(Student).where(Student.id == uuid.UUID(student_id))
     )
     student = result.scalar_one_or_none()
     if not student:
-        raise HTTPException(status_code=404, detail="学生不存在")
+        student = Student(id=uuid.UUID(student_id), name="未命名")
+        db.add(student)
+        await db.commit()
 
     result = await db.execute(
         select(StudentProfile)
@@ -101,14 +113,20 @@ async def get_profile(student_id: str, db: AsyncSession = Depends(get_db)):
         .where(StudentProfile.is_current == True)
     )
     profile = result.scalar_one_or_none()
-    if not profile:
-        raise HTTPException(status_code=404, detail="画像不存在")
+
+    if profile:
+        return {
+            "student_id": str(student.id),
+            "dimensions": profile.dimensions,
+            "version": profile.version,
+            "completeness_score": profile.completeness_score,
+        }
 
     return {
         "student_id": str(student.id),
-        "dimensions": profile.dimensions,
-        "version": profile.version,
-        "completeness_score": profile.completeness_score,
+        "dimensions": _EMPTY_DIMENSIONS,
+        "version": 0,
+        "completeness_score": 0.0,
     }
 
 

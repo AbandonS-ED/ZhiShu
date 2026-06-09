@@ -13,11 +13,13 @@ class Settings(BaseSettings):
     MINIMAX_BASE_URL: str = "https://api.minimax.chat/v1"
     MINIMAX_MODEL: str = "MiniMax-M3"
 
-    # 讯飞星火 V4 (预留，待获取 API Key 后切换)
-    # SPARK_API_KEY: str = ""
-    # SPARK_BASE_URL: str = "https://spark-api-open.xf-yun.com/v1"
-    # SPARK_CHAT_MODEL: str = "generalv3.5"
-    # SPARK_EMBEDDING_MODEL: str = "text"
+    # 讯飞星火 V4 (上线前切换)
+    SPARK_API_KEY: str = ""
+    SPARK_BASE_URL: str = "https://spark-api-open.xf-yun.com/v1"
+    SPARK_MODEL: str = "generalv3.5"
+    
+    # LLM 选择: "minimax" 或 "spark"
+    LLM_PROVIDER: str = "minimax"
     
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     

@@ -1,14 +1,17 @@
-"""学习路径 API"""
+"""学习路径 API — 含 SSE 流式"""
 
+import json
 import uuid
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.core.database import get_db
+from app.core.database import get_db, async_session
 from app.models.student_profile import StudentProfile
 from app.models.learning_path import LearningPath
 from app.agents.path_agent import path_agent
+from app.services import minimax_client as mc_module
 
 router = APIRouter()
 
@@ -68,6 +71,82 @@ async def generate_path(req: PathGenerateRequest, db: AsyncSession = Depends(get
         "edges": path_data.get("edges", []),
         "daily_plan": learning_path.daily_plan,
     }
+
+
+@router.post("/generate/stream")
+async def generate_path_stream(req: PathGenerateRequest, db: AsyncSession = Depends(get_db)):
+    """SSE 流式生成学习路径"""
+
+    # 获取学生画像（在主 session 中完成）
+    profile_result = await db.execute(
+        select(StudentProfile)
+        .where(StudentProfile.student_id == uuid.UUID(req.student_id))
+        .where(StudentProfile.is_current == True)
+        .order_by(StudentProfile.version.desc())
+        .limit(1)
+    )
+    profile = profile_result.scalar_one_or_none()
+    student_profile = profile.dimensions if profile else None
+
+    async def event_generator():
+        async with async_session() as session:
+            try:
+                yield f"data: {json.dumps({'type': 'progress', 'progress': 0.1, 'message': '正在分析课程内容...'}, ensure_ascii=False)}\n\n"
+
+                prompt = path_agent._build_prompt(
+                    req.course_topics, student_profile, req.total_days
+                )
+
+                yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在生成学习路径...'}, ensure_ascii=False)}\n\n"
+
+                stream_text = ""
+                async for token in mc_module.minimax_client.chat_stream(
+                    messages=[{"role": "user", "content": prompt}],
+                    system=path_agent.SYSTEM_PROMPT,
+                    max_tokens=4096,
+                    temperature=0.7,
+                ):
+                    stream_text += token
+                    if token:
+                        yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+
+                path_data = path_agent._parse_response(stream_text)
+
+                yield f"data: {json.dumps({'type': 'progress', 'progress': 0.8, 'message': '正在保存路径...'}, ensure_ascii=False)}\n\n"
+
+                learning_path = LearningPath(
+                    id=uuid.uuid4(),
+                    student_id=uuid.UUID(req.student_id),
+                    course_id=uuid.UUID(req.course_id) if req.course_id else None,
+                    title=path_data.get("title", f"{req.total_days}天学习路径"),
+                    description=path_data.get("description", ""),
+                    total_days=req.total_days,
+                    daily_plan=path_data.get("daily_plan", []),
+                    metadata_={
+                        "nodes": path_data.get("nodes", []),
+                        "edges": path_data.get("edges", []),
+                    },
+                )
+                session.add(learning_path)
+                await session.commit()
+
+                yield f"data: {json.dumps({'type': 'result', 'data': {'path_id': str(learning_path.id), 'title': learning_path.title, 'description': learning_path.description, 'total_days': learning_path.total_days, 'nodes': path_data.get('nodes', []), 'edges': path_data.get('edges', []), 'daily_plan': learning_path.daily_plan}}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+
+            except Exception as e:
+                import traceback
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+                print(f"[path/stream] 异常: {traceback.format_exc()}")
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/{student_id}")
