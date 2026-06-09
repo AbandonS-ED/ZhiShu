@@ -6,7 +6,7 @@
 
 - **前端**: Next.js 14 + TailwindCSS + TypeScript
 - **后端**: FastAPI + SQLAlchemy + asyncpg
-- **Agent**: 6 个子 Agent + Master Agent 编排器（5 个已实现，缺 MindMap Agent）
+- **Agent**: 7 个子 Agent + Master Agent 编排器（全部实现）
 - **LLM**: MiniMax-M3（开发）→ 讯飞星火 V4（上线前切换）
 - **数据库**: PostgreSQL 18 + Redis
 
@@ -14,8 +14,8 @@
 
 ```
 SmartHub/
-├── frontend/          # 7 页面 Next.js 前端（6 页已联调后端）
-├── backend/           # FastAPI 完整后端（8 表 + 6 Agent + 16 API）
+├── frontend/          # 7 页面 Next.js 前端（全部已联调后端）
+├── backend/           # FastAPI 完整后端（9 表 + 7 Agent + 28 API + 11 Service）
 ├── docs/              # 赛题需求 / 设计文档 / 开发流程
 ├── 开发进度.md         # 实时进度跟踪
 ├── AGENTS.md          # 协作文档
@@ -46,13 +46,13 @@ npm run dev
 
 | 模块 | 状态 |
 |------|------|
-| 前端 7 页面 | ✅ 已完成（模板复刻 + 6 页已联调后端） |
-| 后端 8 表 + 6 Agent + 16 API | ✅ 已完成（全部测试通过） |
+| 前端 7 页面 | ✅ 已完成（模板复刻 + 7 页全部联调后端） |
+| 后端 9 表 + 7 Agent + 28 API + 11 Service | ✅ 已完成 |
 | F1 对话式画像 | ✅ 后端+前端完成 |
-| F2 多智能体资源生成 | ⚠️ 缺 MindMap Agent，前端已联调 |
+| **F2 多智能体资源生成** | **✅ MindMap Agent 已实现，前端已联调** |
 | F3 学习路径 | ✅ 后端+前端完成 |
-| N3 防幻觉 + 流式 | ❌ 未实现（仅 chat/stream 有 SSE） |
-| F4 智能辅导 | ⚠️ Agent 有，RAG 空，前端已联调 |
-| F5 效果评估 | ❌ 未实现 |
+| **N3 防幻觉 + 流式** | **✅ 防幻觉三层 + 所有生成接口 SSE 流式** |
+| F4 智能辅导 | ✅ Tutor Agent RAG 接入完成，前端已联调 |
+| F5 效果评估 | ✅ 后端+前端完成 |
 
 详情见 `开发进度.md` 和 `AGENTS.md`。
