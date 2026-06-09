@@ -164,16 +164,16 @@ function getScoreClass(s: number) {
 }
 
 // ═══ RADAR CHART COMPONENT ═══
-function RadarChart() {
+function RadarChart({ dims }: { dims: { name: string; score: number }[] }) {
   const svgRef = useRef<SVGSVGElement>(null)
 
   useEffect(() => {
     if (!svgRef.current) return
     const svg = svgRef.current
     const cx = 150, cy = 150, R = 120
-    const n = dimensions.length
-    const labels = dimensions.map((d) => d.name)
-    const values = dimensions.map((d) => d.score / 100)
+    const n = dims.length
+    const labels = dims.map((d) => d.name)
+    const values = dims.map((d) => d.score / 100)
     const angleStep = (Math.PI * 2) / n
     const startAngle = -Math.PI / 2
 
@@ -238,9 +238,9 @@ function RadarChart() {
       const sr = R + 42
       let sx = cx + sr * Math.cos(a)
       let sy = cy + sr * Math.sin(a)
-      const sc = getScoreClass(dimensions[i].score)
+      const sc = getScoreClass(dims[i].score)
       const color = sc === 'high' ? 'var(--success)' : sc === 'mid' ? 'var(--warm)' : 'var(--danger)'
-      html += `<text x="${sx}" y="${sy}" text-anchor="${anchor}" dy="${dy}" font-family="Newsreader,serif" font-size="12" fill="${color}" font-weight="600">${dimensions[i].score}</text>`
+      html += `<text x="${sx}" y="${sy}" text-anchor="${anchor}" dy="${dy}" font-family="Newsreader,serif" font-size="12" fill="${color}" font-weight="600">${dims[i].score}</text>`
     }
 
     svg.innerHTML = html
@@ -266,6 +266,7 @@ export default function ProfilePage() {
   const [showAiModal, setShowAiModal] = useState(false)
   const [realProfile, setRealProfile] = useState<StudentProfile | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
+  const [qAnswers, setQAnswers] = useState<(string | number)[]>([])
 
   // Animate knowledge bars on mount
   useEffect(() => {
@@ -296,17 +297,44 @@ export default function ProfilePage() {
     }
   }
 
-  const qNav = (dir: number) => {
+  const qNav = async (dir: number) => {
     if (dir > 0 && qStep === questions.length - 1) {
       setShowModal(false)
-      alert('画像问卷已提交！系统正在重新计算画像...')
+      setProfileLoading(true)
+      try {
+        const msg = qAnswers.filter(Boolean).map((a) => ({ role: 'user' as const, content: String(a) }))
+        const result = await profileApi.build(getStudentId(), msg)
+        setRealProfile(result)
+        alert('✅ 画像问卷已提交！')
+      } catch (e: any) {
+        alert('❌ 提交失败: ' + e.message)
+      } finally {
+        setProfileLoading(false)
+      }
       return
     }
     setQStep(Math.max(0, Math.min(questions.length - 1, qStep + dir)))
     setSelectedOpt(null)
   }
 
-  const sortedKnowledge = [...knowledgeData].sort((a, b) => a.score - b.score)
+  const recordAnswer = (val: string | number) => {
+    setQAnswers((prev) => { const n = [...prev]; n[qStep] = val; return n })
+  }
+
+  const displayKnowledge = realProfile?.dimensions?.knowledge_mastery
+    ? Object.entries(realProfile.dimensions.knowledge_mastery).map(([name, score]) => ({ name, score, topic: '—', sessions: 0 }))
+    : knowledgeData
+  const sortedKnowledge = [...displayKnowledge].sort((a, b) => a.score - b.score)
+
+  // 从真实画像计算雷达图维度
+  const radarDims = realProfile?.dimensions
+    ? [
+        { name: '知识基础', score: Math.round(Object.values(realProfile.dimensions.knowledge_mastery || {}).reduce((a, b) => a + b, 0) / Math.max(Object.keys(realProfile.dimensions.knowledge_mastery || {}).length, 1)) },
+        { name: '学习风格', score: Math.round(Object.values(realProfile.dimensions.learning_style || {}).reduce((a, b) => a + b, 0) / 4) },
+        { name: '认知水平', score: Math.round(Object.values(realProfile.dimensions.cognitive_level || {}).reduce((a, b) => a + b, 0) / 4) },
+        { name: '兴趣方向', score: Math.round(Object.values(realProfile.dimensions.interest || {}).reduce((a, b) => a + b, 0) / Math.max(Object.keys(realProfile.dimensions.interest || {}).length, 1)) },
+      ]
+    : dimensions.map((d) => ({ name: d.name, score: d.score }))
   const currentQ = questions[qStep]
 
   return (
@@ -318,10 +346,10 @@ export default function ProfilePage() {
           <div className="card radar-card">
             <div className="card-hd">
               <h3>画像雷达</h3>
-              <span className="tag tag-dark">v3.2</span>
+              <span className="tag tag-dark">{realProfile ? `v${realProfile.version}` : '--'}</span>
             </div>
             <div className="card-bd">
-              <RadarChart />
+              <RadarChart dims={radarDims} />
             </div>
           </div>
 
@@ -329,19 +357,19 @@ export default function ProfilePage() {
           <div className="radar-meta">
             <div className="rm-item">
               <div className="rm-label">置信度</div>
-              <div className="rm-val">0.87</div>
+              <div className="rm-val">{realProfile ? realProfile.completeness_score.toFixed(2) : '0.00'}</div>
             </div>
             <div className="rm-item">
               <div className="rm-label">版本</div>
-              <div className="rm-val">v3.2</div>
+              <div className="rm-val">{realProfile ? `v${realProfile.version}` : '--'}</div>
             </div>
             <div className="rm-item">
               <div className="rm-label">日均学习</div>
-              <div className="rm-val">2.4h</div>
+              <div className="rm-val">{realProfile?.dimensions?.learning_pace?.daily_hours || '--'}h</div>
             </div>
             <div className="rm-item">
               <div className="rm-label">专注时长</div>
-              <div className="rm-val">38min</div>
+              <div className="rm-val">{realProfile?.dimensions?.learning_pace?.focus_duration || '--'}min</div>
             </div>
           </div>
 
@@ -359,12 +387,12 @@ export default function ProfilePage() {
                     stroke="var(--warm)"
                     strokeWidth="5"
                     strokeDasharray="188.5"
-                    strokeDashoffset="47.1"
+                    strokeDashoffset={188.5 - (188.5 * (realProfile?.completeness_score ?? 75)) / 100}
                     strokeLinecap="round"
                   />
                 </svg>
                 <div className="comp-pct">
-                  75%
+                  {Math.round(realProfile?.completeness_score ?? 75)}%
                   <small>完整</small>
                 </div>
               </div>
@@ -581,7 +609,7 @@ export default function ProfilePage() {
                       <div
                         key={i}
                         className={`q-opt${selectedOpt === i ? ' selected' : ''}`}
-                        onClick={() => setSelectedOpt(i)}
+                        onClick={() => { setSelectedOpt(i); recordAnswer(o) }}
                       >
                         <div className="q-radio" />
                         <span>{o}</span>
@@ -601,7 +629,7 @@ export default function ProfilePage() {
                       max={currentQ.max}
                       step={currentQ.step}
                       value={sliderVal}
-                      onChange={(e) => setSliderVal(Number(e.target.value))}
+                      onChange={(e) => { const v = Number(e.target.value); setSliderVal(v); recordAnswer(v) }}
                     />
                     <div className="q-slider-labels">
                       <span>
@@ -619,7 +647,7 @@ export default function ProfilePage() {
                     className="q-input"
                     placeholder={currentQ.placeholder}
                     value={textInput}
-                    onChange={(e) => setTextInput(e.target.value)}
+                    onChange={(e) => { setTextInput(e.target.value); recordAnswer(e.target.value) }}
                   />
                 )}
               </div>
@@ -639,8 +667,8 @@ export default function ProfilePage() {
                     上一步
                   </button>
                 )}
-                <button className="btn btn-solid" onClick={() => qNav(1)}>
-                  {qStep === questions.length - 1 ? '提交' : '下一步'}
+                <button className="btn btn-solid" onClick={() => qNav(1)} disabled={profileLoading}>
+                  {profileLoading ? '提交中...' : qStep === questions.length - 1 ? '提交' : '下一步'}
                 </button>
               </div>
             </div>

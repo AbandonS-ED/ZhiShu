@@ -1,13 +1,14 @@
 // 智枢 API 客户端
-// 后端 baseURL: http://localhost:8000
+// 后端 baseURL: http://localhost:8001
+// (Windows 上 8000 有"僵尸 socket"问题，后端跑在 8001)
 
-const BASE_URL = 'http://localhost:8000/api/v1'
+const BASE_URL = 'http://localhost:8001/api/v1'
 
 // 通用 fetch 封装
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
+    headers: { 'Content-Type': 'application/json', ...options.headers },
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
@@ -44,10 +45,11 @@ export const profileApi = {
 
 // ===== Chat (SSE 流式) =====
 export interface ChatEvent {
-  type: 'session' | 'progress' | 'result' | 'done' | 'error'
+  type: 'session' | 'progress' | 'result' | 'done' | 'error' | 'token'
   session_id?: string
   progress?: number
   message?: string
+  content?: string
   data?: any
 }
 
@@ -120,6 +122,43 @@ export interface Resource {
 }
 
 export const resourceApi = {
+  // SSE 流式生成学习资源
+  generateStream(
+    student_id: string,
+    knowledge_point: string,
+    onEvent: (e: ChatEvent) => void,
+    resource_type = 'all'
+  ): () => void {
+    const controller = new AbortController()
+    fetch(`${BASE_URL}/resource/generate/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id, knowledge_point, resource_type }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`)
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try { onEvent(JSON.parse(line.slice(6))) } catch {}
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') onEvent({ type: 'error', message: err.message })
+      })
+    return () => controller.abort()
+  },
   generate: (student_id: string, knowledge_point: string, resource_type = 'all') =>
     request<Resource>('/resource/generate', {
       method: 'POST',
@@ -137,11 +176,51 @@ export interface Exercise {
   type: 'choice' | 'judge' | 'short_answer' | 'coding'
   question: string
   options?: string[]
+  answer?: string
+  explanation?: string
   difficulty: number
   knowledge_point?: string
 }
 
 export const exerciseApi = {
+  // SSE 流式生成练习题
+  generateStream(
+    student_id: string,
+    knowledge_point: string,
+    onEvent: (e: ChatEvent) => void,
+    count = 5,
+    exercise_type = 'all'
+  ): () => void {
+    const controller = new AbortController()
+    fetch(`${BASE_URL}/resource/exercises/generate/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id, knowledge_point, count, exercise_type }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`)
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try { onEvent(JSON.parse(line.slice(6))) } catch {}
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') onEvent({ type: 'error', message: err.message })
+      })
+    return () => controller.abort()
+  },
   generate: (
     student_id: string,
     knowledge_point: string,
@@ -187,6 +266,43 @@ export interface LearningPathData {
 }
 
 export const pathApi = {
+  // SSE 流式生成学习路径
+  generateStream(
+    student_id: string,
+    course_topics: string[],
+    onEvent: (e: ChatEvent) => void,
+    total_days = 30
+  ): () => void {
+    const controller = new AbortController()
+    fetch(`${BASE_URL}/path/generate/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ student_id, course_topics, total_days }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`)
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try { onEvent(JSON.parse(line.slice(6))) } catch {}
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') onEvent({ type: 'error', message: err.message })
+      })
+    return () => controller.abort()
+  },
   generate: (student_id: string, course_topics: string[], total_days = 30) =>
     request<LearningPathData>('/path/generate', {
       method: 'POST',
@@ -216,5 +332,90 @@ export const tutorApi = {
     request<TutorAnswer>('/tutor/ask', {
       method: 'POST',
       body: JSON.stringify({ student_id, question }),
+    }),
+}
+
+// ===== Dashboard =====
+export interface DashboardStats {
+  knowledge_points: number
+  knowledge_points_trend: string
+  learning_hours: string
+  learning_hours_trend: string
+  accuracy: string
+  accuracy_trend: string
+  path_progress: string
+  path_progress_trend: string
+  recent_activities: Array<{
+    type: string
+    title: string
+    time: string
+    color: string
+  }>
+  recent_chats: Array<{
+    type: string
+    content: string
+    time: string
+  }>
+}
+
+export interface CourseProgress {
+  name: string
+  progress: number
+  status: string
+}
+
+export const dashboardApi = {
+  getStats: (student_id: string = '00000000-0000-0000-0000-000000000001') =>
+    request<DashboardStats>(`/dashboard/stats?student_id=${student_id}`),
+  getCourses: (student_id: string = '00000000-0000-0000-0000-000000000001') =>
+    request<{ courses: CourseProgress[] }>(`/dashboard/courses?student_id=${student_id}`),
+}
+
+// ===== Evaluation =====
+export interface EvaluationStats {
+  total_actions: number
+  total_duration_minutes: number
+  action_breakdown: Record<string, number>
+  knowledge_mastery: Record<string, { avg_score: number; attempt_count: number }>
+  daily_activity: Array<{ date: string; count: number; duration_minutes: number }>
+  weak_areas: string[]
+}
+
+export interface EvaluationReport {
+  student_id: string
+  summary: {
+    total_resources: number
+    total_exercises: number
+    avg_score: number
+    total_actions: number
+    total_duration_minutes: number
+    path_progress: string
+  }
+  knowledge_mastery: Record<string, { avg_score: number; attempt_count: number }>
+  weak_areas: string[]
+  daily_activity: Array<{ date: string; count: number; duration_minutes: number }>
+  overall_score: number
+  recommendations: string[]
+}
+
+export const evaluationApi = {
+  getStats: (student_id: string) =>
+    request<EvaluationStats>(`/evaluation/stats/${student_id}`),
+  getReport: (student_id: string) =>
+    request<EvaluationReport>(`/evaluation/report/${student_id}`),
+  recordAction: (data: {
+    student_id: string
+    action: string
+    resource_type?: string
+    resource_id?: string
+    knowledge_point?: string
+    score?: number
+    duration_seconds?: number
+    detail?: Record<string, any>
+    course_id?: string
+  }) =>
+    request<{ record_id: string; status: string }>('/evaluation/record', {
+      method: 'POST',
+      body: JSON.stringify(data),
     }),
 }

@@ -121,19 +121,32 @@ export default function PathPage() {
   const [generating, setGenerating] = useState(false)
   const [genResult, setGenResult] = useState('')
 
-  const generatePath = async () => {
+  const generatePath = () => {
     if (!genInput.trim() || generating) return
     setGenerating(true)
     setGenResult('正在生成学习路径...')
-    try {
-      const topics = genInput.split(/[,，、\s]+/).filter(Boolean)
-      const r = await pathApi.generate(getStudentId(), topics, 14)
-      setGenResult(`✅ 已生成「${r.title}」\n共 ${r.total_days} 天，${r.nodes.length} 个知识点，${r.edges.length} 条依赖关系\nID: ${r.path_id.slice(0, 8)}...`)
-    } catch (e: any) {
-      setGenResult(`❌ 生成失败: ${e.message}`)
-    } finally {
-      setGenerating(false)
-    }
+
+    const topics = genInput.split(/[,，、\s]+/).filter(Boolean)
+    pathApi.generateStream(
+      getStudentId(),
+      topics,
+      (e) => {
+        if (e.type === 'progress' && e.message) {
+          setGenResult(e.message)
+        }
+        if (e.type === 'result' && e.data) {
+          const data = e.data
+          setGenResult(`✅ 已生成「${data.title || ''}」\n共 ${data.total_days || 0} 天，${data.nodes?.length || 0} 个知识点，${data.edges?.length || 0} 条依赖关系\nID: ${(data.path_id || '').slice(0, 8)}...`)
+        }
+        if (e.type === 'error') {
+          setGenResult(`❌ ${e.message || '调用失败'}`)
+        }
+        if (e.type === 'done' || e.type === 'error') {
+          setGenerating(false)
+        }
+      },
+      14
+    )
   }
 
   // Stats

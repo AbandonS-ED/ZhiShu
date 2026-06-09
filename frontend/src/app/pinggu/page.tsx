@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { tutorApi } from '@/lib/api'
+import { tutorApi, evaluationApi, type EvaluationReport } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 
 // ═══ DATA ═══
-const score = 78
 
 const dimensions = [
   { name: '知识基础', icon: '📚', bg: 'var(--info-soft)', color: 'var(--info)', score: 72, detail: '掌握搜索算法和 ML 基础，深度学习需加强' },
@@ -169,6 +168,15 @@ export default function PingguPage() {
   const [askInput, setAskInput] = useState('')
   const [askLoading, setAskLoading] = useState(false)
   const [askResult, setAskResult] = useState<{ question: string; answer: string; suggestion: string } | null>(null)
+  const [evalReport, setEvalReport] = useState<EvaluationReport | null>(null)
+  const [evalLoading, setEvalLoading] = useState(true)
+
+  useEffect(() => {
+    evaluationApi.getReport(getStudentId())
+      .then((r) => { setEvalReport(r); setCurrentScore(r.overall_score) })
+      .catch(() => {})
+      .finally(() => setEvalLoading(false))
+  }, [])
 
   const askAi = async () => {
     if (!askInput.trim() || askLoading) return
@@ -187,15 +195,21 @@ export default function PingguPage() {
   // Animate score ring
   useEffect(() => {
     let current = 0
-    const target = score
+    let animFrameId: number
+      const target = evalReport?.overall_score ?? 78
     const step = () => {
       current += 2
       if (current > target) current = target
       setCurrentScore(current)
-      if (current < target) requestAnimationFrame(step)
+      if (current < target) {
+        animFrameId = requestAnimationFrame(step)
+      }
     }
-    requestAnimationFrame(step)
+    animFrameId = requestAnimationFrame(step)
     setTimeout(() => setAnimatedBars(true), 300)
+    return () => {
+      cancelAnimationFrame(animFrameId)
+    }
   }, [])
 
   // Records pagination
@@ -203,7 +217,7 @@ export default function PingguPage() {
   const start = (recordPage - 1) * recordsPerPage
   const pageRecords = records.slice(start, start + recordsPerPage)
 
-  const level = score >= 85 ? '优秀' : score >= 70 ? '良好' : score >= 55 ? '中等' : '需加强'
+  const level = currentScore >= 85 ? '优秀' : currentScore >= 70 ? '良好' : currentScore >= 55 ? '中等' : '需加强'
   const circ = 414.7
 
   return (
@@ -273,7 +287,7 @@ export default function PingguPage() {
             </div>
           </div>
           <div className="sh-desc">
-            等级：<strong>{level}</strong><br />超越 <strong>{Math.round(score * 0.82)}%</strong> 的同课程学习者
+            等级：<strong>{level}</strong><br />超越 <strong>{Math.round(currentScore * 0.82)}%</strong> 的同课程学习者
           </div>
         </div>
         <div className="sh-dims">

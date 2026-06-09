@@ -219,26 +219,53 @@ export default function ResourcesPage() {
   const [favorites, setFavorites] = useState<Set<number>>(new Set(resources.filter((r) => r.fav).map((r) => r.id)))
   const [selectedRes, setSelectedRes] = useState<Resource | null>(null)
   const [revealedAns, setRevealedAns] = useState<Set<string>>(new Set())
-  const [audioBars] = useState(() => Array.from({ length: 24 }, () => Math.random() * 16 + 4))
-  const [detailAudioBars] = useState(() => Array.from({ length: 40 }, () => Math.random() * 20 + 4))
+  const [audioBars, setAudioBars] = useState<number[]>([])
+  const [detailAudioBars, setDetailAudioBars] = useState<number[]>([])
+  useEffect(() => {
+    setAudioBars(Array.from({ length: 24 }, () => Math.random() * 16 + 4))
+    setDetailAudioBars(Array.from({ length: 40 }, () => Math.random() * 20 + 4))
+  }, [])
   const [generating, setGenerating] = useState(false)
   const [genResult, setGenResult] = useState<string>('')
   const [genInput, setGenInput] = useState('')
+  const [apiResources, setApiResources] = useState<Array<{ resource_id: string; title: string; knowledge_point: string; created_at: string }>>([])
 
-  const generate = async () => {
+  useEffect(() => {
+    resourceApi.list(getStudentId()).then(setApiResources).catch(() => {})
+  }, [])
+
+  const generate = () => {
     if (!genInput.trim() || generating) return
     setGenerating(true)
     setGenResult('正在生成中...')
-    try {
-      const r = await resourceApi.generate(getStudentId(), genInput.trim())
-      const content = r.content
-      const knowledge = content.knowledge || ''
-      setGenResult(`✅ 已生成「${r.knowledge_point}」资源 (ID: ${r.resource_id.slice(0, 8)}...)\n\n${knowledge.slice(0, 500)}${knowledge.length > 500 ? '...' : ''}`)
-    } catch (e: any) {
-      setGenResult(`❌ 生成失败: ${e.message}`)
-    } finally {
-      setGenerating(false)
-    }
+
+    let streamContent = ''
+    resourceApi.generateStream(
+      getStudentId(),
+      genInput.trim(),
+      (e) => {
+        if (e.type === 'progress' && e.message) {
+          setGenResult(e.message)
+        }
+        if (e.type === 'token' && e.content) {
+          streamContent += e.content
+          setGenResult(streamContent.slice(0, 500) + (streamContent.length > 500 ? '...' : ''))
+        }
+        if (e.type === 'result' && e.data) {
+          const data = e.data
+          const content = data.content || {}
+          const knowledge = content.knowledge || ''
+          setGenResult(`✅ 已生成「${data.knowledge_point || genInput.trim()}」资源\n\n${knowledge.slice(0, 500)}${knowledge.length > 500 ? '...' : ''}`)
+          setApiResources((prev) => [{ resource_id: data.resource_id, title: data.knowledge_point || genInput.trim(), knowledge_point: data.knowledge_point || genInput.trim(), created_at: new Date().toISOString() }, ...prev])
+        }
+        if (e.type === 'error') {
+          setGenResult(`❌ ${e.message || '调用失败'}`)
+        }
+        if (e.type === 'done' || e.type === 'error') {
+          setGenerating(false)
+        }
+      }
+    )
   }
 
   const toggleFav = useCallback((id: number) => {
@@ -280,7 +307,7 @@ export default function ResourcesPage() {
           />
         </div>
         <div className="filter-group">
-          {(['all', 'explanation', 'mindmap', 'exercise', 'code', 'favorites'] as const).map((f) => (
+          {(['all', 'explanation', 'mindmap', 'exercise', 'code', 'audio', 'favorites'] as const).map((f) => (
             <button
               key={f}
               className={`filter-btn${filter === f ? ' active' : ''}`}
@@ -335,11 +362,11 @@ export default function ResourcesPage() {
 
       {/* Stats */}
       <div className="stats-bar">
-        共 <span className="sb-count">{filtered.length}</span> 项资源
+        共 <span className="sb-count">{filtered.length + apiResources.length}</span> 项资源
         <span className="sb-sep">·</span>
         已收藏 <span className="sb-count">{favorites.size}</span> 项
         <span className="sb-sep">·</span>
-        课程：人工智能导论
+        API <span className="sb-count">{apiResources.length}</span> 项来自服务器
       </div>
 
       {/* Grid */}

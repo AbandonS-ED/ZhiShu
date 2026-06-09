@@ -21,8 +21,8 @@
   --line-2: rgba(231,229,228,0.5);
   --accent: #78716c;
   --accent-soft: #e7e5e4;
-  --warm: #a09080;
-  --warm-soft: rgba(160,144,128,0.12);
+  --warm: #c47a3a;
+  --warm-soft: rgba(196,122,58,0.12);
   --success: #059669;
   --success-soft: rgba(5,150,105,0.08);
   --danger: #b09191;
@@ -40,6 +40,13 @@
   --header-h: 60px;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+  /* 别名（兼容各模板的命名差异） */
+  --brand: var(--warm);
+  --brand-soft: var(--warm-soft);
+  --border: var(--line);
+  --text-3: var(--ink-3);
+  --text-2: var(--ink-2);
+  --bg-canvas: var(--bg);
 }
 
 *,*::before,*::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -219,6 +226,7 @@ code, .mono { font-family: 'JetBrains Mono', monospace; font-weight: 400; }
 .chip-exercise{background:var(--warm-soft);color:var(--warm)}
 .chip-code{background:var(--accent-soft);color:var(--ink-2)}
 .typing{display:flex;gap:4px;padding:2px 0}
+.status-bar{display:flex;align-items:center;gap:6px;padding:8px 16px 4px;font-size:12px;color:var(--ink-4)}
 .typing span{width:5px;height:5px;background:var(--ink-3);border-radius:50%;animation:typ 1.4s infinite}
 .typing span:nth-child(2){animation-delay:.2s}
 .typing span:nth-child(3){animation-delay:.4s}

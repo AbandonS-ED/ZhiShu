@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { exerciseApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
+import { markdownToHtml } from '@/lib/utils'
 
 // ═══ TYPES ═══
 interface Exercise {
@@ -146,25 +147,61 @@ export default function TikuPage() {
   const [genInput, setGenInput] = useState('')
   const [generating, setGenerating] = useState(false)
   const [genResult, setGenResult] = useState('')
+  const [apiExercises, setApiExercises] = useState<Exercise[]>([])
 
-  const generateExercises = async () => {
+  const generateExercises = () => {
     if (!genInput.trim() || generating) return
     setGenerating(true)
     setGenResult('正在生成...')
-    try {
-      const r = await exerciseApi.generate(getStudentId(), genInput.trim(), 5)
-      setGenResult(`✅ 已生成 ${r.count} 道「${r.knowledge_point}」题目\nID: ${r.exercises.map(e => e.exercise_id.slice(0, 8)).join(', ')}\n刷新页面查看（开发中：暂未合并到题目列表）`)
-    } catch (e: any) {
-      setGenResult(`❌ 生成失败: ${e.message}`)
-    } finally {
-      setGenerating(false)
-    }
+
+    let freshExercises: Exercise[] = []
+    let firstToken = true
+    exerciseApi.generateStream(
+      getStudentId(),
+      genInput.trim(),
+      (e) => {
+        if (e.type === 'progress' && e.message) {
+          setGenResult(e.message)
+        }
+        if (e.type === 'token' && e.content) {
+          if (firstToken) {
+            setGenResult(e.content)
+            firstToken = false
+          } else {
+            setGenResult((prev) => prev + e.content)
+          }
+        }
+        if (e.type === 'result' && e.data) {
+          const data = e.data
+          freshExercises = (data.exercises || []).map((ex: any, i: number) => ({
+            id: Date.now() + i,
+            type: ex.type as Exercise['type'],
+            diff: '中级',
+            kp: data.knowledge_point || genInput.trim(),
+            q: ex.question || '',
+            opts: ex.options,
+            ans: ex.answer as any,
+            expl: ex.explanation || '',
+          }))
+          setApiExercises((prev) => [...freshExercises, ...prev])
+          setGenResult(`✅ 已生成 ${data.count || freshExercises.length} 道「${data.knowledge_point || genInput.trim()}」题目`)
+        }
+        if (e.type === 'error') {
+          setGenResult(`❌ ${e.message || '调用失败'}`)
+        }
+        if (e.type === 'done' || e.type === 'error') {
+          setGenerating(false)
+        }
+      },
+      5
+    )
   }
 
-  const filtered = tab === 'all' ? exercises : exercises.filter((e) => e.type === tab)
+  const allExercises = [...apiExercises, ...exercises]
+  const filtered = tab === 'all' ? allExercises : allExercises.filter((e) => e.type === tab)
 
   // Stats
-  const total = exercises.length
+  const total = allExercises.length
   const answeredCount = Object.keys(answers).length
   const correctCount = Object.values(answers).filter((a) => a.correct === true).length
   const pct = answeredCount ? Math.round((correctCount / answeredCount) * 100) : 0
@@ -172,7 +209,7 @@ export default function TikuPage() {
 
   // Topics
   const topics: Record<string, { total: number; correct: number; answered: number }> = {}
-  exercises.forEach((ex) => {
+  allExercises.forEach((ex) => {
     if (!topics[ex.kp]) topics[ex.kp] = { total: 0, correct: 0, answered: 0 }
     topics[ex.kp].total++
     if (answers[ex.id]) {
@@ -267,9 +304,7 @@ export default function TikuPage() {
         </button>
       </div>
       {genResult && (
-        <div style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12, fontSize: 13, whiteSpace: 'pre-wrap' }}>
-          {genResult}
-        </div>
+        <div style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12, fontSize: 13 }} dangerouslySetInnerHTML={{ __html: markdownToHtml(genResult) }} />
       )}
 
       {/* Stats */}
@@ -344,7 +379,7 @@ export default function TikuPage() {
                     </div>
                     <div className="qkp">{ex.kp}</div>
                   </div>
-                  <div className="ex-q">{ex.q}</div>
+                  <div className="ex-q" dangerouslySetInnerHTML={{ __html: markdownToHtml(ex.q) }} />
 
                   {/* Choice options */}
                   {ex.type === 'choice' && ex.opts && (
