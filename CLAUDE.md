@@ -47,7 +47,8 @@ SmartHub/
 │   ├── app/agents/                  # 7 个 Agent（Profile / Document / Exercise / Path / Tutor / Master / MindMap）
 │   ├── app/services/                # 11 个服务：minimax_client / spark_client / anti_hallucination / content_safety / document_parser / embedding_service / evaluation_service / json_parser / reranker / text_chunker / vector_store
 │   ├── scripts/init_db.sql          # 手动建库 + 建表脚本
-│   └── tests/                       # test_api.py（最小集成测试）+ __init__.py
+│   └── tests/                       # 5 个测试 + 5 个 debug 脚本（见 backend/README.md "测试"节）
+│                                # ⭐ smoke_test.py 端到端跑 9 API 全 200（2026-06-09 commit 433c8ba）
 ├── docs/                            # 已分类：赛题需求 / 设计文档 / 开发流程 / 运维测试 / 交付物
 ├── 开发进度.md                       # 实时进度跟踪
 ├── AGENTS.md                        # 团队协作文档

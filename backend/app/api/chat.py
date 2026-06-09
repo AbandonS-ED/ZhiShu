@@ -164,6 +164,19 @@ async def stream_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
 
                 if request_type == "tutor":
                     from app.agents.tutor_agent import tutor_agent
+                    from app.services.vector_store import vector_store
+                    from app.services.embedding_service import embedding_service
+                    from app.core.database import async_session as db_async_session
+
+                    try:
+                        query_embedding = await embedding_service.embed_single(last_msg)
+                        async with db_async_session() as rag_db:
+                            chunks = await vector_store.search(rag_db, query_embedding, top_k=5)
+                        state["context_chunks"] = chunks
+                    except Exception as e:
+                        print(f"[chat/stream] RAG 检索失败: {e}")
+                        state["context_chunks"] = None
+
                     user_prompt = tutor_agent._build_prompt(
                         last_msg, state.get("context_chunks"), student_profile, output_format="text"
                     )

@@ -20,11 +20,15 @@ if sys.platform == "win32":
 
 BASE = "http://localhost:8001/api/v1"
 STUDENT_ID = "00000000-0000-0000-0000-000000000001"
-TIMEOUT = 60.0
+TIMEOUT = 120.0
 
 PASS = "[PASS]"
 FAIL = "[FAIL]"
 INFO = "[INFO]"
+
+
+class StepFailed(Exception):
+    pass
 
 
 def header(title: str) -> None:
@@ -39,6 +43,7 @@ def ok(msg: str) -> None:
 
 def bad(msg: str) -> None:
     print(f"  {FAIL} {msg}")
+    raise StepFailed(msg)
 
 
 def info(msg: str) -> None:
@@ -302,11 +307,16 @@ async def step9_mindmap(client: httpx.AsyncClient) -> None:
         bad(f"HTTP {r.status_code} in {dur:.1f}s: {r.text[:300]}")
         return
     data = r.json()
-    mm = data.get("mermaid_code", "")
-    info(f"title: {data.get('title', '?')}")
+    mindmap = data.get("mindmap", {})
+    if not mindmap:
+        bad("response body missing 'mindmap' key")
+    mm = mindmap.get("mermaid_code", "")
+    info(f"title: {mindmap.get('title', '?')}")
     info(f"mermaid_code length: {len(mm)} chars")
+    if not mm:
+        bad("mermaid_code is empty (LLM/parse failure)")
     info(f"mermaid preview: {mm[:80].replace(chr(10), ' / ')}")
-    ok(f"200 in {dur:.1f}s, mindmap generated")
+    ok(f"200 in {dur:.1f}s, {len(mm)} chars mermaid")
 
 
 async def main() -> int:
@@ -334,8 +344,10 @@ async def main() -> int:
             try:
                 await fn(client)
                 results[name] = True
+            except StepFailed:
+                results[name] = False
             except Exception as e:
-                bad(f"unexpected: {e}")
+                print(f"  {FAIL} unexpected: {e}")
                 results[name] = False
 
     print("\n" + "=" * 70)

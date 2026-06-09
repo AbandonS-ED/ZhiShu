@@ -93,24 +93,11 @@ async def generate_path_stream(req: PathGenerateRequest, db: AsyncSession = Depe
             try:
                 yield f"data: {json.dumps({'type': 'progress', 'progress': 0.1, 'message': '正在分析课程内容...'}, ensure_ascii=False)}\n\n"
 
-                prompt = path_agent._build_prompt(
-                    req.course_topics, student_profile, req.total_days
-                )
-
                 yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在生成学习路径...'}, ensure_ascii=False)}\n\n"
 
-                stream_text = ""
-                async for token in mc_module.minimax_client.chat_stream(
-                    messages=[{"role": "user", "content": prompt}],
-                    system=path_agent.SYSTEM_PROMPT,
-                    max_tokens=4096,
-                    temperature=0.7,
-                ):
-                    stream_text += token
-                    if token:
-                        yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
-
-                path_data = path_agent._parse_response(stream_text)
+                path_data = await path_agent.generate(
+                    req.course_topics, student_profile, req.total_days
+                )
 
                 yield f"data: {json.dumps({'type': 'progress', 'progress': 0.8, 'message': '正在保存路径...'}, ensure_ascii=False)}\n\n"
 

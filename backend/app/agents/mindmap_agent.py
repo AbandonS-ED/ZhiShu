@@ -6,6 +6,7 @@
 
 import re
 from app.services import minimax_client as mc_module
+from app.services.anti_hallucination import anti_hallucination
 from app.services.json_parser import parse_json_response
 
 
@@ -38,6 +39,8 @@ class MindMapAgent:
 - 根据学生掌握程度调整深度（薄弱点多展开）
 - 只返回 JSON，不要其他文字"""
 
+    FALLBACK_MERMAID = "mindmap\n  root((学习主题))\n    概念1\n      细节A\n      细节B\n    概念2\n      细节C\n      细节D"
+
     async def generate(
         self,
         knowledge_point: str,
@@ -54,21 +57,49 @@ class MindMapAgent:
         """
         user_prompt = self._build_prompt(knowledge_point, student_profile)
 
+        result = await self._generate_once(user_prompt)
+
+        if self._is_fallback_result(result):
+            retry_prompt = user_prompt + "\n【重要】请务必返回有效的 JSON 格式。Mermaid mindmap 必须包含至少 3 个一级分支，每个分支至少 2 个子节点。"
+            result = await self._generate_once(retry_prompt)
+
+        validation = await anti_hallucination.validate(
+            content=result.get("description", "") + "\n" + " ".join(result.get("nodes", [])),
+            knowledge_point=knowledge_point,
+            skip_llm=True,
+        )
+        result["validation"] = {
+            "passed": validation.passed,
+            "issues": validation.issues,
+            "confidence": validation.confidence,
+        }
+
+        result["mermaid_code"] = self._validate_mermaid(result.get("mermaid_code", ""))
+        return result
+
+    async def _generate_once(self, user_prompt: str) -> dict:
         response = await mc_module.minimax_client.chat(
             messages=[{"role": "user", "content": user_prompt}],
             system=self.SYSTEM_PROMPT,
             max_tokens=2048,
             temperature=0.5,
         )
+        return self._parse_response(response["content"])
 
-        result = self._parse_response(response["content"])
-        result["mermaid_code"] = self._validate_mermaid(result.get("mermaid_code", ""))
-        return result
+    def _is_fallback_result(self, result: dict) -> bool:
+        code = (result.get("mermaid_code") or "").strip()
+        if not code:
+            return True
+        if code == self.FALLBACK_MERMAID:
+            return True
+        if code.startswith("mindmap") and "学习主题" in code:
+            return True
+        return False
 
     def _build_prompt(
         self,
         knowledge_point: str,
-        student_profile: dict | None,
+        student_profile: dict | None = None,
     ) -> str:
         parts = [f"请为「{knowledge_point}」生成一个思维导图。"]
 

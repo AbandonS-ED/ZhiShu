@@ -5,6 +5,7 @@
 
 import json
 from app.services import minimax_client as mc_module
+from app.services.anti_hallucination import anti_hallucination
 
 # 6 维画像的 JSON Schema（供 LLM 结构化输出）
 PROFILE_SCHEMA = """{
@@ -95,8 +96,18 @@ class ProfileAgent:
 
         content = response["content"]
 
-        # 尝试从响应中提取 JSON
         profile = self._parse_profile(content)
+
+        validation = await anti_hallucination.validate(
+            content=json.dumps(profile, ensure_ascii=False)[:2000],
+            knowledge_point=list(profile.get("knowledge_mastery", {}).keys())[0] if profile.get("knowledge_mastery") else "通用知识",
+            skip_llm=True,
+        )
+        profile["validation"] = {
+            "passed": validation.passed,
+            "issues": validation.issues,
+            "confidence": validation.confidence,
+        }
         return profile
 
     def _build_user_prompt(

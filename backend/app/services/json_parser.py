@@ -24,7 +24,9 @@ def parse_json_response(content: str, fallback: dict | None = None) -> dict:
         fallback = {}
 
     # 0. 清除 <think> 标签
-    cleaned = re.sub(r"<think>[\s\S]*?</think>", "", content).strip()
+    cleaned = re.sub(r"<think>[\s\S]*?</think>", "", content)  # 闭合标签：删内容
+    cleaned = re.sub(r"</?think>", "", cleaned)                 # 未闭合标签：只删标签本身
+    cleaned = cleaned.strip()
 
     # 1. 直接解析
     try:

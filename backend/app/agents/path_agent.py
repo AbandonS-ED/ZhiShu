@@ -5,6 +5,7 @@
 
 import json
 from app.services import minimax_client as mc_module
+from app.services.anti_hallucination import anti_hallucination
 
 
 class PathAgent:
@@ -71,11 +72,22 @@ class PathAgent:
         response = await mc_module.minimax_client.chat(
             messages=[{"role": "user", "content": user_prompt}],
             system=self.SYSTEM_PROMPT,
-            max_tokens=4096,
+            max_tokens=8192,
             temperature=0.7,
         )
 
-        return self._parse_response(response["content"])
+        result = self._parse_response(response["content"])
+
+        validation = await anti_hallucination.validate(
+            content=result.get("description", "") + "\n" + " ".join(n.get("label", "") for n in result.get("nodes", [])),
+            skip_llm=True,
+        )
+        result["validation"] = {
+            "passed": validation.passed,
+            "issues": validation.issues,
+            "confidence": validation.confidence,
+        }
+        return result
 
     def _build_prompt(
         self,

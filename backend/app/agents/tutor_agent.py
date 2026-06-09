@@ -6,6 +6,7 @@
 
 import json
 from app.services import minimax_client as mc_module
+from app.services.anti_hallucination import anti_hallucination
 
 
 class TutorAgent:
@@ -70,7 +71,19 @@ class TutorAgent:
             temperature=0.5,
         )
 
-        return self._parse_response(response["content"])
+        result = self._parse_response(response["content"])
+
+        validation = await anti_hallucination.validate(
+            content=result.get("answer", ""),
+            context_chunks=context_chunks,
+            knowledge_point=question[:50],
+        )
+        result["validation"] = {
+            "passed": validation.passed,
+            "issues": validation.issues,
+            "confidence": validation.confidence,
+        }
+        return result
 
     def _build_prompt(
         self,

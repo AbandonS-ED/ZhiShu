@@ -152,13 +152,23 @@ backend/
 ```bash
 cd backend
 
-# 端到端冒烟测试 (9 API 验证，2026-06-09 9/9 PASS)
+# ⭐ 端到端冒烟测试 (9 API 验证，2026-06-09 9/9 PASS)
 python -m tests.smoke_test
 
-# 单元 + 集成（待补全）
+# 单元 + 集成
 pytest tests/ -v
-# 实际：1 个 test_api.py + 4 个 debug_*.py + 1 个 smoke_test.py，没有完整测试套件
 ```
+
+**实际测试文件**（`backend/tests/`）：
+
+| 文件 | 大小 | 用途 |
+|------|------|------|
+| ⭐ `smoke_test.py` | 13.3 KB | **端到端冒烟**，9 API 全 200。F1 version=3 / F4 chat 1032 tokens / F2 resource 防幻觉抓 1 issue / F3 path 7 天 DAG / F2 mindmap A* 28 节点 |
+| `test_agents.py` | 7.7 KB | 7 个 Agent 单元测试 |
+| `test_anti_hallucination.py` | 4.3 KB | 防幻觉三层（PatternDetector / SourceValidator / LLMValidator） |
+| `test_json_parser.py` | 2.1 KB | JSON 解析工具 |
+| `test_api.py` | 2.3 KB | API 最小集成测试 |
+| `debug_*.py` | 5 个 | 调试脚本（exercise / mindmap / path / resource） |
 
 最新测试报告见 `../SMOKE_TEST_REPORT.md`。
 
