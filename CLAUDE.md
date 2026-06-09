@@ -12,14 +12,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **课程切入点**：人工智能导论
 - **主仓库**：<https://github.com/AbandonS-ED/ZhiShu>
 
-## 仓库现状（2026-06-09）
+## 仓库现状（2026-06-10）
 
 ```
-SmartHub/
+ZhiShu/
 ├── frontend/                        # Next.js 14.2.5 + Tailwind 3.4 + TypeScript
 │   ├── src/app/                     # 7 页面：/ /duihua /profile /resources /path /tiku /pinggu
 │   │   ├── layout.tsx               # 模板风 .app 布局：Sidebar + Main
-│   │   ├── page.tsx                 # / 仪表盘（server component，无 'use client'）
+│   │   ├── page.tsx                 # / 仪表盘（'use client'，useState + useEffect）
 │   │   ├── globals.css              # 模板设计系统（米色/墨黑/琥珀）
 │   │   ├── duihua/page.tsx          # 'use client'，SSE 流式 + Master Agent 路由
 │   │   ├── profile/page.tsx         # 'use client'，6 维画像 + AI 弹窗
@@ -31,7 +31,7 @@ SmartHub/
 │   │   ├── Sidebar.tsx              # 7 项菜单（仪表盘 + 智能对话 + 学习画像 + 资源 + 路径 + 题库 + 评估），可折叠
 │   │   └── Header.tsx               # 60px 玻璃拟态 + 动态页面标题
 │   ├── src/lib/
-│   │   ├── api.ts                   # API 客户端（7 模块：profile/chat/resource/exercise/path/tutor/dashboard/evaluation）
+│   │   ├── api.ts                   # API 客户端（8 模块：profile/chat/resource/exercise/path/tutor/dashboard/evaluation）
 │   │   ├── student.ts               # student_id 本地存储（localStorage）
 │   │   └── utils.ts                 # cn() + escapeHtml() + markdownToHtml() + extractAnswer()
 │   ├── src/app/profile/ChatModal.tsx  # 对话式画像提取弹窗
@@ -39,15 +39,15 @@ SmartHub/
 │   ├── src/types/index.ts           # TS 类型契约（暂未使用）
 │   ├── src/app/fonts/               # GeistVF.woff / GeistMonoVF.woff（本地字体）
 │   └── .npmrc                       # npmmirror 国内镜像
-├── backend/                         # FastAPI + 9 表 + 7 Agent + 22 API + 11 Service + 8 Router
+├── backend/                         # FastAPI + 9 表 + 7 Agent + 23 唯一 API + 12 Service + 8 Router
 │   ├── app/main.py                  # 8 router 注册 + lifespan 初始化
 │   ├── app/api/                     # 8 router：profile / resource / path / tutor / chat / mindmap / dashboard / evaluation
 │   ├── app/core/{config,database}.py
 │   ├── app/models/                  # 9 个 Model（Student / Profile / DocumentChunk / Resource / LearningPath / Exercise / ChatSession / ChatMessage / LearningRecord）
 │   ├── app/agents/                  # 7 个 Agent（Profile / Document / Exercise / Path / Tutor / Master / MindMap）
-│   ├── app/services/                # 11 个服务：minimax_client / spark_client / anti_hallucination / content_safety / document_parser / embedding_service / evaluation_service / json_parser / reranker / text_chunker / vector_store
+│   ├── app/services/                # 12 个服务：minimax_client / spark_client / anti_hallucination / content_safety / document_parser / embedding_service / evaluation_service / json_parser / reranker / text_chunker / vector_store / minimax_langchain
 │   ├── scripts/init_db.sql          # 手动建库 + 建表脚本
-│   └── tests/                       # 5 个测试 + 5 个 debug 脚本（见 backend/README.md "测试"节）
+│   └── tests/                       # 4 个测试文件（71 个 pytest） + smoke_test.py + 5 个 debug 脚本
 │                                # ⭐ smoke_test.py 端到端跑 9 API 全 200（2026-06-09 commit 433c8ba）
 ├── docs/                            # 已分类：赛题需求 / 设计文档 / 开发流程 / 运维测试 / 交付物
 ├── 开发进度.md                       # 实时进度跟踪
@@ -55,18 +55,18 @@ SmartHub/
 └── docker-compose.yml               # postgres+pgvector / redis / minio（不含 backend — 后端目前本地裸跑）
 ```
 
-**实际状态（2026-06-09）**：
+**实际状态（2026-06-10）**：
 
 - ✅ 前端 7 页面 **1:1 复刻模板**
 - ✅ **前端联调**：7/7 页全部接入后端 API（`/` 数据聚合 + `/duihua` SSE + `/profile` AI 弹窗 + `/resources` SSE 流式 + `/path` SSE 流式 + `/tiku` SSE 流式 + `/pinggu` AI 评估）
-- ✅ 后端完整：**9 表 + 7 Agent + 22 唯一 API 端点**（8 router 拆分）+ **11 Service**
+- ✅ 后端完整：**9 表 + 7 Agent + 23 唯一 API 端点**（8 router 拆分）+ **12 Service**
 - ✅ MiniMax-M3 LLM 端到端验证通过
 - ✅ **MindMap Agent** 已实现（F2 评分项）
 - ✅ **防幻觉三层验证** 已实现（N3 必做项）
 - ✅ **SSE 流式输出** 所有生成接口已接（资源/练习/路径）
 - ✅ **RAG 管道** 已实现（文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排）
 - ✅ **练习题 dual-format 流式**（2026-06-09 修复）：chat.py:22-39 新增 `STREAM_EXERCISE_SYSTEM` + chat.py:42-62 新增 `_strip_think()`，LLM 一份输出同时给"人看"和"程序用"，实现 type=token 真流式
-- ✅ **端到端冒烟测试**（2026-06-09）：`backend/tests/smoke_test.py` 跑 9 API 全 200。关键证据：F1 version=3 completeness=80% / F4 chat 1032 tokens / F2 resource 防幻觉抓出 1 issue confidence=0.85 / F3 path 7 天 DAG / F2 mindmap A* 28 节点。详见 `SMOKE_TEST_REPORT.md`
+- ✅ **端到端冒烟测试**（2026-06-09 提交 2026-06-10 验证）：`backend/tests/smoke_test.py` 跑 9 API 全 200。关键证据：F1 version=3 completeness=80% / F4 chat 1032 tokens / F2 resource 防幻觉抓出 1 issue confidence=0.85 / F3 path 7 天 DAG / F2 mindmap A* 28 节点。详见 `SMOKE_TEST_REPORT.md`
 
 ## 技术栈（已锁定，不要换）
 
@@ -110,25 +110,25 @@ psql -U postgres -f backend/scripts/init_db.sql
 cd backend
 python -m venv venv; venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-# Swagger: http://localhost:8000/docs
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
+# Swagger: http://localhost:8001/docs
 
 # 切换到讯飞星火 V4：在 backend/.env 配 SPARK_API_KEY 后设
 # LLM_PROVIDER=spark
 # ⚠️ 8000 端口在 Windows 上有"僵尸 socket"问题（任务停了但端口还占着，
 #    taskkill / Get-NetTCPConnection 都看不到 PID）。绕开：改用 8001
 uvicorn app.main:app --host 0.0.0.0 --port 8001
-# 同步改 frontend/src/lib/api.ts:4 的 BASE_URL = 'http://localhost:8001/api/v1'
+# 同步改 frontend/src/lib/api.ts:5 的 BASE_URL = 'http://localhost:8001/api/v1'
 
 # 前端
 cd frontend
 npm install
-npx next dev          # http://localhost:3000
-npx next build        # ✅ 通过（7 路由：/ /duihua /path /pinggu /profile /resources /tiku）
-npx next lint         # ✅ 通过
+npm run dev           # http://localhost:3000
+npm run build         # ✅ 通过（7 路由：/ /duihua /path /pinggu /profile /resources /tiku）
+npm run lint          # ✅ 通过
 ```
 
-**端口现状（2026-06-09）**：
+**端口现状（2026-06-10）**：
 
 - **后端** 当前在 `8001`（匹配 `frontend/src/lib/api.ts:5` 的 `BASE_URL`）
 - **8000** 端口在 Windows 上有"僵尸 socket"问题（任务停了但端口还占着，`taskkill` / `Get-NetTCPConnection` 都看不到 PID）—— 偶尔会自己清，多数时候需用 8001 绕开
@@ -146,27 +146,24 @@ npx next lint         # ✅ 通过
 
 ### P1 — 死代码 / 冗余
 
-- **`types/index.ts` + `stores/appStore.ts`** — 9 个 interface + Zustand store 0 引用，和 page 内 local interface 互相漂移，等接 API 时再启用或重写
-- **`lib/utils.ts`** — `cn()` 全工程 0 引用；`escapeHtml / markdownToHtml / extractAnswer` 实际在 duihua/profile 页面有引用
-- **`package.json`** — 9 个重量级依赖未用（@radix-ui ×5、reactflow、mermaid、react-syntax-highlighter、recharts、swr）
+- **`types/index.ts` + `stores/appStore.ts`** — 11 个 interface + Zustand store 0 引用，和 page 内 local interface 互相漂移，等接 API 时再启用或重写
+- **`lib/utils.ts`** — `cn()` 全工程 0 引用；`escapeHtml / markdownToHtml / extractAnswer` 实际在 duihua 和 tiku 页面有引用
+- **`package.json`** — 17 个重量级依赖未用（@radix-ui ×6、reactflow、mermaid、react-syntax-highlighter、recharts、swr、zustand、react-markdown、rehype-highlight、lucide-react、class-variance-authority、clsx、tailwind-merge、highlight.js、katex、remark-gfm、remark-math）
 - **`profile/page.tsx:164-244`** — 雷达图用 `svg.innerHTML = html` 字符串拼接，应改为声明式 JSX
-- **`{duihua,resources,pinggu}/page.tsx`** 共 7 处 `key={i}` 配排序/前置插入的列表——会触发 React diff 动画重跑
+- **`{duihua,resources,pinggu}/page.tsx`** 共 13 处 `key={i}` 配排序/前置插入的列表——会触发 React diff 动画重跑
 
 ### P2 — 已知老问题
 
 - **pgvector 扩展未装** — Python 包已装，PostgreSQL 扩展未装，embedding 用 JSONB 占位 + Python fallback 余弦相似度
-- **`echo=True`** — database.py SQL 日志硬编码，生产需改为 `echo=settings.DEBUG`
-- **`tutor.py /generate` 与 `resource.py /generate` 重复** — 待清理
-- **router 入参未校验** — `{profile,path,resource,tutor}.py` 全用 query string 接收 `student_id: str`，没 UUID 校验，接库前必须改
+- **router 入参未校验** — `{profile,path,resource,tutor}.py` 全用 Pydantic body 接收 `student_id: str`，没 UUID 校验，接库前必须改（`mindmap.py` 已加 `@field_validator` 校验）
 - **无 Docker 环境** — PostgreSQL/Redis 需本地安装（D:\2026test\）
 - **`requirements.txt` 不完整** — 缺少 loguru/sse-starlette/pymupdf/python-docx/minio 等设计文档依赖
 - **`chat/stream` 实现细节**（`backend/app/api/chat.py`）— 先 `_quick_route` 关键词路由兜底，再走 `master_agent.route`；`tutor/chat` 类型直接走 `minimax_client.chat_stream` 拿 token 流，其他类型走 `master_agent.execute`。**`event_generator` 内必须独立 `async_session()`**（不能复用请求 session，否则流式期间锁住表导致写操作 hang）
-- **RAG 全链路新增**（`backend/app/services/{embedding_service,vector_store,reranker,anti_hallucination,text_chunker,document_parser}.py`）— 但 `tutor.py` 的 RAG 还未贯通到 SSE 流式（仅 `ask` 接口用），Tutor Agent 的 stream prompt 走的是 LLM 直答
-- **前端 5 页面大改未提交** — `duihua` (-180/+426)、`pinggu` (-/+28)、`profile` (-/+72)、`resources` (-/+20)、`tiku` (-/+21)，改完务必先 `npx next build` 验证
+- **RAG 全链路新增**（`backend/app/services/{embedding_service,vector_store,reranker,anti_hallucination,text_chunker,document_parser}.py`）— `tutor.py` 的 RAG 已贯通到 SSE 流式（`chat.py` tutor 分支用 embedding_service + vector_store.search + async_session 独立 session）
 
 ### 已修复（不必再查）
 
-- ✅ `database.py:16` 缺 `text()` → commit `c837fe3` 加了
+- ✅ `database.py:3` 缺 `text()` → commit `c837fe3` 加了
 - ✅ `anthropic` 依赖 → 已删
 - ✅ `Vector(1536)` → 实际代码用 JSONB 占位（无需改）
 - ✅ `minimax_langchain.py` `asyncio.get_event_loop()` → `c837fe3` 改 `get_running_loop()`
@@ -175,18 +172,30 @@ npx next lint         # ✅ 通过
 - ✅ 内存泄漏 → 已添加 `cancelAnimationFrame`
 - ✅ 音频筛选 → 已添加 `'audio'`
 - ✅ CSS 变量 → `--warm` 已改回 `#c47a3a`
-- ✅ **端到端冒烟测试缺失**（2026-06-09 commit `433c8ba`）— `backend/tests/smoke_test.py` 9 API 全 200
+- ✅ **端到端冒烟测试缺失**（2026-06-09 commit `433c8ba`，2026-06-10 验证 9/9 PASS）— `backend/tests/smoke_test.py` 9 API 全 200
+- ✅ **Agent 单元测试缺失**（2026-06-09 commit `90cf394`）— `test_agents.py` 31 + `test_anti_hallucination.py` 19 + `test_json_parser.py` 11 + `test_api.py` 10 = 71 pytest 测试 PASS
+- ✅ **echo=True 硬编码**（2026-06-09）— `database.py` 改为 `echo=settings.DEBUG`
+- ✅ **tutor.py /generate 重复端点**（2026-06-09）— 已删除，resource.py 保留唯一
+- ✅ **MindMap Agent 加重试**（2026-06-09 commit `90cf394`）— `_generate_once()` + `_is_fallback_result()` + `FALLBACK_MERMAID`，fallback 时重试一次
 - ✅ **前端 5 页面大改未提交**（2026-06-09 commits `41b1cf9` + `1b40af8`）— 33 文件全部入库
 - ✅ **dashboard 字段名 typo**（commit `0d8bf6c`）— `Exercise.score` → `is_correct`、`ChatMessage.student_id` → ChatSession 子查询
+- ✅ **防幻觉扩展到 6 个 Agent**（2026-06-09 commit `90cf394`）— Profile/Path/MindMap/Tutor 加 `anti_hallucination.validate()`（skip_llm=True）；Document/Exercise 已有完整三层
+- ✅ **json_parser.py 加固**（2026-06-09）— 处理未闭合 `<think>` 标签
+- ✅ **smoke_test.py 修复**（2026-06-10）— `bad()` 改为 raise `StepFailed`，TIMEOUT 60→120s，MindMap 读嵌套路径
 
 ## 测试
 
-跑法：`cd backend && python -m tests.smoke_test`（前提：后端 8001 + PG 5432 + Redis 6379）
+跑法：`cd backend && python -m pytest tests/ -v`（前提：后端 8001 + PG 5432 + Redis 6379）
 
-输出 9 步报告：health / profile / chat / resource / exercise / path / mindmap / dashboard / evaluation。  
-最近一次跑（2026-06-09）：**9/9 PASS**，详见 `SMOKE_TEST_REPORT.md`。
+端到端冒烟：`cd backend && python -m tests.smoke_test` — 9/9 PASS（2026-06-09）。
 
-未做：Agent 单元测试 + pytest 集成测试套件（仅 smoke_test 一个 + 老 `test_api.py` + 4 个 debug 脚本）。
+**71 个 pytest 单元测试**（2026-06-09 提交，2026-06-10 验证）：
+- `test_json_parser.py` — 11 个 JSON 解析测试
+- `test_anti_hallucination.py` — 19 个防幻觉三层测试
+- `test_agents.py` — 31 个 Agent 单元测试
+- `test_api.py` — 10 个 API 集成测试
+
+最新测试报告见 `SMOKE_TEST_REPORT.md`。
 
 ## 架构与功能要点
 
@@ -196,7 +205,7 @@ npx next lint         # ✅ 通过
 
 ```text
 请求进入
-  ├─ _quick_route(last_msg)         # 关键词命中（"什么是" / "怎么" / "为什么" / "讲解" / "练习" …）→ 直接路由
+  ├─ _quick_route(last_msg)         # 关键词命中（"是什么" / "怎么" / "为什么" / "讲解" / "练习" …）→ 直接路由
   │  └─ 未命中 ↓
   ├─ master_agent.route(state)      # LLM 意图分类（master_agent.py:49）
   │  ├─ request_type="tutor"        # 走 tutor_agent._build_prompt + STREAM_PROMPT → 真逐 token 流
@@ -213,12 +222,12 @@ npx next lint         # ✅ 通过
 - **MindMap Agent** — 思维导图生成，输出 Mermaid 代码（✅ 已实现）
 - **Exercise Agent** — 练习题生成（选择/判断/简答/编程）+ 防幻觉验证（✅ 已实现）
 - **Path Agent** — 学习路径规划，输出知识图谱节点 + 边 + 每日计划（✅ 已实现）
-- **Tutor Agent** — RAG 问答 + 评估报告生成（✅ 已实现，`tutor/ask` 走 RAG，`tutor_agent.answer` 流式直答 LLM）
+- **Tutor Agent** — RAG 问答 + 评估报告生成（✅ 已实现，`tutor/ask` 走 RAG，`tutor_agent.answer` 一次性返回 LLM 回答）
 - **Master Agent** — 多 Agent 编排器，LLM 路由分发（✅ 已实现）
 
 ### 6 维学生画像（F1）
 
-`student_profiles.dimensions` 用 JSONB 存：`knowledge_mastery / learning_style / cognitive_level / interests / weak_topics / learning_pace`。
+`student_profiles.dimensions` 用 JSONB 存：`knowledge_mastery / learning_style / cognitive_level / interest / weak_topics / learning_pace`。
 
 ### 防幻觉（N3 评分项）— ✅ 已实现
 
@@ -227,7 +236,7 @@ npx next lint         # ✅ 通过
 2. **SourceValidator** — 来源引用验证（检查引用格式是否有来源支撑）
 3. **LLMValidator** — LLM 语义一致性校验（用 LLM 检查事实错误）
 
-已集成到 Document Agent 和 Exercise Agent。
+已集成到 6 个 Agent：Document、Exercise、Profile、Path、MindMap、Tutor。
 
 ### 流式输出（N1/N4）— ✅ 全部生成接口已接
 
@@ -244,13 +253,14 @@ npx next lint         # ✅ 通过
 |---|---|---|
 | `/api/v1/chat/stream` (tutor/chat) | ✅ **真流式** | `type=token` 逐 token 推，`_strip_think()` 过滤 <think> 标签 |
 | `/api/v1/chat/stream` (exercise) | ✅ **真流式** | ⭐ **dual-format 协议**（见下） |
-| `/api/v1/chat/stream` (document/path/mindmap/profile) | ⚠️ **伪流式** | 内部 `minimax_client.chat_stream` 仍走，但产出 `display_text` 用 16 字符切片 emit（chat.py:358-365） |
-| `/api/v1/resource/*/stream` | ⚠️ **伪流式** | `type=progress` 阶段推送 + `type=result` 整段 |
+| `/api/v1/chat/stream` (document/path/mindmap/profile) | ⚠️ **伪流式** | 内部 `minimax_client.chat_stream` 仍走，但产出 `display_text` 用 16 字符切片 emit（chat.py:372-378） |
+| `/api/v1/resource/generate/stream` | ✅ **真流式** | `type=token` 逐 token 推（resource.py:150） |
+| `/api/v1/resource/exercises/generate/stream` | ✅ **真流式** | ⭐ dual-format 协议（resource.py:311-330） |
 | `/api/v1/path/generate/stream` | ⚠️ **伪流式** | `type=progress` 阶段推送 + `type=result` 整段 |
 
-后续要做：把 `resource_agent / path_agent` 也改造成 chat_stream 包装（生成器协议），让 `type=token` 覆盖全部生成接口。
+后续要做：把 `path_agent` 也改造成 chat_stream 包装（生成器协议），让 `type=token` 覆盖全部生成接口。
 
-### ⭐ 练习题 dual-format 流式协议（2026-06-09 新增）
+### ⭐ 练习题 dual-format 流式协议（2026-06-09 修复）
 
 **问题**：之前的练习题 SSE 流式（`request_type="exercise"`）走的是 LLM 全量生成 + 内部 16 字符切片 emit 伪流式。LLM 实际输出 JSON 源码（如 `{"exercises":[...]}`）给用户看时满屏 JSON，体验极差。
 
@@ -260,10 +270,10 @@ npx next lint         # ✅ 通过
 
 - **chat.py:22-39** `STREAM_EXERCISE_SYSTEM` —— system prompt 强制 LLM 先 markdown 后 JSON
 - **chat.py:42-62** `_strip_think()` —— 流式增量 diff 过滤 <think> 标签（关键：按剥离后长度算 prev_display_len）
-- **chat.py:247-256** `use_dual_format = True` 分支 —— 改写 prompt + system + parse
-- **chat.py:290-309** 双格式流式循环 —— 遇 `---JSON_DATA---` 停止 emit
-- **chat.py:324-326** JSON 提取 —— `stream_text.split(sep, 1)[1]` + `parse_json_response`
-- **chat.py:335-337** 跳过补发（dual_format 已在 LLM 流式时实时推过）
+- **chat.py:269** `use_dual_format = True` 分支 —— 改写 prompt + system + parse
+- **chat.py:303-334** 双格式流式循环 —— 遇 `---JSON_DATA---` 停止 emit
+- **chat.py:337-339** JSON 提取 —— `stream_text.split(sep, 1)[1]` + `parse_json_response`
+- **chat.py:348-350** 跳过补发（dual_format 已在 LLM 流式时实时推过）
 
 **前端配合**（`frontend/src/app/duihua/page.tsx`）：`type=token` 直接 append 到 `streamContent`，done 时用 `markdownToHtml(streamContent)` 渲染。`type=result` 仍带结构化 `data.exercises` 用于"已生成资源"侧栏更新。
 

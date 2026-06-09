@@ -26,7 +26,7 @@ src/
 │   ├── Sidebar.tsx         # 侧边栏导航（7 项菜单 + 可折叠）
 │   └── Header.tsx          # 顶部导航栏
 ├── lib/
-│   ├── api.ts              # API 客户端（7 模块：profile/chat/resource/exercise/path/tutor/dashboard/evaluation），BASE_URL 配 8001
+│   ├── api.ts              # API 客户端（8 模块：profile/chat/resource/exercise/path/tutor/dashboard/evaluation），BASE_URL 配 8001
 │   ├── student.ts          # student_id 本地存储（localStorage）
 │   └── utils.ts            # cn() + escapeHtml() + markdownToHtml() + extractAnswer()
 ├── app/profile/ChatModal.tsx  # 对话式画像提取弹窗

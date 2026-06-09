@@ -6,13 +6,13 @@
 ## 技术栈
 
 - **前端**: Next.js 14.2.5 + Tailwind 3.4 + TypeScript（纯自定义 CSS，无 shadcn/ui）
-- **后端**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg
+- **后端**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg + 7 Agent + 23 唯一 API + 12 Service
 - **Agent**: 7 个子 Agent + Master Agent 编排器（全部实现，直接调用 LLM，不走 LangGraph StateGraph）
 - **LLM**: MiniMax-M3（开发）→ 讯飞星火 V4（上线前切换，改 1 个环境变量即可）
 - **数据库**: PostgreSQL 18 + Redis（本地安装，无 Docker 跑后端）
 - **防幻觉**: PatternDetector + SourceValidator + LLMValidator 三层验证（N3 必做项）
 - **RAG**: 文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排（已实现 5 个 Service）
-- **SSE**: 全部 6 个生成接口支持真逐 token 流式（chat/stream 1032 tokens / 31s 实测）
+- **SSE**: 4 个 SSE 流式端点（chat/stream + resource/generate/stream + resource/exercises/generate/stream + path/generate/stream）
 
 ## 项目结构
 
@@ -31,9 +31,9 @@ ZhiShu/
 │       ├── api/             # 8 router: profile/resource/path/tutor/chat/mindmap/dashboard/evaluation
 │       ├── agents/          # 7 Agent: profile/document/exercise/path/tutor/mindmap/master
 │       ├── models/          # 9 Model（无外键约束）
-│       ├── services/        # 11 Service: LLM 客户端×2 / RAG×5 / 防幻觉 / 内容安全 / 评估 / JSON / Celery
+│       ├── services/        # 12 Service: LLM×3 / RAG×5 / 防幻觉 / 内容安全 / 评估 / JSON
 │       └── core/            # config.py + database.py + celery_config.py
-├── tests/                 # 端到端冒烟测试 (smoke_test.py + 5 个 debug 脚本)
+├── tests/                 # smoke_test.py（端到端）+ 4 个 pytest 文件（71 个测试）+ 5 个 debug 脚本
 ├── docs/                  # 赛题需求 / 设计文档 / 开发流程 / 运维测试 / 交付物
 ├── 开发进度.md              # 实时进度跟踪
 ├── AGENTS.md              # 团队协作文档（硬约束 + 命令）
@@ -52,7 +52,7 @@ psql -U postgres -f backend/scripts/init_db.sql
 # 2. 后端（默认 8001，详见 CLAUDE.md "端口现状"）
 cd backend
 python -m venv venv; venv\Scripts\activate
-pip install -r requirements.txt
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8001
 # Swagger: http://localhost:8001/docs
 
@@ -65,6 +65,10 @@ npm run dev
 # 4. 端到端冒烟测试（9 API 验证）
 cd backend
 python -m tests.smoke_test
+
+# 5. 单元测试（71 个 pytest 测试）
+cd backend
+python -m pytest tests/ -v
 ```
 
 > 端口注意：`frontend/src/lib/api.ts:5` 的 `BASE_URL` 与后端实际端口要一致。当前默认 `8001`。`8000` 在 Windows 上有"僵尸 socket"问题（进程死后端口还被占）。
@@ -74,10 +78,11 @@ python -m tests.smoke_test
 | 模块 | 状态 |
 |------|------|
 | 前端 7 页面 | ✅ 已完成（模板复刻 + 7 页全部联调后端） |
-| 后端 9 表 + 7 Agent + 22 唯一 API + 11 Service | ✅ 已完成 |
+| 后端 9 表 + 7 Agent + 23 唯一 API + 12 Service | ✅ 已完成 |
 | **端到端冒烟测试** | **✅ 9/9 API 200（2026-06-09，见 SMOKE_TEST_REPORT.md）** |
+| **单元测试** | **✅ 71 个 pytest 测试 PASS（json_parser 11 + anti_hallucination 19 + agents 31 + api 10）** |
 | F1 对话式画像 | ✅ 后端+前端完成 |
-| **F2 多智能体资源生成** | **✅ MindMap Agent + Document/Exercise/Path 全部联调；练习题 dual-format 流式 6/9 修复** |
+| **F2 多智能体资源生成** | **✅ MindMap Agent + Document/Exercise/Path 全部联调；练习题 dual-format 流式已修复（9/9 PASS）** |
 | F3 学习路径 | ✅ 后端+前端完成（7/14/30 天可配） |
 | **N3 防幻觉 + 流式** | **✅ 防幻觉三层（resource/exercise 接入）+ 6 个生成接口 SSE 真流式** |
 | F4 智能辅导 | ✅ Tutor Agent RAG 接入完成，前端已联调 |

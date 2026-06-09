@@ -70,13 +70,13 @@ backend/
 │       ├── text_chunker.py       # 语义切片器
 │       └── vector_store.py       # pgvector 检索 + JSONB 降级方案
 ├── scripts/init_db.sql      # 手动建库 + 建表 SQL 脚本
-├── tests/                   # smoke_test.py（端到端）+ debug_*.py（单接口调试）+ test_api.py（最小集成）
+├── tests/                   # smoke_test.py（端到端）+ 4 个 pytest 文件（71 个测试）+ 5 个 debug 脚本
 ├── Dockerfile               # ⚠️ 未实际使用，后端本地裸跑
 ├── requirements.txt
 └── .env                     # API Key（已 gitignore）
 ```
 
-## API 路由（22 个端点）
+## API 路由（23 个端点）
 
 | 方法 | 路径 | 标签 | 状态 |
 |------|------|------|------|
@@ -94,7 +94,6 @@ backend/
 | GET | `/api/v1/path/{student_id}` | 学习路径 | ✅ |
 | GET | `/api/v1/path/{student_id}/{path_id}` | 学习路径 | ✅ |
 | POST | `/api/v1/tutor/ask` | 智能辅导 | ✅ RAG 检索已接入 |
-| POST | `/api/v1/tutor/generate` | 智能辅导 | ✅ |
 | POST | `/api/v1/chat/stream` | 聊天 | ✅ SSE 流式 |
 | GET | `/api/v1/chat/sessions/{student_id}` | 聊天 | ✅ |
 | GET | `/api/v1/chat/sessions/{session_id}/messages` | 聊天 | ✅ |
@@ -142,9 +141,7 @@ backend/
 ## 已知问题
 
 - pgvector PostgreSQL 扩展未安装（Python 包已装），embedding 暂用 JSONB
-- `tutor.py /generate` 与 `resource.py /generate` 重复
-- `echo=True` 在 database.py，生产需关闭
-- 后端无 Dockerfile，docker-compose.yml 只配了 postgres/redis/minio，**实际后端本地裸跑**
+- Dockerfile 已存在但未实际使用，docker-compose.yml 只配了 postgres/redis/minio，**实际后端本地裸跑**
 - Celery 异步任务未启用（开发进度写"已完成"是早期计划，实际 `app/core/celery_config.py` 已存在但未跑 worker）
 
 ## 测试
@@ -155,7 +152,7 @@ cd backend
 # ⭐ 端到端冒烟测试 (9 API 验证，2026-06-09 9/9 PASS)
 python -m tests.smoke_test
 
-# 单元 + 集成
+# 单元 + 集成（71 个 pytest 测试）
 pytest tests/ -v
 ```
 
@@ -164,7 +161,7 @@ pytest tests/ -v
 | 文件 | 大小 | 用途 |
 |------|------|------|
 | ⭐ `smoke_test.py` | 13.3 KB | **端到端冒烟**，9 API 全 200。F1 version=3 / F4 chat 1032 tokens / F2 resource 防幻觉抓 1 issue / F3 path 7 天 DAG / F2 mindmap A* 28 节点 |
-| `test_agents.py` | 7.7 KB | 7 个 Agent 单元测试 |
+| `test_agents.py` | 7.7 KB | 31 个 Agent 单元测试 |
 | `test_anti_hallucination.py` | 4.3 KB | 防幻觉三层（PatternDetector / SourceValidator / LLMValidator） |
 | `test_json_parser.py` | 2.1 KB | JSON 解析工具 |
 | `test_api.py` | 2.3 KB | API 最小集成测试 |

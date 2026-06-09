@@ -1,8 +1,18 @@
 # 智枢 (SmartHub) — AI Coding 工具使用说明
 
-> **竞赛**: 第十五届中国软件杯 A3 赛题  
-> **工具**: Claude Code (OpenCode)  
-> **版本**: v1.0  
+> ⚠️ **PARTIALLY DEPRECATED · 2026-06-09**
+>
+> 本文档 §4 关键代码片段（LangGraph Master Agent + pgvector RAG）和 §3.6 前端开发阶段（提到 shadcn/ui）描述的代码 / 架构**与实际不符**：
+>
+> - 实际未用 LangGraph StateGraph，Master Agent 是直接调 LLM + 关键词快路由
+> - 实际未用 shadcn/ui / ReactFlow / Mermaid（虽然 package.json 装了但 0 引用）
+>
+> §3.1-§3.5（项目初始化、数据库、讯飞 API、多智能体、RAG）大致准确，可作历史参考。
+> 当前真实架构见 [`CLAUDE.md`](../../CLAUDE.md)。
+
+> **竞赛**: 第十五届中国软件杯 A3 赛题
+> **工具**: Claude Code (OpenCode)
+> **版本**: v1.0
 > **日期**: 2026-06-05
 
 ---

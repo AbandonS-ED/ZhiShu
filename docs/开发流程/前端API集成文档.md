@@ -1,7 +1,17 @@
 # 智枢 (SmartHub) 前端 API 集成文档
 
-> **版本**: v1.0  
-> **日期**: 2026-06-06  
+> ⚠️ **DEPRECATED · 2026-06-09**
+>
+> 本文档描述的 `ApiClient` 类、Token 刷新、SWR 集成、Auth 模块等**全部未在项目中实现**。
+>
+> **实际项目**（2026-06-09）只用了一个轻量 `lib/api.ts`：7 个 module（profile/chat/resource/exercise/path/tutor/dashboard/evaluation），用 `fetch` + `ReadableStream` 解析 SSE，无 Token / SWR / Auth。
+>
+> 真实前端 API 用法见 [`frontend/src/lib/api.ts`](../../frontend/src/lib/api.ts) 和 [`frontend/src/lib/student.ts`](../../frontend/src/lib/student.ts)。**不要按本文档动手开发。**
+>
+> 保留仅作历史参考 + 答辩材料。
+
+> **版本**: v1.0
+> **日期**: 2026-06-06
 > **目标**: 详细说明前端与后端 API 的集成方式
 
 ---
