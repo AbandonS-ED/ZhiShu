@@ -19,11 +19,10 @@ psql -U postgres -f backend/scripts/init_db.sql
 # 后端（Swagger: http://localhost:8001/docs）
 cd backend && python -m venv venv && venv\Scripts\activate
 pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8001   # 必须 8001（8000 Windows 僵尸 socket）
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8001   # 必须 8001
 
 # 测试
-cd backend && python -m pytest tests/ -v                    # 98 个 pytest（需 PG 5432 + Redis 6379）
-cd backend && python -m pytest tests/test_agents.py -v      # 单文件测试（Windows 上不要用 pytest tests/）
+cd backend && python -m pytest tests/ -v                    # 120 pytest（需 PG 5432 + Redis 6379）
 cd backend && python -m tests.smoke_test                    # 端到端冒烟测试 (9 API)
 
 # 前端（http://localhost:3000）
@@ -42,12 +41,30 @@ cd frontend && npm install && npm run dev / build / lint
 
 ## 架构要点
 
-- **8 router / 23 唯一 API / 8 Agent / 9 Model / 12 Service / 98 pytest**
+- **8 router / 23 唯一 API / 8 Agent / 9 Model / 12 Service / 120 pytest**
 - **StateGraph 多智能体编排**（`backend/app/agents/master_agent.py`）：13 节点 LangGraph StateGraph（intent_recognition → task_planning → conditional_route → 7 子 Agent → result_aggregation → response_generation）。`tutor/chat` 走原路径真逐 token 流式，其他意图走 StateGraph。
-- **`<think>` 标签过滤**：流式期间必须用 `chat.py:42-62` 的 `_strip_think` 状态机，否则会吞前端渲染。
+- **`<think>` 标签过滤**：流式期间必须用 `_strip_think` 状态机，否则会吞前端渲染。
 - **防幻觉**：6 个 Agent 都接 `anti_hallucination.validate()`（Document/Exercise 走完整三层，Profile/Path/MindMap/Tutor 走 `skip_llm=True` 快速模式）。
 - **RAG**：`tutor.py` 的 `/ask` 和 `chat/stream` 的 tutor 分支都走 embedding + vector_store.search + reranker，`document_chunks` 表 embedding 用 JSONB 占位。
-- **SSE 流式**：4 个真流式端点（`chat/stream` tutor/exercise + `resource/generate/stream` + `resource/exercises/generate/stream`）+ 1 个伪流式（`path/generate/stream`，仅 progress + result）。
+- **SSE 流式**：4 个真流式端点 + 1 个伪流式端点。
+
+## 已修复的 P0 问题（2026-06-10）
+
+- `learning_records` 表已建（init_db.sql + create_all）
+- `evaluationApi.recordAction` 已在前端 5 处调用
+- `/tutor/ask` `embed_text` 已改为 `embed_single`
+- UUID 校验统一在 `core/dependencies.py`
+- profile/resources/pinggu 3 页面硬编码已替换为真实 API 数据
+- `_strip_think` 死代码已回滚
+
+## P1 未修（注意）
+
+- `chat_message.content` 存 JSON 字符串 → 历史消息显示原始 JSON
+- `markdownToHtml` 不消毒 → XSS 风险 6 处
+- 3 套 `Resource` / `Exercise` 类型定义漂移
+- 13 处 `alert()`
+- `print()` 代替 logging（10+ 处）
+- 防幻觉正则太激进
 
 ## 提交规范
 
