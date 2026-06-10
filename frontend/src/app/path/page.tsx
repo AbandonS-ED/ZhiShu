@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { pathApi } from '@/lib/api'
+import { pathApi, evaluationApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 
 // ═══ TYPES ═══
@@ -137,6 +137,13 @@ export default function PathPage() {
         if (e.type === 'result' && e.data) {
           const data = e.data
           setGenResult(`✅ 已生成「${data.title || ''}」\n共 ${data.total_days || 0} 天，${data.nodes?.length || 0} 个知识点，${data.edges?.length || 0} 条依赖关系\nID: ${(data.path_id || '').slice(0, 8)}...`)
+          evaluationApi.recordAction({
+            student_id: getStudentId(),
+            action: 'generate',
+            resource_type: 'path',
+            resource_id: data.path_id,
+            detail: { total_days: data.total_days, topics },
+          }).catch(() => {})
         }
         if (e.type === 'error') {
           setGenResult(`❌ ${e.message || '调用失败'}`)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { tutorApi, evaluationApi, type EvaluationReport } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 
@@ -71,15 +71,66 @@ function scoreColor(s: number) {
   return s >= 70 ? 'var(--success)' : s >= 40 ? 'var(--warm)' : 'var(--danger)'
 }
 
+// 把后端 EvaluationReport 派生为页面所需的展示数据
+function deriveDimensions(report: EvaluationReport | null) {
+  if (!report) return dimensions
+  const km = report.knowledge_mastery || {}
+  const entries = Object.entries(km)
+  if (entries.length === 0) return dimensions
+  // 取前 6 个知识点 → 6 个维度卡
+  return entries.slice(0, 6).map(([name, info], i) => ({
+    name: name.length > 8 ? name.slice(0, 8) + '…' : name,
+    icon: ['📚', '🧠', '🎯', '⚠️', '⏱️', '💡'][i] || '📌',
+    bg: 'var(--info-soft)',
+    color: 'var(--info)',
+    score: Math.round(info.avg_score),
+    detail: `练习 ${info.attempt_count} 次，平均 ${Math.round(info.avg_score)} 分`,
+  }))
+}
+
+function deriveKnowledgeTable(report: EvaluationReport | null) {
+  if (!report) return knowledgeTable
+  const km = report.knowledge_mastery || {}
+  const entries = Object.entries(km)
+  if (entries.length === 0) return knowledgeTable
+  return entries.map(([name, info]) => ({
+    name,
+    mastery: Math.round(info.avg_score),
+    attempts: info.attempt_count,
+    accuracy: Math.round(info.avg_score),
+  }))
+}
+
+function deriveWeeklyHours(report: EvaluationReport | null) {
+  if (!report) return weeklyHours
+  const daily = report.daily_activity || []
+  if (daily.length === 0) return weeklyHours
+  const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+  // 取最近 7 天，按日期排序
+  return daily.slice(0, 7).reverse().map((d) => {
+    const dt = new Date(d.date)
+    return { day: dayNames[dt.getDay()], val: d.duration_minutes / 60 }
+  })
+}
+
+function deriveTopicAccuracy(report: EvaluationReport | null) {
+  if (!report) return topicAccuracy
+  const km = report.knowledge_mastery || {}
+  return Object.entries(km).slice(0, 7).map(([name, info]) => ({
+    name: name.length > 6 ? name.slice(0, 6) + '…' : name,
+    pct: Math.round(info.avg_score),
+  }))
+}
+
 // ═══ LINE CHART COMPONENT ═══
-function TrendChart() {
+function TrendChart({ data }: { data: { day: string; val: number }[] }) {
   const W = 520, H = 220
   const pad = { t: 20, r: 20, b: 30, l: 40 }
   const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b
-  const maxVal = Math.max(...weeklyHours.map((d) => d.val)) * 1.2
+  const maxVal = Math.max(...data.map((d) => d.val), 0.1) * 1.2
 
-  const points = weeklyHours.map((d, i) => ({
-    x: pad.l + (cw / (weeklyHours.length - 1)) * i,
+  const points = data.map((d, i) => ({
+    x: pad.l + (cw / (data.length - 1)) * i,
     y: pad.t + ch - (ch * d.val / maxVal),
   }))
 
@@ -97,7 +148,7 @@ function TrendChart() {
       })}
 
       {/* X labels */}
-      {weeklyHours.map((d, i) => (
+      {data.map((d, i) => (
         <text key={i} x={points[i].x} y={H - 6} textAnchor="middle" className="lc-axis">{d.day}</text>
       ))}
 
@@ -116,12 +167,12 @@ function TrendChart() {
 }
 
 // ═══ BAR CHART COMPONENT ═══
-function BarChart() {
+function BarChart({ data }: { data: Array<{ name: string; pct: number }> }) {
   const W = 520, H = 220
   const pad = { t: 15, r: 20, b: 45, l: 10 }
   const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b
-  const barW = Math.min(40, (cw / topicAccuracy.length) - 12)
-  const gap = (cw - barW * topicAccuracy.length) / (topicAccuracy.length + 1)
+  const barW = Math.min(40, (cw / data.length) - 12)
+  const gap = (cw - barW * data.length) / (data.length + 1)
 
   return (
     <svg className="bar-chart" viewBox={`0 0 ${W} ${H}`}>
@@ -137,7 +188,7 @@ function BarChart() {
       })}
 
       {/* Bars */}
-      {topicAccuracy.map((d, i) => {
+      {data.map((d, i) => {
         const x = pad.l + gap + i * (barW + gap)
         const barH = ch * d.pct / 100
         const y = pad.t + ch - barH
@@ -169,6 +220,11 @@ export default function PingguPage() {
   const [askLoading, setAskLoading] = useState(false)
   const [askResult, setAskResult] = useState<{ question: string; answer: string; suggestion: string } | null>(null)
   const [evalReport, setEvalReport] = useState<EvaluationReport | null>(null)
+
+  const displayDimensions = useMemo(() => deriveDimensions(evalReport), [evalReport])
+  const displayKnowledgeTable = useMemo(() => deriveKnowledgeTable(evalReport), [evalReport])
+  const displayWeeklyHours = useMemo(() => deriveWeeklyHours(evalReport), [evalReport])
+  const displayTopicAccuracy = useMemo(() => deriveTopicAccuracy(evalReport), [evalReport])
   const [evalLoading, setEvalLoading] = useState(true)
 
   useEffect(() => {
@@ -281,6 +337,7 @@ export default function PingguPage() {
               <circle cx="80" cy="80" r="66" fill="none" stroke={scoreColor(currentScore)} strokeWidth="10"
                 strokeDasharray={circ} strokeDashoffset={circ - (circ * currentScore / 100)} strokeLinecap="round" />
             </svg>
+            {/* 派生真数据：使用 evalReport 时显示 */}
             <div className="sh-val">
               <div className="sh-num">{currentScore}</div>
               <div className="sh-label">综合评分</div>
@@ -291,8 +348,8 @@ export default function PingguPage() {
           </div>
         </div>
         <div className="sh-dims">
-          {dimensions.map((d, i) => (
-            <div key={i} className="dim-bar-card" style={{ opacity: 0, animation: `fadeUp .4s var(--ease) ${i * 0.06}s forwards` }}>
+          {displayDimensions.map((d, i) => (
+            <div key={`${d.name}-${i}`} className="dim-bar-card" style={{ opacity: 0, animation: `fadeUp .4s var(--ease) ${i * 0.06}s forwards` }}>
               <div className="db-top">
                 <div className="db-icon" style={{ background: d.bg, color: d.color }}>{d.icon}</div>
                 <div className="db-name">{d.name}</div>
@@ -339,7 +396,7 @@ export default function PingguPage() {
             <span className="tag tag-info">本周</span>
           </div>
           <div className="card-bd">
-            <TrendChart />
+            <TrendChart data={displayWeeklyHours} />
           </div>
         </div>
         <div className="card chart-card">
@@ -348,7 +405,7 @@ export default function PingguPage() {
             <span className="tag tag-green">按知识点</span>
           </div>
           <div className="card-bd">
-            <BarChart />
+            <BarChart data={displayTopicAccuracy} />
           </div>
         </div>
       </div>
@@ -404,7 +461,7 @@ export default function PingguPage() {
             <table className="km-table">
               <thead><tr><th>知识点</th><th>掌握度</th><th>进度</th><th>练习</th><th>正确率</th></tr></thead>
               <tbody>
-                {knowledgeTable.map((k, i) => {
+                {displayKnowledgeTable.map((k, i) => {
                   const col = scoreColor(k.accuracy)
                   return (
                     <tr key={i}>

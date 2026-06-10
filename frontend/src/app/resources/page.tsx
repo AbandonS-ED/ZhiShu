@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { resourceApi } from '@/lib/api'
+import { resourceApi, evaluationApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 
 // ═══ DATA ═══
@@ -178,6 +178,7 @@ interface Exercise {
 interface Resource {
   id: number
   type: ResourceType
+  isApi?: boolean
   title: string
   kp: string
   desc: string
@@ -257,6 +258,13 @@ export default function ResourcesPage() {
           const knowledge = content.knowledge || ''
           setGenResult(`✅ 已生成「${data.knowledge_point || genInput.trim()}」资源\n\n${knowledge.slice(0, 500)}${knowledge.length > 500 ? '...' : ''}`)
           setApiResources((prev) => [{ resource_id: data.resource_id, title: data.knowledge_point || genInput.trim(), knowledge_point: data.knowledge_point || genInput.trim(), created_at: new Date().toISOString() }, ...prev])
+          evaluationApi.recordAction({
+            student_id: getStudentId(),
+            action: 'generate',
+            resource_type: 'resource',
+            resource_id: data.resource_id,
+            knowledge_point: data.knowledge_point || genInput.trim(),
+          }).catch(() => {})
         }
         if (e.type === 'error') {
           setGenResult(`❌ ${e.message || '调用失败'}`)
@@ -277,7 +285,20 @@ export default function ResourcesPage() {
     })
   }, [])
 
-  const filtered: Resource[] = resources.filter((r) => {
+  const apiResourceCards: Resource[] = apiResources.map((r, i) => ({
+    id: 1000 + i,
+    type: 'explanation' as ResourceType,
+    isApi: true,
+    title: r.title || r.knowledge_point,
+    kp: r.knowledge_point,
+    desc: r.title || r.knowledge_point,
+    diff: '中级',
+    verified: true,
+    time: r.created_at ? new Date(r.created_at).toLocaleDateString('zh-CN') : '刚刚',
+    fav: false,
+  }))
+
+  const filtered: Resource[] = [...resources, ...apiResourceCards].filter((r) => {
     if (filter === 'favorites') return favorites.has(r.id)
     if (filter !== 'all') return r.type === (filter as ResourceType)
     return true
@@ -362,11 +383,9 @@ export default function ResourcesPage() {
 
       {/* Stats */}
       <div className="stats-bar">
-        共 <span className="sb-count">{filtered.length + apiResources.length}</span> 项资源
+        共 <span className="sb-count">{filtered.length}</span> 项资源
         <span className="sb-sep">·</span>
         已收藏 <span className="sb-count">{favorites.size}</span> 项
-        <span className="sb-sep">·</span>
-        API <span className="sb-count">{apiResources.length}</span> 项来自服务器
       </div>
 
       {/* Grid */}
@@ -528,6 +547,13 @@ export default function ResourcesPage() {
                     </div>
                     <div className="rc-audio-dur">{selectedRes.duration || '--:--'}</div>
                   </div>
+                </div>
+              )}
+              {!selectedRes.content && !selectedRes.mindmap && !selectedRes.code && !selectedRes.exercises && selectedRes.type !== 'audio' && selectedRes.isApi && (
+                <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--ink-3)' }}>
+                  <div style={{ fontSize: '32px', marginBottom: '12px' }}>📄</div>
+                  <div style={{ fontWeight: 500, marginBottom: 6 }}>AI 生成的资源</div>
+                  <div style={{ fontSize: 13 }}>在 AI 生成面板输入知识点即可重新生成</div>
                 </div>
               )}
             </div>

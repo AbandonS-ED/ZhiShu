@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { exerciseApi } from '@/lib/api'
+import { exerciseApi, evaluationApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { markdownToHtml } from '@/lib/utils'
 
@@ -185,6 +185,13 @@ export default function TikuPage() {
           }))
           setApiExercises((prev) => [...freshExercises, ...prev])
           setGenResult(`✅ 已生成 ${data.count || freshExercises.length} 道「${data.knowledge_point || genInput.trim()}」题目`)
+          evaluationApi.recordAction({
+            student_id: getStudentId(),
+            action: 'generate',
+            resource_type: 'exercise',
+            knowledge_point: data.knowledge_point || genInput.trim(),
+            detail: { count: data.count || freshExercises.length },
+          }).catch(() => {})
         }
         if (e.type === 'error') {
           setGenResult(`❌ ${e.message || '调用失败'}`)
@@ -231,6 +238,13 @@ export default function TikuPage() {
     const correct = selected === ex.ans
     setAnswers((prev) => ({ ...prev, [id]: { selected, correct } }))
     addRecent(ex, correct)
+    evaluationApi.recordAction({
+      student_id: getStudentId(),
+      action: 'exercise',
+      resource_type: 'exercise',
+      knowledge_point: ex.kp,
+      score: correct ? 100 : 0,
+    }).catch(() => {})
   }, [answers, addRecent])
 
   const answerJudge = useCallback((id: number, selected: boolean) => {
@@ -239,6 +253,13 @@ export default function TikuPage() {
     const correct = selected === ex.ans
     setAnswers((prev) => ({ ...prev, [id]: { selected, correct } }))
     addRecent(ex, correct)
+    evaluationApi.recordAction({
+      student_id: getStudentId(),
+      action: 'exercise',
+      resource_type: 'exercise',
+      knowledge_point: ex.kp,
+      score: correct ? 100 : 0,
+    }).catch(() => {})
   }, [answers, addRecent])
 
   const answerShort = useCallback((id: number, value: string) => {

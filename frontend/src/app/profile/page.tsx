@@ -19,14 +19,14 @@ const knowledgeData = [
   { name: '反向传播算法', score: 40, topic: '深度学习', sessions: 3 },
 ]
 
-const weaknessData = [
+const fallbackWeaknessData = [
   { name: '强化学习', score: 22, detail: '仅有基础概念理解', level: 'danger' },
   { name: 'RNN 与 LSTM', score: 35, detail: '序列建模需加深', level: 'danger' },
   { name: '反向传播算法', score: 40, detail: '梯度计算易出错', level: 'warm' },
   { name: 'Transformer 架构', score: 48, detail: '注意力机制需巩固', level: 'warm' },
 ]
 
-const dimensions = [
+const fallbackDimensions = [
   {
     name: '知识基础',
     icon: '📚',
@@ -163,6 +163,48 @@ function getScoreClass(s: number) {
   return s >= 70 ? 'high' : s >= 30 ? 'mid' : 'low'
 }
 
+// ═══ DERIVE FROM PROFILE ═══
+function deriveWeakness(p: StudentProfile | null) {
+  const km = p?.dimensions?.knowledge_mastery
+  if (!km || Object.keys(km).length === 0) return fallbackWeaknessData
+  const sorted = Object.entries(km).sort((a, b) => a[1] - b[1])
+  const levelMap = (s: number) => s < 30 ? 'danger' : s < 50 ? 'warm' : 'info'
+  return sorted.slice(0, 4).map(([name, score]) => ({
+    name,
+    score,
+    detail: score < 30 ? '仅有基础概念理解' : score < 50 ? '需加深理解' : '掌握中等',
+    level: levelMap(score),
+  }))
+}
+
+function deriveSixDimensions(p: StudentProfile | null) {
+  const d = p?.dimensions
+  if (!d) return fallbackDimensions
+  const km = d.knowledge_mastery || {}
+  const ls = d.learning_style || { visual: 0, textual: 0, auditory: 0, kinesthetic: 0 }
+  const cl = d.cognitive_level || { memory: 0, understand: 0, apply: 0, analyze: 0 }
+  const interest = d.interest || {}
+  const avg = (obj: Record<string, number>) => {
+    const vals = Object.values(obj)
+    return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0
+  }
+  const kmAvg = avg(km)
+  const lsAvg = Math.round((ls.visual + ls.textual + ls.auditory + ls.kinesthetic) / 4)
+  const clAvg = Math.round((cl.memory + cl.understand + cl.apply + cl.analyze) / 4)
+  const intAvg = avg(interest)
+  const daily = d.learning_pace?.daily_hours || 0
+  const paceScore = Math.min(100, Math.round(daily * 30))
+  const weakScore = kmAvg < 50 ? Math.round(kmAvg * 1.2) : Math.max(20, 100 - kmAvg)
+  return [
+    { name: '知识基础', icon: '📚', iconBg: 'var(--info-soft)', iconColor: 'var(--info)', score: kmAvg, desc: `掌握 ${Object.keys(km).length} 个知识点`, tags: Object.keys(km).slice(0, 4), details: Object.entries(km).slice(0, 5).map(([label, val]) => ({ label, val })) },
+    { name: '认知风格', icon: '🧠', iconBg: 'var(--success-soft)', iconColor: 'var(--success)', score: lsAvg, desc: '学习风格综合评估', tags: ['视觉型', '原理优先', '代码驱动', '归纳推理'], details: [{ label: '视觉偏好', val: ls.visual }, { label: '抽象思维', val: ls.textual }, { label: '动手实践', val: ls.auditory }, { label: '记忆风格', val: ls.kinesthetic }] },
+    { name: '学习目标', icon: '🎯', iconBg: 'var(--warm-soft)', iconColor: 'var(--warm)', score: clAvg, desc: '认知水平综合评估', tags: ['课程目标', '理解应用', '分析能力', '记忆能力'], details: [{ label: '记忆', val: cl.memory }, { label: '理解', val: cl.understand }, { label: '应用', val: cl.apply }, { label: '分析', val: cl.analyze }] },
+    { name: '易错点', icon: '⚠️', iconBg: 'var(--danger-soft)', iconColor: 'var(--danger)', score: weakScore, desc: '薄弱环节识别', tags: d.weak_topics?.slice(0, 4) || [], details: Object.entries(km).sort((a, b) => a[1] - b[1]).slice(0, 5).map(([label, val]) => ({ label, val })) },
+    { name: '学习节奏', icon: '⏱️', iconBg: 'var(--info-soft)', iconColor: 'var(--info)', score: paceScore, desc: `日均 ${daily}h，专注 ${d.learning_pace?.focus_duration || 0}min`, tags: ['晚间高效', `${daily}h/天`, `${d.learning_pace?.focus_duration || 0}min 专注`, '间歇学习'], details: [{ label: '日均时长', val: paceScore }, { label: '专注时长', val: d.learning_pace?.focus_duration || 0 }, { label: '连续天数', val: Math.min(60, Math.round((d.learning_pace?.focus_duration || 0) * 1.2)) }, { label: '效率指数', val: paceScore }, { label: '休息频率', val: Math.round(100 - paceScore * 0.4) }] },
+    { name: '兴趣方向', icon: '💡', iconBg: 'var(--success-soft)', iconColor: 'var(--success)', score: intAvg, desc: '兴趣方向综合评估', tags: Object.keys(interest).slice(0, 4), details: Object.entries(interest).slice(0, 5).map(([label, val]) => ({ label, val })) },
+  ]
+}
+
 // ═══ RADAR CHART COMPONENT ═══
 function RadarChart({ dims }: { dims: { name: string; score: number }[] }) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -290,10 +332,10 @@ export default function ProfilePage() {
   }
 
   const expandAll = () => {
-    if (openDims.size === dimensions.length) {
+    if (openDims.size === derivedDimensions.length) {
       setOpenDims(new Set())
     } else {
-      setOpenDims(new Set(dimensions.map((_, i) => i)))
+      setOpenDims(new Set(derivedDimensions.map((_, i) => i)))
     }
   }
 
@@ -325,6 +367,8 @@ export default function ProfilePage() {
     ? Object.entries(realProfile.dimensions.knowledge_mastery).map(([name, score]) => ({ name, score, topic: '—', sessions: 0 }))
     : knowledgeData
   const sortedKnowledge = [...displayKnowledge].sort((a, b) => a.score - b.score)
+  const derivedWeakness = deriveWeakness(realProfile)
+  const derivedDimensions = deriveSixDimensions(realProfile)
 
   // 从真实画像计算雷达图维度
   const radarDims = realProfile?.dimensions
@@ -334,7 +378,7 @@ export default function ProfilePage() {
         { name: '认知水平', score: Math.round(Object.values(realProfile.dimensions.cognitive_level || {}).reduce((a, b) => a + b, 0) / 4) },
         { name: '兴趣方向', score: Math.round(Object.values(realProfile.dimensions.interest || {}).reduce((a, b) => a + b, 0) / Math.max(Object.keys(realProfile.dimensions.interest || {}).length, 1)) },
       ]
-    : dimensions.map((d) => ({ name: d.name, score: d.score }))
+    : fallbackDimensions.map((d) => ({ name: d.name, score: d.score }))
   const currentQ = questions[qStep]
 
   return (
@@ -475,7 +519,7 @@ export default function ProfilePage() {
             </div>
             <div className="card-bd">
               <div className="weak-grid">
-                {weaknessData.map((w, i) => {
+                {derivedWeakness.map((w, i) => {
                   const c = getScoreClass(w.score)
                   return (
                     <div key={i} className="weak-item">
@@ -501,7 +545,7 @@ export default function ProfilePage() {
               </button>
             </div>
             <div className="card-bd">
-              {dimensions.map((d, i) => {
+              {derivedDimensions.map((d, i) => {
                 const isOpen = openDims.has(i)
                 return (
                   <div key={i} className="dim-section">

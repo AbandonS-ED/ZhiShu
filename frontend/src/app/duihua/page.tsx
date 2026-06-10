@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { chatApi, profileApi, type StudentProfile } from '@/lib/api'
+import { chatApi, profileApi, evaluationApi, type StudentProfile } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { escapeHtml, markdownToHtml, extractAnswer } from '@/lib/utils'
 
@@ -127,6 +127,12 @@ export default function DuihuaPage() {
         if (e.type === 'done' || e.type === 'error') {
           setStreaming(false)
           setStatus('')
+          evaluationApi.recordAction({
+            student_id: studentId,
+            action: 'chat',
+            resource_type: 'chat',
+            knowledge_point: userMsg,
+          }).catch(() => {})
           if (e.type === 'error') {
             setMessages((prev) => {
               const arr = [...prev]
