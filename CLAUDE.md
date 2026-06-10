@@ -44,11 +44,14 @@ ZhiShu/
 │   ├── app/api/                     # 8 router：profile / resource / path / tutor / chat / mindmap / dashboard / evaluation
 │   ├── app/core/{config,database}.py
 │   ├── app/models/                  # 9 个 Model（Student / Profile / DocumentChunk / Resource / LearningPath / Exercise / ChatSession / ChatMessage / LearningRecord）
-│   ├── app/agents/                  # 7 个 Agent（Profile / Document / Exercise / Path / Tutor / Master / MindMap）
+│   ├── app/agents/                  # 8 Agent + StateGraph 编排（Profile / Document / Exercise / Path / Tutor / Master / MindMap / Audio）
+│   │   ├── state.py                 # AgentState TypedDict + default_state + IntentType 枚举
+│   │   ├── communicator.py          # MessageBus pub/sub + AgentCommunicator（Agent 间通信）
+│   │   └── master_agent.py          # LangGraph StateGraph 13 节点编排（intent→plan→route→execute→aggregate→respond）
 │   ├── app/services/                # 12 个服务：minimax_client / spark_client / anti_hallucination / content_safety / document_parser / embedding_service / evaluation_service / json_parser / reranker / text_chunker / vector_store / minimax_langchain
 │   ├── scripts/init_db.sql          # 手动建库 + 建表脚本
-│   └── tests/                       # 4 个测试文件（71 个 pytest） + smoke_test.py + 5 个 debug 脚本
-│                                # ⭐ smoke_test.py 端到端跑 9 API 全 200（2026-06-09 commit 433c8ba）
+│   └── tests/                       # 6 个 test_*.py（88 pytest）+ smoke_test.py + 6 个 debug_*.py 脚本
+│                                # ⭐ smoke_test.py 端到端跑 9 API 全 200（2026-06-09 commit 433c8ba，2026-06-10 验证）
 ├── docs/                            # 已分类：赛题需求 / 设计文档 / 开发流程 / 运维测试 / 交付物
 ├── 开发进度.md                       # 实时进度跟踪
 ├── AGENTS.md                        # 团队协作文档
@@ -66,7 +69,8 @@ ZhiShu/
 - ✅ **SSE 流式输出** 所有生成接口已接（资源/练习/路径）
 - ✅ **RAG 管道** 已实现（文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排）
 - ✅ **练习题 dual-format 流式**（2026-06-09 修复）：chat.py:22-39 新增 `STREAM_EXERCISE_SYSTEM` + chat.py:42-62 新增 `_strip_think()`，LLM 一份输出同时给"人看"和"程序用"，实现 type=token 真流式
-- ✅ **端到端冒烟测试**（2026-06-09 提交 2026-06-10 验证）：`backend/tests/smoke_test.py` 跑 9 API 全 200。关键证据：F1 version=3 completeness=80% / F4 chat 1032 tokens / F2 resource 防幻觉抓出 1 issue confidence=0.85 / F3 path 7 天 DAG / F2 mindmap A* 28 节点。详见 `SMOKE_TEST_REPORT.md`
+- ✅ **端到端冒烟测试**（2026-06-09 commit `433c8ba`，2026-06-10 验证 + 修复 commit `fcd9f04`）：`backend/tests/smoke_test.py` 跑 9 API 全 200。关键证据：F1 version=3 completeness=80% / F4 chat 1032 tokens / F2 resource 防幻觉抓出 1 issue confidence=0.85 / F3 path 7 天 DAG / F2 mindmap A* 28 节点。详见 `SMOKE_TEST_REPORT.md`
+- ✅ **LangGraph StateGraph 多智能体编排**（2026-06-10）：Master Agent 从 if-else 路由升级为 13 节点 StateGraph（intent_recognition → task_planning → conditional_route → 7 子 Agent → result_aggregation → response_generation），支持 resource_generate/learn_and_practice/full_course 真多 Agent 协同
 
 ## 技术栈（已锁定，不要换）
 
@@ -74,7 +78,7 @@ ZhiShu/
 |---|---|---|
 | 前端 | Next.js 14.2.5 (App Router) + Tailwind 3.4 + TypeScript | 无 shadcn/ui，纯自定义 CSS |
 | 后端 | FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg | Python 3.11 |
-| Agent | LangGraph + LangChain（已安装，未使用 StateGraph） | 直接调用 LLM |
+| Agent | LangGraph StateGraph（13 节点编排 + MessageBus 通信） + LangChain | 8 Agent 协同 |
 | LLM | **双客户端**：`MiniMaxClient`（开发，默认） + `SparkClient`（上线前切到讯飞星火 V4） | OpenAI 兼容格式；`LLM_PROVIDER=spark\|minimax` 切换 |
 | 向量库 | pgvector（Python 包已装，PG 扩展未装） | embedding 用 JSONB 占位 + Python fallback 余弦相似度 |
 | 数据库 | PostgreSQL 18 + Redis（本地安装，无 Docker） | MinIO AGPL-3.0 需 LICENSE |
@@ -158,7 +162,7 @@ npm run lint          # ✅ 通过
 - **router 入参未校验** — `{profile,path,resource,tutor}.py` 全用 Pydantic body 接收 `student_id: str`，没 UUID 校验，接库前必须改（`mindmap.py` 已加 `@field_validator` 校验）
 - **无 Docker 环境** — PostgreSQL/Redis 需本地安装（D:\2026test\）
 - **`requirements.txt` 不完整** — 缺少 loguru/sse-starlette/pymupdf/python-docx/minio 等设计文档依赖
-- **`chat/stream` 实现细节**（`backend/app/api/chat.py`）— 先 `_quick_route` 关键词路由兜底，再走 `master_agent.route`；`tutor/chat` 类型直接走 `minimax_client.chat_stream` 拿 token 流，其他类型走 `master_agent.execute`。**`event_generator` 内必须独立 `async_session()`**（不能复用请求 session，否则流式期间锁住表导致写操作 hang）
+- **`chat/stream` 实现细节**（`backend/app/api/chat.py`）— 先 `_quick_route` 关键词路由兜底，再走 `master_agent.route`；`tutor/chat` 类型直接走 `minimax_client.chat_stream` 拿 token 流，其他类型走 StateGraph 编排（`intent_recognition → task_planning → conditional_route → Agent执行 → result_aggregation → response_generation`），通过 SSE 推送进度和结果。**`event_generator` 内必须独立 `async_session()`**（不能复用请求 session，否则流式期间锁住表导致写操作 hang）
 - **RAG 全链路新增**（`backend/app/services/{embedding_service,vector_store,reranker,anti_hallucination,text_chunker,document_parser}.py`）— `tutor.py` 的 RAG 已贯通到 SSE 流式（`chat.py` tutor 分支用 embedding_service + vector_store.search + async_session 独立 session）
 
 ### 已修复（不必再查）
@@ -175,13 +179,15 @@ npm run lint          # ✅ 通过
 - ✅ **端到端冒烟测试缺失**（2026-06-09 commit `433c8ba`，2026-06-10 验证 9/9 PASS）— `backend/tests/smoke_test.py` 9 API 全 200
 - ✅ **Agent 单元测试缺失**（2026-06-09 commit `90cf394`）— `test_agents.py` 31 + `test_anti_hallucination.py` 19 + `test_json_parser.py` 11 + `test_api.py` 10 = 71 pytest 测试 PASS
 - ✅ **echo=True 硬编码**（2026-06-09）— `database.py` 改为 `echo=settings.DEBUG`
-- ✅ **tutor.py /generate 重复端点**（2026-06-09）— 已删除，resource.py 保留唯一
+- ✅ **tutor.py /generate 重复端点**（2026-06-10 commit `414652e`）— 已删除，resource.py 保留唯一
+- ✅ **Spark-V4 升级**（2026-06-10 commit `414652e`）— `config.py:SPARK_MODEL` 从 `generalv3.5` → `Spark-V4`，对齐比赛硬约束
+- ✅ **DEBUG 配置开关**（2026-06-10 commit `414652e`）— `config.py` 新增 `DEBUG: bool = False`，`database.py` `echo=True` → `echo=settings.DEBUG`
 - ✅ **MindMap Agent 加重试**（2026-06-09 commit `90cf394`）— `_generate_once()` + `_is_fallback_result()` + `FALLBACK_MERMAID`，fallback 时重试一次
 - ✅ **前端 5 页面大改未提交**（2026-06-09 commits `41b1cf9` + `1b40af8`）— 33 文件全部入库
 - ✅ **dashboard 字段名 typo**（commit `0d8bf6c`）— `Exercise.score` → `is_correct`、`ChatMessage.student_id` → ChatSession 子查询
 - ✅ **防幻觉扩展到 6 个 Agent**（2026-06-09 commit `90cf394`）— Profile/Path/MindMap/Tutor 加 `anti_hallucination.validate()`（skip_llm=True）；Document/Exercise 已有完整三层
 - ✅ **json_parser.py 加固**（2026-06-09）— 处理未闭合 `<think>` 标签
-- ✅ **smoke_test.py 修复**（2026-06-10）— `bad()` 改为 raise `StepFailed`，TIMEOUT 60→120s，MindMap 读嵌套路径
+- ✅ **smoke_test.py 修复**（2026-06-09 commit `fcd9f04`）— `bad()` 改为 raise `StepFailed`，TIMEOUT 60→120s，MindMap 读嵌套路径
 
 ## 测试
 
@@ -189,11 +195,13 @@ npm run lint          # ✅ 通过
 
 端到端冒烟：`cd backend && python -m tests.smoke_test` — 9/9 PASS（2026-06-09）。
 
-**71 个 pytest 单元测试**（2026-06-09 提交，2026-06-10 验证）：
+**88 个 pytest 单元测试**（2026-06-09 提交，2026-06-10 验证，2026-06-10 commit `fcd9f04` 文档同步）：
 - `test_json_parser.py` — 11 个 JSON 解析测试
 - `test_anti_hallucination.py` — 19 个防幻觉三层测试
-- `test_agents.py` — 31 个 Agent 单元测试
+- `test_agents.py` — 31 个 Agent 单元测试（Profile / Document / Exercise / Path / Tutor / MindMap / Audio）
 - `test_api.py` — 10 个 API 集成测试
+- `test_message_bus.py` — 12 个 Agent 通信总线测试
+- `test_state_graph.py` — 25 个 LangGraph StateGraph 编排测试
 
 最新测试报告见 `SMOKE_TEST_REPORT.md`。
 
