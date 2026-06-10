@@ -4,10 +4,11 @@ import json
 import uuid
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db, async_session
+from app.core.dependencies import valid_student_id, valid_path_id
 from app.models.student_profile import StudentProfile
 from app.models.learning_path import LearningPath
 from app.agents.path_agent import path_agent
@@ -21,6 +22,17 @@ class PathGenerateRequest(BaseModel):
     course_id: str | None = None
     course_topics: list[str]
     total_days: int = 30
+
+    @field_validator("student_id", "course_id")
+    @classmethod
+    def _validate_uuid(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            uuid.UUID(v)
+            return v
+        except (ValueError, AttributeError, TypeError):
+            raise ValueError(f"无效的 UUID: {v}")
 
 
 @router.post("/generate")
@@ -123,6 +135,7 @@ async def generate_path_stream(req: PathGenerateRequest, db: AsyncSession = Depe
             except Exception as e:
                 import traceback
                 yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
                 print(f"[path/stream] 异常: {traceback.format_exc()}")
 
     return StreamingResponse(
@@ -137,11 +150,14 @@ async def generate_path_stream(req: PathGenerateRequest, db: AsyncSession = Depe
 
 
 @router.get("/{student_id}")
-async def get_paths(student_id: str, db: AsyncSession = Depends(get_db)):
+async def get_paths(
+    student_id: uuid.UUID = Depends(valid_student_id),
+    db: AsyncSession = Depends(get_db),
+):
     """获取学生的所有学习路径"""
     result = await db.execute(
         select(LearningPath)
-        .where(LearningPath.student_id == uuid.UUID(student_id))
+        .where(LearningPath.student_id == student_id)
         .order_by(LearningPath.created_at.desc())
     )
     paths = result.scalars().all()
@@ -158,12 +174,16 @@ async def get_paths(student_id: str, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/{student_id}/{path_id}")
-async def get_path_detail(student_id: str, path_id: str, db: AsyncSession = Depends(get_db)):
+async def get_path_detail(
+    student_id: uuid.UUID = Depends(valid_student_id),
+    path_id: uuid.UUID = Depends(valid_path_id),
+    db: AsyncSession = Depends(get_db),
+):
     """获取学习路径详情"""
     result = await db.execute(
         select(LearningPath)
-        .where(LearningPath.id == uuid.UUID(path_id))
-        .where(LearningPath.student_id == uuid.UUID(student_id))
+        .where(LearningPath.id == path_id)
+        .where(LearningPath.student_id == student_id)
     )
     path = result.scalar_one_or_none()
     if not path:

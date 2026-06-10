@@ -2,7 +2,7 @@
 
 import uuid
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
@@ -21,6 +21,17 @@ class AskRequest(BaseModel):
     question: str
     course_id: str | None = None
     use_rag: bool = True
+
+    @field_validator("student_id", "course_id")
+    @classmethod
+    def _validate_uuid(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            uuid.UUID(v)
+            return v
+        except (ValueError, AttributeError, TypeError):
+            raise ValueError(f"无效的 UUID: {v}")
 
 
 @router.post("/ask")
@@ -43,7 +54,7 @@ async def ask_tutor(req: AskRequest, db: AsyncSession = Depends(get_db)):
     if req.use_rag and req.question.strip():
         try:
             # 1. 向量化查询
-            query_embedding = await embedding_service.embed_text(req.question)
+            query_embedding = await embedding_service.embed_single(req.question)
 
             # 2. 向量检索
             search_results = await vector_store.search(

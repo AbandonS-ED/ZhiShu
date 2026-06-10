@@ -9,7 +9,7 @@
 - 课程进度
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.core.database import get_db
@@ -31,7 +31,10 @@ async def get_dashboard_stats(
     db: AsyncSession = Depends(get_db),
 ):
     """获取仪表盘统计数据"""
-    sid = uuid.UUID(student_id)
+    try:
+        sid = uuid.UUID(student_id)
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(status_code=422, detail=f"无效的 student_id: {student_id}")
 
     # 已学知识点数（从资源表统计）
     resource_count = await db.execute(
@@ -126,7 +129,10 @@ async def get_course_progress(
     db: AsyncSession = Depends(get_db),
 ):
     """获取课程进度"""
-    sid = uuid.UUID(student_id)
+    try:
+        sid = uuid.UUID(student_id)
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(status_code=422, detail=f"无效的 student_id: {student_id}")
 
     # 获取所有学习路径作为课程
     paths_result = await db.execute(

@@ -22,8 +22,8 @@ class MindMapGenRequest(BaseModel):
         try:
             uuid.UUID(v)
             return v
-        except ValueError:
-            raise HTTPException(status_code=400, detail="student_id 必须是有效的 UUID")
+        except (ValueError, AttributeError, TypeError):
+            raise ValueError(f"无效的 UUID: {v}")
 
 
 @router.post("/generate")

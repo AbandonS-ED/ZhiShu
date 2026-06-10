@@ -111,8 +111,25 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS learning_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL,
+    course_id UUID,
+    action VARCHAR(50) NOT NULL,
+    resource_type VARCHAR(50),
+    resource_id UUID,
+    knowledge_point VARCHAR(200),
+    score FLOAT,
+    duration_seconds INTEGER,
+    detail JSONB DEFAULT '{}',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_learning_records_student_id ON learning_records(student_id);
+CREATE INDEX IF NOT EXISTS idx_learning_records_action ON learning_records(action);
+CREATE INDEX IF NOT EXISTS idx_learning_records_created_at ON learning_records(created_at);
+
 -- 4. 完成
-\echo '✅ 数据库 zhishu 初始化完成，共 8 张表'
+\echo '✅ 数据库 zhishu 初始化完成，共 9 张表'
 \echo '   students / student_profiles / document_chunks'
 \echo '   resources / learning_paths / exercises'
-\echo '   chat_sessions / chat_messages'
+\echo '   chat_sessions / chat_messages / learning_records'

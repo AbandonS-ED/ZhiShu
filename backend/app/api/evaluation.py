@@ -2,9 +2,10 @@
 
 import uuid
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
+from app.core.dependencies import valid_student_id
 from app.services.evaluation_service import evaluation_service
 
 router = APIRouter()
@@ -20,6 +21,17 @@ class RecordActionRequest(BaseModel):
     duration_seconds: int | None = None
     detail: dict | None = None
     course_id: str | None = None
+
+    @field_validator("student_id", "course_id")
+    @classmethod
+    def _validate_uuid(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            uuid.UUID(v)
+            return v
+        except (ValueError, AttributeError, TypeError):
+            raise ValueError(f"无效的 UUID: {v}")
 
 
 @router.post("/record")
@@ -42,20 +54,20 @@ async def record_action(req: RecordActionRequest, db: AsyncSession = Depends(get
 
 @router.get("/stats/{student_id}")
 async def get_statistics(
-    student_id: str,
+    student_id: uuid.UUID = Depends(valid_student_id),
     days: int = 30,
     db: AsyncSession = Depends(get_db),
 ):
     """获取学习统计"""
-    stats = await evaluation_service.get_statistics(db, student_id, days)
+    stats = await evaluation_service.get_statistics(db, str(student_id), days)
     return stats
 
 
 @router.get("/report/{student_id}")
 async def get_evaluation_report(
-    student_id: str,
+    student_id: uuid.UUID = Depends(valid_student_id),
     db: AsyncSession = Depends(get_db),
 ):
     """生成学习评估报告"""
-    report = await evaluation_service.get_evaluation_report(db, student_id)
+    report = await evaluation_service.get_evaluation_report(db, str(student_id))
     return report

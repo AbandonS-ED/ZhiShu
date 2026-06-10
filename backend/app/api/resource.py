@@ -4,10 +4,11 @@ import json
 import uuid
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db, async_session
+from app.core.dependencies import valid_student_id
 from app.models.student_profile import StudentProfile
 from app.models.resource import Resource
 from app.models.exercise import Exercise
@@ -40,26 +41,35 @@ router = APIRouter()
 
 
 def _strip_think(text: str) -> str:
-    """去掉 <think>...</think> 标签及其内容，返回纯显示文本"""
+    """去掉 <think>...</think> 标签及其内容（支持嵌套和未闭合标签）
+
+    流中断在 <think> 内时，只截断到最后一个未闭合的 <think> 之前，
+    而不是删掉 rfind 之后的所有内容（包括合法文本）。
+    """
     result = ""
     depth = 0
+    open_tag = "<think>"
+    close_tag = "</think>"
+    open_len = len(open_tag)
+    close_len = len(close_tag)
+    last_open_in_result = -1
     i = 0
-    while i < len(text):
-        if text[i:i+7] == "<think>":
-            depth += 1
-            i += 7
-        elif text[i:i+8] == "</think>":
-            depth = max(0, depth - 1)
-            i += 8
+    n = len(text)
+    while i < n:
+        if depth == 0 and text[i:i + open_len] == open_tag:
+            last_open_in_result = len(result)
+            depth = 1
+            i += open_len
+        elif depth > 0 and text[i:i + close_len] == close_tag:
+            depth = 0
+            i += close_len
         elif depth == 0:
             result += text[i]
             i += 1
         else:
             i += 1
-    # 去掉末尾可能不完整的 <think>
-    if "<think>" in result:
-        idx = result.rfind("<think>")
-        result = result[:idx]
+    if depth > 0 and last_open_in_result >= 0:
+        result = result[:last_open_in_result]
     return result
 
 
@@ -68,6 +78,36 @@ class ResourceGenRequest(BaseModel):
     knowledge_point: str
     resource_type: str = "all"
     course_id: str | None = None
+
+    @field_validator("student_id", "course_id")
+    @classmethod
+    def _validate_uuid(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            uuid.UUID(v)
+            return v
+        except (ValueError, AttributeError, TypeError):
+            raise ValueError(f"无效的 UUID: {v}")
+
+
+class ExerciseGenRequest(BaseModel):
+    student_id: str
+    knowledge_point: str
+    exercise_type: str = "all"
+    count: int = 5
+    course_id: str | None = None
+
+    @field_validator("student_id", "course_id")
+    @classmethod
+    def _validate_uuid(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            uuid.UUID(v)
+            return v
+        except (ValueError, AttributeError, TypeError):
+            raise ValueError(f"无效的 UUID: {v}")
 
 
 @router.post("/generate")
@@ -182,6 +222,7 @@ async def generate_resource_stream(req: ResourceGenRequest, db: AsyncSession = D
             except Exception as e:
                 import traceback
                 yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
                 print(f"[resource/stream] 异常: {traceback.format_exc()}")
 
     return StreamingResponse(
@@ -196,11 +237,14 @@ async def generate_resource_stream(req: ResourceGenRequest, db: AsyncSession = D
 
 
 @router.get("/list")
-async def list_resources(student_id: str, db: AsyncSession = Depends(get_db)):
+async def list_resources(
+    student_id: uuid.UUID = Depends(valid_student_id),
+    db: AsyncSession = Depends(get_db),
+):
     """获取学生的所有资源"""
     result = await db.execute(
         select(Resource)
-        .where(Resource.student_id == uuid.UUID(student_id))
+        .where(Resource.student_id == student_id)
         .order_by(Resource.created_at.desc())
     )
     resources = result.scalars().all()
@@ -214,14 +258,6 @@ async def list_resources(student_id: str, db: AsyncSession = Depends(get_db)):
         }
         for r in resources
     ]
-
-
-class ExerciseGenRequest(BaseModel):
-    student_id: str
-    knowledge_point: str
-    exercise_type: str = "all"
-    count: int = 5
-    course_id: str | None = None
 
 
 @router.post("/exercises/generate")
@@ -390,6 +426,7 @@ async def generate_exercises_stream(req: ExerciseGenRequest, db: AsyncSession = 
             except Exception as e:
                 import traceback
                 yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
                 print(f"[exercises/stream] 异常: {traceback.format_exc()}")
 
     return StreamingResponse(
@@ -404,11 +441,14 @@ async def generate_exercises_stream(req: ExerciseGenRequest, db: AsyncSession = 
 
 
 @router.get("/exercises/{student_id}")
-async def list_exercises(student_id: str, db: AsyncSession = Depends(get_db)):
+async def list_exercises(
+    student_id: uuid.UUID = Depends(valid_student_id),
+    db: AsyncSession = Depends(get_db),
+):
     """获取学生的练习题列表"""
     result = await db.execute(
         select(Exercise)
-        .where(Exercise.student_id == uuid.UUID(student_id))
+        .where(Exercise.student_id == student_id)
         .order_by(Exercise.created_at.desc())
     )
     exercises = result.scalars().all()

@@ -2,11 +2,12 @@
 
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.dependencies import valid_student_id
 from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.agents.profile_agent import profile_agent
@@ -17,6 +18,15 @@ router = APIRouter()
 class BuildProfileRequest(BaseModel):
     student_id: str
     messages: list[dict]  # [{"role": "user", "content": "..."}, ...]
+
+    @field_validator("student_id")
+    @classmethod
+    def _validate_uuid(cls, v: str) -> str:
+        try:
+            uuid.UUID(v)
+            return v
+        except (ValueError, AttributeError, TypeError):
+            raise ValueError(f"无效的 UUID: {v}")
 
 
 class ProfileResponse(BaseModel):
@@ -30,14 +40,15 @@ class ProfileResponse(BaseModel):
 async def build_profile(req: BuildProfileRequest, db: AsyncSession = Depends(get_db)):
     """根据对话内容构建/更新学生画像"""
     # 1. 查找或创建学生
+    student_uuid = uuid.UUID(req.student_id)  # BuildProfileRequest 已用 field_validator 校验
     result = await db.execute(
-        select(Student).where(Student.id == uuid.UUID(req.student_id))
+        select(Student).where(Student.id == student_uuid)
     )
     student = result.scalar_one_or_none()
 
     if not student:
         # 自动创建学生记录
-        student = Student(id=uuid.UUID(req.student_id), name="未命名")
+        student = Student(id=student_uuid, name="未命名")
         db.add(student)
         await db.flush()
 
@@ -96,10 +107,13 @@ _EMPTY_DIMENSIONS = {
 
 
 @router.get("/{student_id}")
-async def get_profile(student_id: str, db: AsyncSession = Depends(get_db)):
+async def get_profile(
+    student_id: uuid.UUID = Depends(valid_student_id),
+    db: AsyncSession = Depends(get_db),
+):
     """获取学生当前画像，不存在时返回空画像"""
     result = await db.execute(
-        select(Student).where(Student.id == uuid.UUID(student_id))
+        select(Student).where(Student.id == student_id)
     )
     student = result.scalar_one_or_none()
     if not student:
