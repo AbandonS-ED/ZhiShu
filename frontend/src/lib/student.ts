@@ -1,13 +1,22 @@
-// 简易本地存储的 student_id (开发阶段固定 UUID)
-const KEY = 'zhishu_student_id'
-const DEFAULT = 'e198c489-e9e7-456c-9ba6-21d09af280da'
+// 从登录数据中获取 student_id
+const LOGIN_KEY = 'zhishu_student'
 
 export function getStudentId(): string {
-  if (typeof window === 'undefined') return DEFAULT
-  let id = localStorage.getItem(KEY)
-  if (!id) {
-    id = crypto.randomUUID()
-    localStorage.setItem(KEY, id)
+  if (typeof window === 'undefined') return ''
+  try {
+    const raw = localStorage.getItem(LOGIN_KEY)
+    if (raw) {
+      const student = JSON.parse(raw)
+      if (student?.id) return student.id
+    }
+  } catch {}
+  return ''
+}
+
+export function requireLogin(): string {
+  const id = getStudentId()
+  if (!id && typeof window !== 'undefined') {
+    window.location.href = '/login'
   }
   return id
 }

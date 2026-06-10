@@ -4,15 +4,33 @@
 
 const BASE_URL = 'http://localhost:8001/api/v1'
 
-// 通用 fetch 封装
+// 通用 fetch 封装（自动带 token）
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
   })
   if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`API ${res.status}: ${text || res.statusText}`)
+    let msg = res.statusText
+    try {
+      const body = await res.json()
+      msg = body.detail || body.message || JSON.stringify(body)
+    } catch {
+      msg = await res.text().catch(() => res.statusText)
+    }
+    // token 过期/无效 → 清 localStorage，跳登录页（仅非登录/注册接口触发）
+    if (res.status === 401 && typeof window !== 'undefined' && !path.startsWith('/auth/')) {
+      localStorage.removeItem('zhishu_token')
+      localStorage.removeItem('zhishu_refresh_token')
+      localStorage.removeItem('zhishu_student')
+      window.location.href = '/login'
+    }
+    throw new Error(msg)
   }
   return res.json()
 }
@@ -62,9 +80,13 @@ export const chatApi = {
     opts?: { session_id?: string; course_topics?: string[] }
   ): () => void {
     const controller = new AbortController()
+    const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
     fetch(`${BASE_URL}/chat/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ student_id, message, ...opts }),
       signal: controller.signal,
     })
@@ -102,6 +124,10 @@ export const chatApi = {
     request<Array<{ id: string; role: string; content: string; created_at: string }>>(
       `/chat/sessions/${session_id}/messages`
     ),
+  deleteSession: (session_id: string) =>
+    request<{ status: string }>(`/chat/sessions/${session_id}`, {
+      method: 'DELETE',
+    }),
 }
 
 // ===== Resource =====
@@ -130,9 +156,13 @@ export const resourceApi = {
     resource_type = 'all'
   ): () => void {
     const controller = new AbortController()
+    const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
     fetch(`${BASE_URL}/resource/generate/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ student_id, knowledge_point, resource_type }),
       signal: controller.signal,
     })
@@ -192,9 +222,13 @@ export const exerciseApi = {
     exercise_type = 'all'
   ): () => void {
     const controller = new AbortController()
+    const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
     fetch(`${BASE_URL}/resource/exercises/generate/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ student_id, knowledge_point, count, exercise_type }),
       signal: controller.signal,
     })
@@ -274,9 +308,13 @@ export const pathApi = {
     total_days = 30
   ): () => void {
     const controller = new AbortController()
+    const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
     fetch(`${BASE_URL}/path/generate/stream`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ student_id, course_topics, total_days }),
       signal: controller.signal,
     })
@@ -415,6 +453,40 @@ export const evaluationApi = {
     course_id?: string
   }) =>
     request<{ record_id: string; status: string }>('/evaluation/record', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+}
+
+// ===== Auth (登录 / 注册) =====
+export interface AuthStudent {
+  id: string
+  student_no: string
+  name?: string
+  email?: string
+  major?: string
+}
+
+export interface AuthResponse {
+  token: string
+  refresh_token?: string
+  student: AuthStudent
+}
+
+export const authApi = {
+  login: (data: { student_no: string; password: string }) =>
+    request<AuthResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  register: (data: {
+    student_no: string
+    password: string
+    name?: string
+    email?: string
+    major?: string
+  }) =>
+    request<AuthResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
