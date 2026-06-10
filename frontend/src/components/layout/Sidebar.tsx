@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 
 type NavItem = {
   href: string
@@ -80,7 +80,32 @@ const navGroups: { label: string; items: NavItem[] }[] = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
+  const [userName, setUserName] = useState('未登录')
+  const [userRole, setUserRole] = useState('')
+  const [userAvatar, setUserAvatar] = useState('未')
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('zhishu_student')
+      if (raw) {
+        const student = JSON.parse(raw)
+        const name = student.name || student.student_no || '未登录'
+        setUserName(name)
+        setUserAvatar(name.charAt(0))
+        const parts = [student.major, student.grade].filter(Boolean)
+        setUserRole(parts.join(' · ') || '智枢用户')
+      }
+    } catch {}
+  }, [])
+
+  function handleLogout() {
+    localStorage.removeItem('zhishu_token')
+    localStorage.removeItem('zhishu_refresh_token')
+    localStorage.removeItem('zhishu_student')
+    router.push('/login')
+  }
 
   const isActive = (href: string) => {
     return pathname === href || pathname.startsWith(href + '/')
@@ -135,11 +160,34 @@ export default function Sidebar() {
       </nav>
 
       <div className="sb-foot">
-        <div className="av">张</div>
+        <div className="av">{userAvatar}</div>
         <div className="info sb-text">
-          <div className="name">张明远</div>
-          <div className="role">计算机科学 · 大三</div>
+          <div className="name">{userName}</div>
+          <div className="role">{userRole}</div>
         </div>
+        <button
+          className="sb-logout"
+          onClick={handleLogout}
+          title="退出登录"
+          style={{
+            marginLeft: 'auto',
+            background: 'none',
+            border: 'none',
+            color: 'var(--muted)',
+            cursor: 'pointer',
+            padding: '4px',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </button>
       </div>
     </aside>
   )

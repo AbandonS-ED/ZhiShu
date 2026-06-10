@@ -1,4 +1,6 @@
-import type { Metadata } from 'next'
+'use client'
+
+import { usePathname } from 'next/navigation'
 import localFont from 'next/font/local'
 import './globals.css'
 import Sidebar from '@/components/layout/Sidebar'
@@ -17,9 +19,14 @@ const geistMono = localFont({
   display: 'swap',
 })
 
-export const metadata: Metadata = {
-  title: '智枢 SmartHub',
-  description: '多智能体学习资源生成系统',
+// 不需要 AppShell（Sidebar + Header）的路由
+const NO_SHELL_ROUTES = ['/login']
+
+function isNoShell(pathname: string | null): boolean {
+  if (!pathname) return false
+  return NO_SHELL_ROUTES.some(
+    (p) => pathname === p || pathname.startsWith(p + '/')
+  )
 }
 
 export default function RootLayout({
@@ -27,19 +34,26 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+  const pathname = usePathname()
+  const noShell = isNoShell(pathname)
+
   return (
     <html
       lang="zh-CN"
       className={`${geistSans.variable} ${geistMono.variable}`}
     >
-      <body className="font-sans">
-        <div className="app">
-          <Sidebar />
-          <div className="main">
-            <Header />
-            <div className="content">{children}</div>
+      <body className={`font-sans${noShell ? ' auth-mode' : ''}`}>
+        {noShell ? (
+          children
+        ) : (
+          <div className="app">
+            <Sidebar />
+            <div className="main">
+              <Header />
+              <div className="content">{children}</div>
+            </div>
           </div>
-        </div>
+        )}
       </body>
     </html>
   )

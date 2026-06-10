@@ -85,6 +85,20 @@ export default function DuihuaPage() {
     setGenResources([])
   }
 
+  // 删除会话
+  const deleteSession = async (sid: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      await chatApi.deleteSession(sid)
+      setSessions((prev) => prev.filter((s) => s.id !== sid))
+      if (sessionId === sid) {
+        setSessionId(null)
+        setMessages([])
+        setGenResources([])
+      }
+    } catch {}
+  }
+
   const sendMessage = () => {
     if (!input.trim() || streaming) return
     const userMsg = input.trim()
@@ -246,7 +260,17 @@ export default function DuihuaPage() {
                 className={`session-tab${sessionId === s.id ? ' active' : ''}`}
                 onClick={() => loadSession(s.id)}
               >
-                {s.title || `对话 ${s.id.slice(0, 6)}`}
+                <span className="session-tab-text">{s.title || `对话 ${s.id.slice(0, 6)}`}</span>
+                <button
+                  className="session-tab-del"
+                  onClick={(e) => deleteSession(s.id, e)}
+                  title="删除对话"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="12" height="12">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
               </div>
             ))
           ) : (
