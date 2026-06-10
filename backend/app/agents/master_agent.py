@@ -450,6 +450,7 @@ class MasterAgent:
         try:
             result = await tutor_agent.answer(
                 question=state.get("user_message", ""),
+                history=state.get("messages", []),  # 多轮对话上下文
                 context_chunks=state.get("intent_params", {}).get("context_chunks"),
                 student_profile=state.get("student_profile"),
             )

@@ -9,6 +9,8 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
+from app.models.student import Student
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
 from app.models.student_profile import StudentProfile
@@ -121,7 +123,23 @@ async def _handle_tutor_chat_stream(
         user_prompt = None
         system_prompt = "你是一个友好的 AI 学习助手。用简洁清晰的中文回答。直接输出回答内容，不要返回 JSON 格式，不要使用 <think> 标签。"
 
-    messages = [{"role": "user", "content": user_prompt or last_msg}]
+    # 构建多轮对话消息：历史 + 当前问题
+    messages = []
+    for msg in history:
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        # assistant 消息在 DB 里是 JSON，解析出文本
+        if role == "assistant":
+            try:
+                data = json.loads(content)
+                inner = data.get("data", data)
+                content = inner.get("answer", inner.get("final_response", content))
+            except (json.JSONDecodeError, TypeError):
+                pass
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": content})
+    # 当前问题作为最后一条
+    messages.append({"role": "user", "content": user_prompt or last_msg})
 
     yield f"data: {json.dumps({'type': 'progress', 'progress': 0.4, 'message': f'已路由到 {intent} Agent，开始生成...'}, ensure_ascii=False)}\n\n"
 
@@ -208,8 +226,8 @@ async def _handle_state_graph_stream(
         "course_topics": req.course_topics,
     }
 
-    # 通过 StateGraph 执行
-    final_state = None
+    # 通过 StateGraph 执行（累积所有节点的输出作为最终状态）
+    final_state: dict = {}
     async for event in master_agent.run_stream(initial_state):
         if "error" in event:
             error_state = event["error"]
@@ -224,7 +242,9 @@ async def _handle_state_graph_stream(
         if isinstance(node_output, dict) and node_output.get("progress"):
             yield f"data: {json.dumps({'type': 'progress', 'progress': node_output['progress'], 'message': node_output.get('current_step', '')}, ensure_ascii=False)}\n\n"
 
-        final_state = node_output
+        # 累积：每个节点的输出合并到 final_state
+        if isinstance(node_output, dict):
+            final_state.update(node_output)
 
     # StateGraph 执行完毕 → 推结果
     if not final_state or not isinstance(final_state, dict):
@@ -268,8 +288,11 @@ async def _handle_state_graph_stream(
 
 
 @router.post("/stream")
-async def stream_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
+async def stream_chat(req: ChatRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
     """SSE 流式对话 — Master Agent 路由 + 逐 token 流式返回"""
+    if str(user.id) != req.student_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
 
     # 获取或创建会话
     if req.session_id:
@@ -354,8 +377,12 @@ async def stream_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
 async def list_sessions(
     student_id: uuid.UUID = Depends(valid_student_id),
     db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
 ):
     """获取学生的会话列表"""
+    if user.id != student_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="只能查看自己的数据")
     result = await db.execute(
         select(ChatSession)
         .where(ChatSession.student_id == student_id)
@@ -377,8 +404,16 @@ async def list_sessions(
 async def list_messages(
     session_id: uuid.UUID = Depends(valid_session_id),
     db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
 ):
     """获取会话的消息历史"""
+    sess_result = await db.execute(
+        select(ChatSession).where(ChatSession.id == session_id)
+    )
+    session = sess_result.scalar_one_or_none()
+    if not session or session.student_id != user.id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="会话不存在")
     result = await db.execute(
         select(ChatMessage)
         .where(ChatMessage.session_id == session_id)
@@ -394,6 +429,32 @@ async def list_messages(
         }
         for m in messages
     ]
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(
+    session_id: uuid.UUID = Depends(valid_session_id),
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    """删除会话及其所有消息"""
+    from fastapi import HTTPException
+    from sqlalchemy import delete as sql_delete
+
+    sess_result = await db.execute(
+        select(ChatSession).where(ChatSession.id == session_id)
+    )
+    session = sess_result.scalar_one_or_none()
+    if not session or session.student_id != user.id:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    # 先删消息，再删会话
+    await db.execute(
+        sql_delete(ChatMessage).where(ChatMessage.session_id == session_id)
+    )
+    await db.delete(session)
+    await db.commit()
+    return {"status": "ok", "message": "会话已删除"}
 
 
 def _extract_answer(text: str) -> dict:
@@ -460,7 +521,18 @@ def _quick_route(msg: str) -> str | None:
             return intent
 
     # tutor 最后检查（避免"讲解...并出题"被误判为 tutor）
-    tutor_keywords = ["讲解", "为什么", "怎么", "是什么", "什么是", "解释", "原理", "区别", "对比", "比较", " vs ", "vs"]
+    # 加入更多通用疑问词，让简单问题（"一加一等于几"、"什么是 X"）也走 tutor 真流式
+    tutor_keywords = [
+        "讲解", "为什么", "怎么", "什么", "解释", "原理", "区别", "对比", "比较",
+        "等于", "多少", "几", "？", "?", "怎么算", "如何", "请问", "帮我说", "帮我讲",
+        "然后", "接下来", "接着", "继续", "还有", "再说", "另外", "补充",
+        "对吗", "是吗", "对吧", "是不是", "对不对",
+    ]
+    # 短消息（<15字）没匹配到其他意图，默认走 tutor（多轮追问场景）
+    if len(msg.strip()) < 15 and not any(
+        w in msg_lower for w in ["画像", "思维导图", "脑图", "练习", "题目", "出题", "路径", "规划", "教程", "学习材料", "音频"]
+    ):
+        return "tutor"
     if any(w in msg_lower for w in tutor_keywords):
         return "tutor"
 

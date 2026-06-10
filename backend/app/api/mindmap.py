@@ -6,6 +6,8 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
+from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.agents.mindmap_agent import mindmap_agent
 
@@ -27,8 +29,10 @@ class MindMapGenRequest(BaseModel):
 
 
 @router.post("/generate")
-async def generate_mindmap(req: MindMapGenRequest, db: AsyncSession = Depends(get_db)):
+async def generate_mindmap(req: MindMapGenRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
     """生成思维导图"""
+    if str(user.id) != req.student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
 
     # 获取学生画像
     profile_result = await db.execute(

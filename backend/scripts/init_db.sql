@@ -20,6 +20,8 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'zhishu')\gexec
 
 CREATE TABLE IF NOT EXISTS students (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_no VARCHAR(50) UNIQUE,
+    password_hash VARCHAR(255),
     name VARCHAR(100) NOT NULL,
     email VARCHAR(255) UNIQUE,
     major VARCHAR(100),
@@ -128,8 +130,16 @@ CREATE INDEX IF NOT EXISTS idx_learning_records_student_id ON learning_records(s
 CREATE INDEX IF NOT EXISTS idx_learning_records_action ON learning_records(action);
 CREATE INDEX IF NOT EXISTS idx_learning_records_created_at ON learning_records(created_at);
 
--- 4. 完成
-\echo '✅ 数据库 zhishu 初始化完成，共 9 张表'
+-- 5. 常用查询索引（student_id 在 5+ 张表频繁查询）
+CREATE INDEX IF NOT EXISTS idx_student_profiles_student_id ON student_profiles(student_id);
+CREATE INDEX IF NOT EXISTS idx_resources_student_id ON resources(student_id);
+CREATE INDEX IF NOT EXISTS idx_learning_paths_student_id ON learning_paths(student_id);
+CREATE INDEX IF NOT EXISTS idx_exercises_student_id ON exercises(student_id);
+CREATE INDEX IF NOT EXISTS idx_chat_sessions_student_id ON chat_sessions(student_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id);
+
+-- 6. 完成
+\echo '✅ 数据库 zhishu 初始化完成，共 9 张表 + 10 个索引'
 \echo '   students / student_profiles / document_chunks'
 \echo '   resources / learning_paths / exercises'
 \echo '   chat_sessions / chat_messages / learning_records'

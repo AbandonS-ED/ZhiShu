@@ -1,11 +1,13 @@
 """智能辅导 API — RAG 问答"""
 
 import uuid
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
+from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.agents.tutor_agent import tutor_agent
 from app.services.embedding_service import embedding_service
@@ -35,8 +37,10 @@ class AskRequest(BaseModel):
 
 
 @router.post("/ask")
-async def ask_tutor(req: AskRequest, db: AsyncSession = Depends(get_db)):
+async def ask_tutor(req: AskRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
     """RAG 问答 — 基于知识库回答学生问题"""
+    if str(user.id) != req.student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
 
     # 获取学生画像
     profile_result = await db.execute(

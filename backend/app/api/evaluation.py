@@ -4,8 +4,10 @@ import uuid
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import HTTPException
 from app.core.database import get_db
-from app.core.dependencies import valid_student_id
+from app.core.dependencies import valid_student_id, get_current_user
+from app.models.student import Student
 from app.services.evaluation_service import evaluation_service
 
 router = APIRouter()
@@ -35,8 +37,10 @@ class RecordActionRequest(BaseModel):
 
 
 @router.post("/record")
-async def record_action(req: RecordActionRequest, db: AsyncSession = Depends(get_db)):
+async def record_action(req: RecordActionRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
     """记录学习行为"""
+    if str(user.id) != req.student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
     record = await evaluation_service.record_action(
         db=db,
         student_id=req.student_id,
@@ -57,8 +61,11 @@ async def get_statistics(
     student_id: uuid.UUID = Depends(valid_student_id),
     days: int = 30,
     db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
 ):
     """获取学习统计"""
+    if user.id != student_id:
+        raise HTTPException(status_code=403, detail="只能查看自己的数据")
     stats = await evaluation_service.get_statistics(db, str(student_id), days)
     return stats
 
@@ -67,7 +74,10 @@ async def get_statistics(
 async def get_evaluation_report(
     student_id: uuid.UUID = Depends(valid_student_id),
     db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
 ):
     """生成学习评估报告"""
+    if user.id != student_id:
+        raise HTTPException(status_code=403, detail="只能查看自己的数据")
     report = await evaluation_service.get_evaluation_report(db, str(student_id))
     return report

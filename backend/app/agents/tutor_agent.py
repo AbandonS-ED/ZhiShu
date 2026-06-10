@@ -51,6 +51,7 @@ class TutorAgent:
         question: str,
         context_chunks: list[dict] | None = None,
         student_profile: dict | None = None,
+        history: list[dict] | None = None,
     ) -> dict:
         """回答学生问题
 
@@ -58,14 +59,25 @@ class TutorAgent:
             question: 学生提问
             context_chunks: RAG 检索到的相关文档片段 [{content, source, score}]
             student_profile: 学生画像
+            history: 对话历史 [{"role": "user"/"assistant", "content": "..."}]
 
         Returns:
             {answer, confidence, sources, related_topics, suggestion}
         """
         user_prompt = self._build_prompt(question, context_chunks, student_profile)
 
+        # 构建多轮对话：历史 + 当前问题
+        messages = []
+        if history:
+            for msg in history[-10:]:  # 最近 10 条，防止 token 超限
+                role = msg.get("role", "")
+                content = msg.get("content", "")
+                if role in ("user", "assistant") and content:
+                    messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": user_prompt})
+
         response = await mc_module.minimax_client.chat(
-            messages=[{"role": "user", "content": user_prompt}],
+            messages=messages,
             system=self.SYSTEM_PROMPT,
             max_tokens=4096,
             temperature=0.5,

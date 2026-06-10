@@ -5,8 +5,10 @@ from app.core.database import Base
 
 class Student(Base):
     __tablename__ = "students"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    student_no = Column(String(50), unique=True, nullable=True)
+    password_hash = Column(String(255), nullable=True)
     name = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, nullable=True)
     major = Column(String(100), nullable=True)

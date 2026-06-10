@@ -7,8 +7,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from fastapi import HTTPException
 from app.core.database import get_db, async_session
-from app.core.dependencies import valid_student_id
+from app.core.dependencies import valid_student_id, get_current_user
+from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.models.resource import Resource
 from app.models.exercise import Exercise
@@ -111,8 +113,10 @@ class ExerciseGenRequest(BaseModel):
 
 
 @router.post("/generate")
-async def generate_resource(req: ResourceGenRequest, db: AsyncSession = Depends(get_db)):
+async def generate_resource(req: ResourceGenRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
     """生成学习资源"""
+    if str(user.id) != req.student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
 
     # 获取学生画像
     profile_result = await db.execute(
@@ -153,8 +157,10 @@ async def generate_resource(req: ResourceGenRequest, db: AsyncSession = Depends(
 
 
 @router.post("/generate/stream")
-async def generate_resource_stream(req: ResourceGenRequest, db: AsyncSession = Depends(get_db)):
+async def generate_resource_stream(req: ResourceGenRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
     """SSE 流式生成学习资源"""
+    if str(user.id) != req.student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
 
     # 获取学生画像（在主 session 中完成）
     profile_result = await db.execute(
@@ -240,8 +246,11 @@ async def generate_resource_stream(req: ResourceGenRequest, db: AsyncSession = D
 async def list_resources(
     student_id: uuid.UUID = Depends(valid_student_id),
     db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
 ):
     """获取学生的所有资源"""
+    if user.id != student_id:
+        raise HTTPException(status_code=403, detail="只能查看自己的数据")
     result = await db.execute(
         select(Resource)
         .where(Resource.student_id == student_id)
@@ -261,8 +270,10 @@ async def list_resources(
 
 
 @router.post("/exercises/generate")
-async def generate_exercises(req: ExerciseGenRequest, db: AsyncSession = Depends(get_db)):
+async def generate_exercises(req: ExerciseGenRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
     """生成练习题"""
+    if str(user.id) != req.student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
 
     # 获取学生画像
     profile_result = await db.execute(
@@ -319,8 +330,10 @@ async def generate_exercises(req: ExerciseGenRequest, db: AsyncSession = Depends
 
 
 @router.post("/exercises/generate/stream")
-async def generate_exercises_stream(req: ExerciseGenRequest, db: AsyncSession = Depends(get_db)):
+async def generate_exercises_stream(req: ExerciseGenRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
     """SSE 流式生成练习题"""
+    if str(user.id) != req.student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
 
     # 获取学生画像（在主 session 中完成）
     profile_result = await db.execute(
@@ -444,8 +457,11 @@ async def generate_exercises_stream(req: ExerciseGenRequest, db: AsyncSession = 
 async def list_exercises(
     student_id: uuid.UUID = Depends(valid_student_id),
     db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
 ):
     """获取学生的练习题列表"""
+    if user.id != student_id:
+        raise HTTPException(status_code=403, detail="只能查看自己的数据")
     result = await db.execute(
         select(Exercise)
         .where(Exercise.student_id == student_id)

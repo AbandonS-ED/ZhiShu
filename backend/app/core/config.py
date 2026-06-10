@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     
+    JWT_SECRET: str = "zhishu-demo-secret-2026"
+    
     DEBUG: bool = False
     
     class Config:

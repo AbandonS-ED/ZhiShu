@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import valid_student_id
+from app.core.dependencies import valid_student_id, get_current_user
 from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.agents.profile_agent import profile_agent
@@ -37,8 +37,10 @@ class ProfileResponse(BaseModel):
 
 
 @router.post("/build")
-async def build_profile(req: BuildProfileRequest, db: AsyncSession = Depends(get_db)):
+async def build_profile(req: BuildProfileRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
     """根据对话内容构建/更新学生画像"""
+    if str(user.id) != req.student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的画像")
     # 1. 查找或创建学生
     student_uuid = uuid.UUID(req.student_id)  # BuildProfileRequest 已用 field_validator 校验
     result = await db.execute(
@@ -110,8 +112,11 @@ _EMPTY_DIMENSIONS = {
 async def get_profile(
     student_id: uuid.UUID = Depends(valid_student_id),
     db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
 ):
     """获取学生当前画像，不存在时返回空画像"""
+    if user.id != student_id:
+        raise HTTPException(status_code=403, detail="只能查看自己的画像")
     result = await db.execute(
         select(Student).where(Student.id == student_id)
     )

@@ -12,7 +12,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from fastapi import HTTPException
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
 from app.models.student import Student
 from app.models.resource import Resource
 from app.models.learning_path import LearningPath
@@ -27,10 +29,13 @@ router = APIRouter()
 
 @router.get("/stats")
 async def get_dashboard_stats(
-    student_id: str = "00000000-0000-0000-0000-000000000001",
+    student_id: str,
     db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
 ):
     """获取仪表盘统计数据"""
+    if str(user.id) != student_id:
+        raise HTTPException(status_code=403, detail="只能查看自己的数据")
     try:
         sid = uuid.UUID(student_id)
     except (ValueError, AttributeError, TypeError):
@@ -125,10 +130,13 @@ async def get_dashboard_stats(
 
 @router.get("/courses")
 async def get_course_progress(
-    student_id: str = "00000000-0000-0000-0000-000000000001",
+    student_id: str,
     db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
 ):
     """获取课程进度"""
+    if str(user.id) != student_id:
+        raise HTTPException(status_code=403, detail="只能查看自己的数据")
     try:
         sid = uuid.UUID(student_id)
     except (ValueError, AttributeError, TypeError):

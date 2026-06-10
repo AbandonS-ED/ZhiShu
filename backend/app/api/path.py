@@ -7,8 +7,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from fastapi import HTTPException
 from app.core.database import get_db, async_session
-from app.core.dependencies import valid_student_id, valid_path_id
+from app.core.dependencies import valid_student_id, valid_path_id, get_current_user
+from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.models.learning_path import LearningPath
 from app.agents.path_agent import path_agent
@@ -36,8 +38,10 @@ class PathGenerateRequest(BaseModel):
 
 
 @router.post("/generate")
-async def generate_path(req: PathGenerateRequest, db: AsyncSession = Depends(get_db)):
+async def generate_path(req: PathGenerateRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
     """生成个性化学习路径"""
+    if str(user.id) != req.student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
 
     # 获取学生画像
     profile_result = await db.execute(
@@ -86,8 +90,10 @@ async def generate_path(req: PathGenerateRequest, db: AsyncSession = Depends(get
 
 
 @router.post("/generate/stream")
-async def generate_path_stream(req: PathGenerateRequest, db: AsyncSession = Depends(get_db)):
+async def generate_path_stream(req: PathGenerateRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
     """SSE 流式生成学习路径"""
+    if str(user.id) != req.student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
 
     # 获取学生画像（在主 session 中完成）
     profile_result = await db.execute(
@@ -153,8 +159,11 @@ async def generate_path_stream(req: PathGenerateRequest, db: AsyncSession = Depe
 async def get_paths(
     student_id: uuid.UUID = Depends(valid_student_id),
     db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
 ):
     """获取学生的所有学习路径"""
+    if user.id != student_id:
+        raise HTTPException(status_code=403, detail="只能查看自己的数据")
     result = await db.execute(
         select(LearningPath)
         .where(LearningPath.student_id == student_id)
@@ -178,8 +187,11 @@ async def get_path_detail(
     student_id: uuid.UUID = Depends(valid_student_id),
     path_id: uuid.UUID = Depends(valid_path_id),
     db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
 ):
     """获取学习路径详情"""
+    if user.id != student_id:
+        raise HTTPException(status_code=403, detail="只能查看自己的数据")
     result = await db.execute(
         select(LearningPath)
         .where(LearningPath.id == path_id)

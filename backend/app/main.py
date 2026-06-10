@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import profile, resource, path, tutor, chat, mindmap, dashboard, evaluation
+from app.api import profile, resource, path, tutor, chat, mindmap, dashboard, evaluation, auth
 from app.core.config import settings
 from app.core.database import init_db
 from app.services.minimax_client import init_minimax_client
@@ -50,6 +50,7 @@ app.include_router(chat.router, prefix="/api/v1/chat", tags=["聊天"])
 app.include_router(mindmap.router, prefix="/api/v1/mindmap", tags=["思维导图"])
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["仪表盘"])
 app.include_router(evaluation.router, prefix="/api/v1/evaluation", tags=["效果评估"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["认证"])
 
 @app.get("/")
 async def root():
