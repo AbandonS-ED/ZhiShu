@@ -69,6 +69,182 @@ class ChatRequest(BaseModel):
     course_topics: list[str] | None = None
 
 
+# ====================================================================
+# tutor/chat 真逐 token 流式（保持原有逻辑不变）
+# ====================================================================
+
+async def _handle_tutor_chat_stream(
+    intent: str, last_msg: str, history: list, student_profile, session, db
+):
+    """tutor/chat 意图：真逐 token 流式（原逻辑）"""
+    yield f"data: {json.dumps({'type': 'progress', 'progress': 0.2, 'message': '正在分析请求...'}, ensure_ascii=False)}\n\n"
+
+    context_chunks = None
+    if intent == "tutor":
+        from app.agents.tutor_agent import tutor_agent
+        from app.services.vector_store import vector_store
+        from app.services.embedding_service import embedding_service
+        from app.core.database import async_session as db_async_session
+
+        try:
+            query_embedding = await embedding_service.embed_single(last_msg)
+            async with db_async_session() as rag_db:
+                chunks = await vector_store.search(rag_db, query_embedding, top_k=5)
+            context_chunks = chunks
+        except Exception as e:
+            print(f"[chat/stream] RAG 检索失败: {e}")
+
+        user_prompt = tutor_agent._build_prompt(
+            last_msg, context_chunks, student_profile, output_format="text"
+        )
+        system_prompt = tutor_agent.STREAM_PROMPT
+    else:
+        user_prompt = None
+        system_prompt = "你是一个友好的 AI 学习助手。用简洁清晰的中文回答。直接输出回答内容，不要返回 JSON 格式，不要使用 <think> 标签。"
+
+    messages = [{"role": "user", "content": user_prompt or last_msg}]
+
+    yield f"data: {json.dumps({'type': 'progress', 'progress': 0.4, 'message': f'已路由到 {intent} Agent，开始生成...'}, ensure_ascii=False)}\n\n"
+
+    think_depth = 0
+    think_open = "<think>"
+    think_close = "</think>"
+    tail = ""
+    stream_text = ""
+    async for token in mc_module.minimax_client.chat_stream(
+        messages=messages,
+        system=system_prompt,
+        max_tokens=4096,
+        temperature=0.5 if intent == "tutor" else 0.7,
+    ):
+        pending = tail + token
+        cursor = 0
+        while cursor < len(pending):
+            if think_depth == 0:
+                idx = pending.find(think_open, cursor)
+                if idx == -1:
+                    safe_end = len(pending) - len(think_open) + 1
+                    if safe_end > cursor:
+                        seg = pending[cursor:safe_end]
+                        stream_text += seg
+                        yield f"data: {json.dumps({'type': 'token', 'content': seg}, ensure_ascii=False)}\n\n"
+                    tail = pending[safe_end:]
+                    cursor = len(pending)
+                else:
+                    if idx > cursor:
+                        seg = pending[cursor:idx]
+                        stream_text += seg
+                        yield f"data: {json.dumps({'type': 'token', 'content': seg}, ensure_ascii=False)}\n\n"
+                    cursor = idx + len(think_open)
+                    think_depth = 1
+            else:
+                idx = pending.find(think_close, cursor)
+                if idx == -1:
+                    tail = ""
+                    cursor = len(pending)
+                else:
+                    cursor = idx + len(think_close)
+                    think_depth = 0
+    if think_depth == 0 and tail:
+        stream_text += tail
+        yield f"data: {json.dumps({'type': 'token', 'content': tail}, ensure_ascii=False)}\n\n"
+
+    if intent == "tutor":
+        from app.agents.tutor_agent import tutor_agent
+        result_data = tutor_agent._parse_response(stream_text)
+    else:
+        result_data = _extract_answer(stream_text)
+
+    assistant_msg = ChatMessage(
+        id=uuid.uuid4(),
+        session_id=session.id,
+        role="assistant",
+        content=json.dumps({"type": intent, "data": result_data}, ensure_ascii=False),
+    )
+    db.add(assistant_msg)
+    await db.commit()
+
+    yield f"data: {json.dumps({'type': 'result', 'data': {'type': intent, **result_data}}, ensure_ascii=False)}\n\n"
+    yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+
+
+# ====================================================================
+# 其他意图：StateGraph 多智能体编排
+# ====================================================================
+
+async def _handle_state_graph_stream(
+    req: ChatRequest, history: list, student_profile, session, db
+):
+    """非 tutor/chat 意图：走 StateGraph 多智能体编排"""
+    yield f"data: {json.dumps({'type': 'progress', 'progress': 0.1, 'message': '正在分析请求...'}, ensure_ascii=False)}\n\n"
+
+    # 构建 StateGraph 初始状态
+    initial_state = {
+        "student_id": req.student_id,
+        "session_id": str(session.id),
+        "user_message": req.message,
+        "messages": history,
+        "student_profile": student_profile,
+        "intent_params": {},
+        "course_topics": req.course_topics,
+    }
+
+    # 通过 StateGraph 执行
+    final_state = None
+    async for event in master_agent.run_stream(initial_state):
+        if "error" in event:
+            error_state = event["error"]
+            yield f"data: {json.dumps({'type': 'error', 'message': error_state.get('error', '未知错误')}, ensure_ascii=False)}\n\n"
+            return
+
+        node_name = list(event.keys())[0]
+        node_output = event[node_name]
+
+        # 推进度
+        if isinstance(node_output, dict) and node_output.get("progress"):
+            yield f"data: {json.dumps({'type': 'progress', 'progress': node_output['progress'], 'message': node_output.get('current_step', '')}, ensure_ascii=False)}\n\n"
+
+        final_state = node_output
+
+    # StateGraph 执行完毕 → 推结果
+    if not final_state or not isinstance(final_state, dict):
+        yield f"data: {json.dumps({'type': 'error', 'message': 'StateGraph 执行异常'}, ensure_ascii=False)}\n\n"
+        return
+
+    final_response = final_state.get("final_response", "任务处理完成。")
+    resources = final_state.get("resources", [])
+
+    # 切片推 token（让前端实时看到内容）
+    chunk_size = 16
+    for i in range(0, len(final_response), chunk_size):
+        chunk = final_response[i:i + chunk_size]
+        if chunk:
+            yield f"data: {json.dumps({'type': 'token', 'content': chunk}, ensure_ascii=False)}\n\n"
+
+    # 推完整结果
+    result_data = {
+        "type": "multi",
+        "data": {
+            "final_response": final_response,
+            "resources": resources,
+            "intent": final_state.get("intent", ""),
+        },
+    }
+    yield f"data: {json.dumps({'type': 'result', 'data': result_data}, ensure_ascii=False)}\n\n"
+
+    # 存储 assistant 消息
+    assistant_msg = ChatMessage(
+        id=uuid.uuid4(),
+        session_id=session.id,
+        role="assistant",
+        content=json.dumps(result_data, ensure_ascii=False),
+    )
+    db.add(assistant_msg)
+    await db.commit()
+
+    yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+
+
 @router.post("/stream")
 async def stream_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
     """SSE 流式对话 — Master Agent 路由 + 逐 token 流式返回"""
@@ -124,291 +300,25 @@ async def stream_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
         try:
             yield f"data: {json.dumps({'type': 'session', 'session_id': str(session.id)}, ensure_ascii=False)}\n\n"
 
-            state = {
-                "request_type": "",
-                "student_id": req.student_id,
-                "messages": history,
-                "student_profile": student_profile,
-                "knowledge_point": None,
-                "course_topics": req.course_topics,
-                "context_chunks": None,
-                "result": None,
-                "error": None,
-            }
+            last_msg = history[-1].get("content", "") if history else ""
 
-            yield f"data: {json.dumps({'type': 'progress', 'progress': 0.2, 'message': '正在分析请求...'}, ensure_ascii=False)}\n\n"
+            # 关键词快速路由判断意图
+            intent = _quick_route(last_msg)
 
-            last_msg = state["messages"][-1].get("content", "") if state["messages"] else ""
-            request_type = _quick_route(last_msg)
-
-            if not request_type:
-                state = await master_agent.route(state)
-                if state.get("error"):
-                    yield f"data: {json.dumps({'type': 'error', 'message': state['error']}, ensure_ascii=False)}\n\n"
-                    return
-                request_type = state.get("request_type", "chat")
-            else:
-                state["request_type"] = request_type
-                if not state.get("knowledge_point"):
-                    state["knowledge_point"] = _extract_knowledge_point(last_msg)
-
-            yield f"data: {json.dumps({'type': 'progress', 'progress': 0.4, 'message': f'已路由到 {request_type} Agent，开始生成...'}, ensure_ascii=False)}\n\n"
-
-            async def yield_token(text: str):
-                if text:
-                    return f"data: {json.dumps({'type': 'token', 'content': text}, ensure_ascii=False)}\n\n"
-                return None
-
-            if request_type in ("tutor", "chat"):
-                last_msg = state["messages"][-1].get("content", "")
-
-                if request_type == "tutor":
-                    from app.agents.tutor_agent import tutor_agent
-                    from app.services.vector_store import vector_store
-                    from app.services.embedding_service import embedding_service
-                    from app.core.database import async_session as db_async_session
-
-                    try:
-                        query_embedding = await embedding_service.embed_single(last_msg)
-                        async with db_async_session() as rag_db:
-                            chunks = await vector_store.search(rag_db, query_embedding, top_k=5)
-                        state["context_chunks"] = chunks
-                    except Exception as e:
-                        print(f"[chat/stream] RAG 检索失败: {e}")
-                        state["context_chunks"] = None
-
-                    user_prompt = tutor_agent._build_prompt(
-                        last_msg, state.get("context_chunks"), student_profile, output_format="text"
-                    )
-                    system_prompt = tutor_agent.STREAM_PROMPT
-                else:
-                    user_prompt = None
-                    system_prompt = "你是一个友好的 AI 学习助手。用简洁清晰的中文回答。直接输出回答内容，不要返回 JSON 格式，不要使用 <think> 标签。"
-
-                messages = [{"role": "user", "content": user_prompt or last_msg}]
-                print(f"[chat/stream] 开始流式调用 request_type={request_type}, msg_count={len(messages)}")
-
-                think_depth = 0
-                think_open = "<think>"
-                think_close = "</think>"
-                tail = ""
-                stream_text = ""
-                async for token in mc_module.minimax_client.chat_stream(
-                    messages=messages,
-                    system=system_prompt,
-                    max_tokens=4096,
-                    temperature=0.5 if request_type == "tutor" else 0.7,
+            # tutor/chat → 走原路径（真逐 token 流式）
+            if intent in ("tutor", "chat"):
+                async for evt in _handle_tutor_chat_stream(
+                    intent, last_msg, history, student_profile, session, db
                 ):
-                    pending = tail + token
-                    cursor = 0
-                    while cursor < len(pending):
-                        if think_depth == 0:
-                            idx = pending.find(think_open, cursor)
-                            if idx == -1:
-                                safe_end = len(pending) - len(think_open) + 1
-                                if safe_end > cursor:
-                                    seg = pending[cursor:safe_end]
-                                    stream_text += seg
-                                    out = await yield_token(seg)
-                                    if out:
-                                        yield out
-                                tail = pending[safe_end:]
-                                cursor = len(pending)
-                            else:
-                                if idx > cursor:
-                                    seg = pending[cursor:idx]
-                                    stream_text += seg
-                                    out = await yield_token(seg)
-                                    if out:
-                                        yield out
-                                cursor = idx + len(think_open)
-                                think_depth = 1
-                        else:
-                            idx = pending.find(think_close, cursor)
-                            if idx == -1:
-                                tail = ""
-                                cursor = len(pending)
-                            else:
-                                cursor = idx + len(think_close)
-                                think_depth = 0
-                if think_depth == 0 and tail:
-                    stream_text += tail
-                    out = await yield_token(tail)
-                    if out:
-                        yield out
-                print(f"[chat/stream] LLM 流式结束, stream长度={len(stream_text)}")
+                    yield evt
+                return
 
-                if request_type == "tutor":
-                    result_data = tutor_agent._parse_response(stream_text)
-                else:
-                    result_data = _extract_answer(stream_text)
+            # 其他所有意图 → 走 StateGraph 多智能体编排
+            async for evt in _handle_state_graph_stream(
+                req, history, student_profile, session, db
+            ):
+                yield evt
 
-                assistant_msg = ChatMessage(
-                    id=uuid.uuid4(),
-                    session_id=session.id,
-                    role="assistant",
-                    content=json.dumps({"type": request_type, "data": result_data}, ensure_ascii=False),
-                )
-                db.add(assistant_msg)
-                await db.commit()
-
-                yield f"data: {json.dumps({'type': 'result', 'data': {'type': request_type, **result_data}}, ensure_ascii=False)}\n\n"
-
-            elif request_type in ("exercise", "document", "path", "mindmap", "profile"):
-                kp = state.get("knowledge_point", "通用知识")
-
-                use_dual_format = False
-                if request_type == "exercise":
-                    from app.agents.exercise_agent import exercise_agent
-                    from app.services.anti_hallucination import anti_hallucination as ah
-                    prompt = exercise_agent._build_prompt(kp, student_profile, "all", 5).replace(
-                        "请返回 JSON 格式。只返回 JSON。", "请先输出人类可读的完整题目内容，末尾再输出 JSON 数据。"
-                    )
-                    system = STREAM_EXERCISE_SYSTEM
-                    parse = exercise_agent._parse_response
-                    use_dual_format = True
-
-                elif request_type == "document":
-                    from app.agents.document_agent import document_agent
-                    from app.services.anti_hallucination import anti_hallucination as ah
-                    prompt = document_agent._build_prompt(kp, student_profile, "all")
-                    system = document_agent.SYSTEM_PROMPT
-                    parse = document_agent._parse_response
-
-                elif request_type == "path":
-                    from app.agents.path_agent import path_agent
-                    topics = state.get("course_topics") or [kp]
-                    prompt = path_agent._build_prompt(topics, student_profile, 30)
-                    system = path_agent.SYSTEM_PROMPT
-                    parse = path_agent._parse_response
-
-                elif request_type == "mindmap":
-                    from app.agents.mindmap_agent import mindmap_agent
-                    prompt = mindmap_agent._build_prompt(kp, student_profile)
-                    system = mindmap_agent.SYSTEM_PROMPT
-                    parse = mindmap_agent._parse_response
-
-                else:
-                    from app.agents.profile_agent import profile_agent
-                    prompt = profile_agent._build_user_prompt(state["messages"], student_profile)
-                    system = profile_agent.system_prompt
-                    parse = profile_agent._parse_profile
-
-                stream_text = ""
-                token_count = 0
-                sep = "---JSON_DATA---"
-                sep_found = False
-                prev_display_len = 0
-
-                if use_dual_format:
-                    # 双格式：实时推 LLM token（过滤 think），遇 ---JSON_DATA--- 停止
-                    async for token in mc_module.minimax_client.chat_stream(
-                        messages=[{"role": "user", "content": prompt}],
-                        system=system,
-                        max_tokens=4096,
-                        temperature=0.7,
-                    ):
-                        stream_text += token
-                        token_count += 1
-                        if sep in stream_text:
-                            sep_found = True
-                        if not sep_found:
-                            display = _strip_think(stream_text)
-                            new_content = display[prev_display_len:]
-                            prev_display_len = len(display)
-                            if new_content:
-                                yield f"data: {json.dumps({'type': 'token', 'content': new_content}, ensure_ascii=False)}\n\n"
-                            elif token_count % 100 == 0:
-                                yield f"data: {json.dumps({'type': 'progress', 'message': f'正在由 {request_type} Agent 生成... ({token_count})'}, ensure_ascii=False)}\n\n"
-                else:
-                    async for token in mc_module.minimax_client.chat_stream(
-                        messages=[{"role": "user", "content": prompt}],
-                        system=system,
-                        max_tokens=4096,
-                        temperature=0.7,
-                    ):
-                        stream_text += token
-                        token_count += 1
-                        if token_count % 100 == 0:
-                            yield f"data: {json.dumps({'type': 'progress', 'message': f'正在由 {request_type} Agent 生成... ({token_count})'}, ensure_ascii=False)}\n\n"
-
-                print(f"[chat/stream] {request_type} 流式结束, len={len(stream_text)}, tokens={token_count}, dual={use_dual_format}")
-
-                if use_dual_format and sep in stream_text:
-                    json_part = stream_text.split(sep, 1)[1].strip()
-                    result = parse_json_response(json_part, {"exercises": []})
-                else:
-                    result = parse(stream_text)
-                if request_type == "mindmap":
-                    result["mermaid_code"] = mindmap_agent._validate_mermaid(result.get("mermaid_code", ""))
-
-                result_data = {"type": request_type, "data": result}
-
-                display_text = ""
-                if use_dual_format:
-                    # 双格式已在 LLM 流式时实时推 token，这里不需要再推
-                    pass
-                elif request_type == "exercise":
-                    exs = result.get("exercises", [])
-                    display_text = f"📝 为你生成了 **{len(exs)}** 道题：\n\n"
-                    for i, ex in enumerate(exs, 1):
-                        q = ex.get("question", "")
-                        display_text += f"{i}. {q}\n\n"
-                elif request_type == "document":
-                    display_text = result.get("knowledge", "") or ""
-                    if not display_text:
-                        display_text = json.dumps(result, ensure_ascii=False)
-                elif request_type == "path":
-                    display_text = f"📚 **{result.get('title', '学习路径')}**\n\n"
-                    display_text += f"{result.get('description', '')}\n\n"
-                    display_text += f"共 {len(result.get('nodes', []))} 个知识点，{len(result.get('edges', []))} 条依赖关系"
-                elif request_type == "mindmap":
-                    display_text = f"🧠 **{result.get('title', '思维导图')}**\n\n"
-                    display_text += f"```mermaid\n{result.get('mermaid_code', '')}\n```"
-                else:
-                    display_text = json.dumps(result, ensure_ascii=False, indent=2)
-
-                if display_text:
-                    chunk_size = 16
-                    for i in range(0, len(display_text), chunk_size):
-                        chunk = display_text[i:i + chunk_size]
-                        if chunk:
-                            out = await yield_token(chunk)
-                            if out:
-                                yield out
-
-                assistant_msg = ChatMessage(
-                    id=uuid.uuid4(),
-                    session_id=session.id,
-                    role="assistant",
-                    content=json.dumps(result_data, ensure_ascii=False),
-                )
-                db.add(assistant_msg)
-                await db.commit()
-
-                yield f"data: {json.dumps({'type': 'result', 'data': result_data}, ensure_ascii=False)}\n\n"
-
-            else:
-                state = await master_agent.execute(state)
-
-                if state.get("error"):
-                    yield f"data: {json.dumps({'type': 'error', 'message': state['error']}, ensure_ascii=False)}\n\n"
-                    return
-
-                result_data = state.get("result", {})
-
-                assistant_msg = ChatMessage(
-                    id=uuid.uuid4(),
-                    session_id=session.id,
-                    role="assistant",
-                    content=json.dumps(result_data, ensure_ascii=False),
-                )
-                db.add(assistant_msg)
-                await db.commit()
-
-                yield f"data: {json.dumps({'type': 'result', 'data': result_data}, ensure_ascii=False)}\n\n"
-
-            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
         except Exception as e:
             import traceback
             yield f"data: {json.dumps({'type': 'error', 'message': f'服务器内部错误: {str(e)}'}, ensure_ascii=False)}\n\n"

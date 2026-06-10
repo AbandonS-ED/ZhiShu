@@ -85,6 +85,14 @@ class TutorAgent:
         }
         return result
 
+    async def execute(self, state: dict) -> dict:
+        """从 AgentState 解包参数，调用 answer()"""
+        return await self.answer(
+            question=state.get("user_message", ""),
+            context_chunks=state.get("intent_params", {}).get("context_chunks"),
+            student_profile=state.get("student_profile"),
+        )
+
     def _build_prompt(
         self,
         question: str,

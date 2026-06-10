@@ -90,6 +90,16 @@ class ExerciseAgent:
 
         return result
 
+    async def execute(self, state: dict) -> dict:
+        """从 AgentState 解包参数，调用 generate()"""
+        kp = state.get("intent_params", {}).get("knowledge_point", "通用知识")
+        return await self.generate(
+            knowledge_point=kp,
+            student_profile=state.get("student_profile"),
+            exercise_type=state.get("intent_params", {}).get("exercise_type", "all"),
+            count=state.get("intent_params", {}).get("exercise_count", 5),
+        )
+
     def _build_prompt(
         self,
         knowledge_point: str,

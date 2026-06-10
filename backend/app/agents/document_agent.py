@@ -73,6 +73,15 @@ class DocumentAgent:
 
         return result
 
+    async def execute(self, state: dict) -> dict:
+        """从 AgentState 解包参数，调用 generate()"""
+        kp = state.get("intent_params", {}).get("knowledge_point", "通用知识")
+        return await self.generate(
+            knowledge_point=kp,
+            student_profile=state.get("student_profile"),
+            resource_type=state.get("intent_params", {}).get("resource_type", "all"),
+        )
+
     def _build_prompt(
         self,
         knowledge_point: str,

@@ -89,6 +89,20 @@ class PathAgent:
         }
         return result
 
+    async def execute(self, state: dict) -> dict:
+        """从 AgentState 解包参数，调用 generate()"""
+        kp = state.get("intent_params", {}).get("knowledge_point", "")
+        topics = state.get("intent_params", {}).get("course_topics", ["基础知识"])
+        if isinstance(topics, str):
+            topics = [topics]
+        if kp and kp not in topics:
+            topics = [kp] + topics
+        return await self.generate(
+            course_topics=topics,
+            student_profile=state.get("student_profile"),
+            total_days=state.get("intent_params", {}).get("total_days", 14),
+        )
+
     def _build_prompt(
         self,
         course_topics: list[str],

@@ -77,6 +77,14 @@ class MindMapAgent:
         result["mermaid_code"] = self._validate_mermaid(result.get("mermaid_code", ""))
         return result
 
+    async def execute(self, state: dict) -> dict:
+        """从 AgentState 解包参数，调用 generate()"""
+        kp = state.get("intent_params", {}).get("knowledge_point", "通用知识")
+        return await self.generate(
+            knowledge_point=kp,
+            student_profile=state.get("student_profile"),
+        )
+
     async def _generate_once(self, user_prompt: str) -> dict:
         response = await mc_module.minimax_client.chat(
             messages=[{"role": "user", "content": user_prompt}],

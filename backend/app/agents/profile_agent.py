@@ -141,6 +141,13 @@ class ProfileAgent:
                 result[key] = default[key]
         return result
 
+    async def execute(self, state: dict) -> dict:
+        """从 AgentState 解包参数，调用 analyze()"""
+        return await self.analyze(
+            messages=state.get("messages", []),
+            current_profile=state.get("student_profile"),
+        )
+
     def _default_profile(self) -> dict:
         """返回默认的空画像"""
         return {
