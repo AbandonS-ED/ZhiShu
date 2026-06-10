@@ -59,15 +59,15 @@
 ## 第三次（2026-06-10 20:30）— P0 修复后验证
 
 > **背景**：全部 10 个 P0 问题修复完成后，验证关键改动  
-> **检测方式**：后端 120 pytest 全过 + `next build` 编译成功 + 前后端 200 可达
+> **检测方式**：后端 119 pytest 全过 + `next build` 编译成功 + 前后端 200 可达
 
 ### 验证清单
 
 | 验证项 | 方法 | 结果 |
 |---|---|---|
-| 后端 120 个 pytest | `python -m pytest tests/ -v` | ✅ 全部通过 |
+| 后端 119 个 pytest | `python -m pytest tests/ -v` | ✅ 全部通过 |
 | 前端编译 | `npx next build` | ✅ 编译成功 |
-| `_strip_think` 22 测试 | `test_strip_think.py` | ✅ 全部通过（含回滚后） |
+| `_strip_think` 11 测试 | `test_strip_think.py` | ✅ 全部通过（含回滚后） |
 | 前后端可达 | HTTP 200 | ✅ 8001 + 3000 均响应 |
 | profile 页 | 真实数据派生 | ✅ `deriveWeakness`/`deriveSixDimensions` |
 | resources 页 | API 资源合并入网格 | ✅ `isApi` 标记 + modal 兜底 |
@@ -75,6 +75,41 @@
 | UUID 校验 | 7 router Pydantic 验证 | ✅ `dependencies.py` 统一依赖 |
 | `learning_records` 表 | init_db.sql + create_all | ✅ 双保险建表 |
 | `recordAction` 调用 | 5 处前端 | ✅ resources/tiku/duihua/path |
+
+---
+
+## 第四次（2026-06-11）— 登录注册系统验证
+
+> **背景**：登录注册系统完成后，验证密码哈希 + JWT + 门禁机制  
+> **检测方式**：端到端 API 调用 + pytest
+
+### 验证清单
+
+| 验证项 | 方法 | 结果 |
+|---|---|---|
+| bcrypt 密码哈希 | `security.py hash_password / verify_password` | ✅ 哈希 60 字节，验证 True/False |
+| JWT 生成/解码 | `security.py create_access_token / decode_token` | ✅ 7 天过期，HS256 标准格式 |
+| 注册 | `POST /auth/register` → bcrypt 存储 + 返回 JWT | ✅ 200 + token + student_id |
+| 重复注册 | `POST /auth/register` 相同学号 | ✅ 400 学号已存在 |
+| 登录 | `POST /auth/login` → bcrypt 校验 + 返回 JWT | ✅ 200 + token |
+| 错误密码 | `POST /auth/login` 错误密码 | ✅ 401 密码错误 |
+| 无 token 访问 | 无 Authorization 头访问业务接口 | ✅ 401 未提供凭据 |
+| 错误 token | `Authorization: Bearer xxx` | ✅ 401 凭据无效 |
+| 有 token 访问 | `Authorization: Bearer <valid_token>` | ✅ 正常返回 |
+| 前端自动带 token | `api.ts` request() 自动附加 Bearer | ✅ 无需手动设置 |
+| 401 自动跳转 | `api.ts` 收到 401 自动清 token 跳登录页 | ✅ |
+| 会话删除 | `DELETE /sessions/{session_id}` | ✅ 200 + 会话及消息已删除 |
+| 多轮对话 | 连续发 3 条消息，LLM 能记住上下文 | ✅ 历史消息传入 LLM |
+| SSE stream auth | 4 个 stream 方法带 Authorization 头 | ✅ 不再 401 |
+
+### 关键发现
+
+- **密码安全**：bcrypt 哈希存储，不明文保存密码
+- **JWT 标准**：HS256 格式，7 天过期，密钥从 JWT_SECRET 环境变量读取
+- **门禁完整**：24 个业务端点全部加 `get_current_user` 依赖
+- **前端无感**：`api.ts` 自动带 token，401 自动跳登录页，用户体验流畅
+- **会话管理**：支持创建/切换/删除会话，会话消息带所有权校验
+- **多轮上下文**：最近 10 条消息传入 LLM，assistant 消息 JSON 解析正确
 
 ---
 
@@ -91,9 +126,12 @@
 
 ## 比赛现场建议演示顺序
 
-1. `/profile` → AI 弹窗 → 6 维画像 build → 6 维返回
-2. `/duihua` → 发"什么是反向传播" → 看到 1000+ tokens 真逐字流
-3. `/resources` → 输入"A* 搜索算法" → 看到流式生成
-4. `/tiku` → 输入"梯度下降" → 看到 3 道题 + 选项
-5. `/path` → 输入"机器学习,深度学习" + 7 天 → 看到 DAG
-6. `/` 仪表盘 → 看到刚才生成的数据聚合
+1. `/login` → 注册 → 登录 → JWT token 自动生效
+2. `/profile` → AI 弹窗 → 6 维画像 build → 6 维返回
+3. `/duihua` → 发"什么是反向传播" → 看到 1000+ tokens 真逐字流 + 多轮对话
+4. `/resources` → 输入"A* 搜索算法" → 看到流式生成
+5. `/tiku` → 输入"梯度下降" → 看到 3 道题 + 选项
+6. `/path` → 输入"机器学习,深度学习" + 7 天 → 看到 DAG
+7. `/pinggu` → 顶部输入问题 → 看到 LLM 智能评估
+8. `/` 仪表盘 → 看到刚才生成的数据聚合
+9. 回到 `/duihua` → 删除旧会话 → 新开会话 → 证明会话管理

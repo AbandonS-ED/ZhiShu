@@ -12,67 +12,71 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **课程切入点**：人工智能导论
 - **主仓库**：<https://github.com/AbandonS-ED/ZhiShu>
 
-## 仓库现状（2026-06-10）
+## 仓库现状（2026-06-11）
 
 ```
 ZhiShu/
 ├── frontend/                        # Next.js 14.2.5 + Tailwind 3.4 + TypeScript
-│   ├── src/app/                     # 7 页面：/ /duihua /profile /resources /path /tiku /pinggu
+│   ├── src/app/                     # 8 页面：/ /login /duihua /profile /resources /path /tiku /pinggu
 │   │   ├── layout.tsx               # 模板风 .app 布局：Sidebar + Main
 │   │   ├── page.tsx                 # / 仪表盘（'use client'）
 │   │   ├── globals.css              # 模板设计系统（米色/墨黑/琥珀）
-│   │   ├── duihua/page.tsx          # SSE 流式 + Master Agent 路由
+│   │   ├── login/page.tsx           # 登录/注册页（含 Tab 切换、密码校验、自动跳转）
+│   │   ├── login/layout.tsx         # 登录页独立布局（无 Sidebar）
+│   │   ├── duihua/page.tsx          # SSE 流式 + Master Agent 路由 + 会话管理
 │   │   ├── profile/page.tsx         # 6 维画像 + AI 弹窗（真实数据派生）
 │   │   ├── resources/page.tsx       # SSE 流式生成 + API 资源合并网格
 │   │   ├── path/page.tsx            # DAG 路径 + SSE 流式
 │   │   ├── tiku/page.tsx            # 练习题 + SSE 流式
 │   │   └── pinggu/page.tsx          # AI 评估（图表数据驱动）
 │   ├── src/components/layout/
-│   │   ├── Sidebar.tsx              # 7 项菜单，可折叠
-│   │   └── Header.tsx               # 60px 玻璃拟态 + 动态页面标题
+│   │   ├── Sidebar.tsx              # 7 项菜单 + 用户信息 + 退出按钮
+│   │   └── Header.tsx               # 60px 玻璃拟态 + 动态页面标题 + 退出按钮
 │   ├── src/lib/
-│   │   ├── api.ts                   # API 客户端（8 模块）
-│   │   ├── student.ts               # student_id 本地存储
+│   │   ├── api.ts                   # API 客户端（9 模块 + auth，自动带 token）
+│   │   ├── student.ts               # student_id 本地存储（zhishu_student）
 │   │   └── utils.ts                 # cn() + escapeHtml() + markdownToHtml() + extractAnswer()
 │   ├── src/app/profile/ChatModal.tsx # 对话式画像提取弹窗
 │   ├── src/stores/appStore.ts       # Zustand store（暂未使用）
 │   ├── src/types/index.ts           # TS 类型契约（暂未使用）
 │   ├── src/app/fonts/               # 本地 woff 字体
 │   └── .npmrc                       # npmmirror 国内镜像
-├── backend/                         # FastAPI + 9 表 + 8 Agent + 23 唯一 API + 12 Service + 8 Router
-│   ├── app/main.py                  # 8 router 注册 + lifespan 初始化
-│   ├── app/api/                     # 8 router
-│   ├── app/core/                    # config.py / database.py / dependencies.py / celery_config.py
-│   ├── app/models/                  # 9 个 Model
+├── backend/                         # FastAPI + 9 表 + 8 Agent + 27 唯一 API + 12 Service
+│   ├── app/main.py                  # 9 router 注册 + lifespan 初始化
+│   ├── app/api/                     # 9 router（含 auth，27 端点）
+│   ├── app/core/                    # config.py / database.py / dependencies.py / security.py / celery_config.py
+│   ├── app/models/                  # 9 个 Model（students 含 password_hash）
 │   ├── app/agents/                  # 8 Agent + StateGraph 编排
 │   │   ├── state.py                 # AgentState TypedDict + IntentType
 │   │   ├── communicator.py          # MessageBus pub/sub
 │   │   └── master_agent.py          # LangGraph StateGraph 13 节点
 │   ├── app/services/                # 12 个服务
-│   ├── scripts/init_db.sql          # 手动建库 + 建表脚本
+│   ├── scripts/init_db.sql          # 手动建库 + 建表脚本（含 password_hash 列）
 │   └── tests/                       # 7 个 test_*.py（119 pytest）+ smoke_test.py + 6 个 debug_*.py
 ├── docs/                            # 赛题需求 / 设计文档 / 开发流程 / 运维测试 / 交付物
 ├── 开发进度.md                       # 实时进度跟踪
 ├── AGENTS.md                        # 团队协作文档
 ├── CLAUDE.md                        # 本文件
-├── SMOKE_TEST_REPORT.md             # 三次冒烟测试记录
+├── SMOKE_TEST_REPORT.md             # 冒烟测试记录
 ├── README.md                        # 项目 README
 └── docker-compose.yml               # postgres+pgvector / redis / minio
 ```
 
-**实际状态（2026-06-10）**：
+**实际状态（2026-06-11）**：
 
-- ✅ 前端 7 页面 **1:1 复刻模板** + **7/7 全部接入 API**
-- ✅ 后端完整：**9 表 + 8 Agent + 23 唯一 API 端点** + **12 Service**
+- ✅ 前端 8 页面 **1:1 复刻模板** + **8/8 全部接入 API**（含登录/注册页）
+- ✅ 后端完整：**9 表 + 8 Agent + 27 唯一 API 端点** + **12 Service**（含 3 个 auth 端点）
 - ✅ **P0 全部 10 个问题已修复**（UUID 校验 / learning_records 建表+recordAction / embed_text 拼写 / 前端 3 页面硬编码替换）
+- ✅ **登录注册系统**：bcrypt 密码哈希 + JWT 验证 + 全路由门禁（24 个业务端点全部保护）
 - ✅ MiniMax-M3 LLM 端到端验证通过
 - ✅ **LangGraph StateGraph 多智能体编排**（13 节点）
 - ✅ **防幻觉三层验证**（N3 必做项）
 - ✅ **SSE 流式输出**（4 个流式端点）
 - ✅ **RAG 管道**（文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排）
 - ✅ **练习题 dual-format 流式**（markdown + JSON 双输出）
-- ✅ **端到端冒烟测试**3 次验证：2026-06-09 / 2026-06-10 17:29 / 2026-06-10 20:30
-- ✅ **119 pytest 全过**（test_state_graph 25 + test_agents 31 + test_anti_hallucination 19 + test_message_bus 12 + test_json_parser 11 + test_strip_think 11）
+- ✅ **端到端冒烟测试**4 次验证：2026-06-09 / 2026-06-10 17:29 / 2026-06-10 20:30 / 2026-06-11
+- ✅ **119 pytest 全过**（test_agents 31 + test_state_graph 25 + test_anti_hallucination 19 + test_json_parser 11 + test_message_bus 12 + test_strip_think 11 + test_api 10）
+- ✅ **多轮对话上下文**：最近 10 条消息传给 LLM
 
 ## 技术栈（已锁定，不要换）
 
@@ -81,7 +85,7 @@ ZhiShu/
 | 前端 | Next.js 14.2.5 (App Router) + Tailwind 3.4 + TypeScript | 无 shadcn/ui，纯自定义 CSS |
 | 后端 | FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg | Python 3.11 |
 | Agent | LangGraph StateGraph（13 节点编排 + MessageBus 通信） | 8 Agent 协同 |
-| LLM | **双客户端**：`MiniMaxClient`（开发） + `SparkClient`（上线前切） | `LLM_PROVIDER=spark\|minimax` 切换 |
+| LLM | **双客户端**：`MiniMaxClient`（开发） + `SparkClient`（上线前切） | `LLM_PROVIDER=spark|minimax` 切换 |
 | 向量库 | pgvector（Python 包已装，PG 扩展未装） | embedding 用 JSONB 占位 + 余弦相似度降级 |
 | 数据库 | PostgreSQL 18 + Redis（本地安装） | MinIO AGPL-3.0 需 LICENSE |
 
@@ -106,7 +110,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 # Swagger: http://localhost:8001/docs
 
-# 测试（120 pytest，需 PG 5432 + Redis 6379）
+# 测试（119 pytest，需 PG 5432 + Redis 6379）
 cd backend && python -m pytest tests/ -v
 
 # 端到端冒烟
@@ -149,10 +153,12 @@ cd frontend && npm install && npm run dev / build / lint
 - **`chatApi.stream` 无超时/重试**
 - **Spark client 默认 base_url 指向智谱**（非讯飞）
 - **SSE 实现 4 处重复**（resource/exercise/path/chat）
+- **DB schema 漂移**：`init_db.sql` 已加 `students.student_no` / `password_hash` + `learning_records` 表，但**老 DB 不会自动迁移**。`/auth/register` 会触发 `UndefinedColumnError`。`backend/scripts/init_db.sql` 是 `CREATE TABLE IF NOT EXISTS`，不会 ALTER 老表。修法：删 `DROP DATABASE zhishu` 重跑，或手动 `ALTER TABLE students ADD COLUMN student_no VARCHAR(50)` 等。
+- **`requirements.txt` 列出 `bcrypt>=4.0.0` 但旧 venv 没装**——clone 仓库后第一次 `pip install -r requirements.txt` 即可；老 venv 手工 `pip install bcrypt` 修。
+- **`profile_agent` 调 LLM 报 `'HumanMessage' object is not subscriptable`**
 
 ### P2 — 清理项
 
-- 缺数据库索引（`student_id` 在 5+ 张表）
 - 缺外键约束
 - `chat_messages.content VARCHAR(10000)` 太小
 - `Resource.resource_type` 永远存 "knowledge"
@@ -178,6 +184,16 @@ cd frontend && npm install && npm run dev / build / lint
 - ✅ profile/resources/pinggu 硬编码替换（2026-06-10）
 - ✅ learning_records 建表 + recordAction（2026-06-10）
 - ✅ `embed_text` → `embed_single`（2026-06-10）
+- ✅ 登录注册系统（2026-06-11）：bcrypt 密码哈希 + JWT + 全路由门禁
+- ✅ CSS `@keyframes fadeIn` 缺失（2026-06-11）：登录页右侧表单不可见
+- ✅ `get_current_user` 门禁覆盖全部 24 个业务端点（2026-06-11）
+- ✅ `auth.py /me/{student_id}` 补门禁（2026-06-11）
+- ✅ `chat.py /sessions/{session_id}/messages` 补所有权检查（2026-06-11）
+- ✅ `dashboard.py` 去掉默认 student_id（2026-06-11）
+- ✅ `chat.py` DELETE /sessions/{session_id} 会话删除（2026-06-11）
+- ✅ SSE stream 方法全部加 Authorization 头（2026-06-11）
+- ✅ `chat.py` StateGraph final_state 累积 bug 修复（2026-06-11）
+- ✅ 多轮对话上下文支持（2026-06-11）
 
 ## 架构与功能要点
 
@@ -189,14 +205,34 @@ intent_recognition → task_planning → conditional_route
   → result_aggregation → response_generation
 ```
 
+### 登录注册系统（2026-06-11）
+
+```
+注册：POST /auth/register → bcrypt 哈希密码 → 存入 students.password_hash → 返回 JWT
+登录：POST /auth/login → bcrypt 校验密码 → 返回 JWT
+验证：Authorization: Bearer <token> → decode_token() → get_current_user() 依赖
+门禁：24 个业务端点全部加 Depends(get_current_user) + student_id 所有权校验
+公开：/auth/login、/auth/register、/mindmap/examples（无需 token）
+```
+
+- 密码哈希：`bcrypt`（`core/security.py`）
+- JWT：标准 HS256 格式，7 天过期，密钥从 `JWT_SECRET` 环境变量读取
+- 前端：`api.ts` 的 `request()` 自动带 `Authorization: Bearer` 头，401 自动跳登录页
+
 ### 请求处理流程
 
 ```
 用户输入 → chat/stream (SSE)
   → _quick_route() 关键词快速路由
-    → tutor/chat: 真逐 token 流式（支持 RAG）
+    → tutor/chat: 真逐 token 流式（支持 RAG + 多轮上下文）
     → 其他意图: StateGraph 13 节点编排
 ```
+
+### 多轮对话上下文
+
+- `_handle_tutor_chat_stream` 和 `tutor_agent.answer()` 都传 `history`（最近 10 条）给 LLM
+- assistant 消息在 DB 里是 JSON `{"type":"tutor","data":{...}}`，需要解析出 `answer` 字段
+- short message（<15 字）默认走 tutor 真流式
 
 ### 6 维学生画像（F1）
 
@@ -216,6 +252,8 @@ intent_recognition → task_planning → conditional_route
 | `/api/v1/resource/exercises/generate/stream` | ✅ **真流式** | dual-format |
 | `/api/v1/path/generate/stream` | ⚠️ **伪流式** | progress + result |
 
+所有 stream 方法必须手动加 `Authorization: Bearer` 头。
+
 ### 练习题 dual-format 流式协议
 
 LLM 一份输出 = 人类可读 markdown + `---JSON_DATA---` + 结构化 JSON。后端实时推 markdown，遇分隔符停止 emit token，结尾解析 JSON。
@@ -230,6 +268,7 @@ LLM 一份输出 = 人类可读 markdown + `---JSON_DATA---` + 结构化 JSON。
 - **CSS 集中在 `globals.css`**——不动 `tailwind.config.js`
 - **静态数据写在 page.tsx 内**（联调后改为 API 调用）
 - **`.next` 缓存损坏**：`npm run build` 后切 `npm run dev` 报错 → 删 `.next` → 重启
+- **student_id**：从 `localStorage.getItem('zhishu_student')` 读取（登录时存入），不是随机 UUID
 
 ## 评分优先级
 

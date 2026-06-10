@@ -1,12 +1,12 @@
 # 智枢(SmartHub) - 多智能体个性化学习资源生成系统
 
 > 第十五届中国软件杯 A3 赛题。基于大模型的个性化学习资源生成与学习多智能体系统。  
-> **最新状态**：2026-06-10 全部 10 个 P0 问题已修复，120 pytest 全过，3 次冒烟验证通过。
+> **最新状态**：2026-06-11 登录注册系统完成（bcrypt + JWT + 全路由门禁），119 pytest 全过，4 次冒烟验证通过。
 
 ## 技术栈
 
 - **前端**: Next.js 14.2.5 + Tailwind 3.4 + TypeScript（纯自定义 CSS）
-- **后端**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg + 8 Agent + 23 唯一 API + 12 Service
+- **后端**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg + 8 Agent + 27 唯一 API + 12 Service
 - **Agent**: LangGraph StateGraph 13 节点编排 + 8 个 Agent（全部实现）
 - **LLM**: MiniMax-M3（开发）→ 讯飞星火 V4（上线前切换，改 1 个环境变量）
 - **数据库**: PostgreSQL 18 + Redis（本地安装）
@@ -18,27 +18,27 @@
 
 ```
 ZhiShu/
-├── frontend/              # 7 页面 Next.js 前端（全部已联调后端）
+├── frontend/              # 8 页面 Next.js 前端（全部已联调后端）
 │   └── src/
-│       ├── app/             # 7 路由（/ /duihua /profile /resources /path /tiku /pinggu）
-│       ├── components/layout/  # Sidebar + Header
-│       ├── lib/             # api.ts / student.ts / utils.ts
+│       ├── app/             # 8 路由（/ /login /duihua /profile /resources /path /tiku /pinggu）
+│       ├── components/layout/  # Sidebar + Header（含退出按钮）
+│       ├── lib/             # api.ts（自动带 token）/ student.ts / utils.ts
 │       ├── stores/          # Zustand（未使用）
 │       └── types/           # TS 接口（未使用）
 ├── backend/               # FastAPI 完整后端
 │   └── app/
-│       ├── main.py          # 8 router + lifespan
-│       ├── api/             # 8 router
+│       ├── main.py          # 9 router + lifespan
+│       ├── api/             # 9 router（含 auth，27 端点）
 │       ├── agents/          # 8 Agent + StateGraph + MessageBus
-│       ├── models/          # 9 Model
+│       ├── models/          # 9 Model（students 含 password_hash）
 │       ├── services/        # 12 Service
-│       └── core/            # config.py / database.py / dependencies.py / celery_config.py
-├── tests/                 # smoke_test.py + 6 个 pytest 文件（120 测试）
+│       └── core/            # config.py / database.py / dependencies.py / security.py / celery_config.py
+├── tests/                 # smoke_test.py + 7 个 pytest 文件（119 测试）
 ├── docs/                  # 设计文档 / 开发流程 / 交付物 / 赛题需求
 ├── 开发进度.md              # 实时进度跟踪
 ├── AGENTS.md              # 团队协作文档
 ├── CLAUDE.md              # 项目技术文档
-├── SMOKE_TEST_REPORT.md   # 三次冒烟测试记录
+├── SMOKE_TEST_REPORT.md   # 四次冒烟测试记录
 ├── docker-compose.yml     # postgres+pgvector / redis / minio
 └── .env.example           # 环境变量模板
 ```
@@ -60,7 +60,7 @@ cd frontend
 npm install
 npm run dev     # http://localhost:3000
 
-# 4. 单元测试（120 pytest）
+# 4. 单元测试（119 pytest）
 cd backend
 python -m pytest tests/ -v
 
@@ -73,11 +73,12 @@ python -m tests.smoke_test
 
 | 模块 | 状态 |
 |------|------|
-| 前端 7 页面 | ✅ 已完成（模板复刻 + 全部联调后端） |
-| 后端 9 表 + 8 Agent + 23 唯一 API + 12 Service | ✅ 已完成 |
+| 前端 8 页面 | ✅ 已完成（模板复刻 + 全部联调后端，含登录注册页） |
+| 后端 9 表 + 8 Agent + 27 唯一 API + 12 Service | ✅ 已完成 |
+| **登录注册系统** | **✅ 已完成**（bcrypt 密码哈希 + JWT + 全路由门禁） |
 | **P0 全部 10 个问题** | **✅ 已修复（UUID 校验/建表/embed_text/3 页面硬编码）** |
-| **单元测试** | **✅ 120 个 pytest 测试 PASS** |
-| **端到端冒烟测试** | **✅ 3 次验证：9/9 API 200** |
+| **单元测试** | **✅ 119 个 pytest 测试 PASS** |
+| **端到端冒烟测试** | **✅ 4 次验证：9/9 API 200** |
 | F1 对话式画像 | ✅ 后端+前端完成 |
 | F2 多智能体资源生成 | ✅ StateGraph 编排 + 4 Agent 联调 + dual-format 流式 |
 | F3 学习路径 | ✅ 后端+前端完成（7/14/30 天可配） |
