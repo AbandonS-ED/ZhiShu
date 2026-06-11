@@ -62,6 +62,7 @@ class StudentDTO(BaseModel):
     name: str = ""
     email: str = ""
     major: str = ""
+    role: str = "student"
 
 
 class AuthResponse(BaseModel):
@@ -82,6 +83,13 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=401, detail="该账号未设置密码，请重新注册")
     if not verify_password(req.password, student.password_hash):
         raise HTTPException(status_code=401, detail="学号或密码错误")
+    if not student.is_active:
+        raise HTTPException(status_code=403, detail="账号已被禁用，请联系管理员")
+
+    from datetime import datetime, timezone
+    student.last_login = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(student)
 
     token = create_token(str(student.id))
     refresh = create_refresh_token(str(student.id))
@@ -94,6 +102,7 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
             name=student.name or "",
             email=student.email or "",
             major=student.major or "",
+            role=student.role or "student",
         ),
     )
 
@@ -114,6 +123,8 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
         name=req.name or ("用户" + req.student_no[-4:]),
         email=req.email or None,
         major=req.major or None,
+        role="student",
+        is_active=True,
     )
     db.add(student)
     await db.commit()
@@ -130,6 +141,7 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
             name=student.name or "",
             email=student.email or "",
             major=student.major or "",
+            role=student.role or "student",
         ),
     )
 
@@ -153,4 +165,5 @@ async def me(student_id: str, db: AsyncSession = Depends(get_db), user: Student 
         name=student.name or "",
         email=student.email or "",
         major=student.major or "",
+        role=student.role or "student",
     )

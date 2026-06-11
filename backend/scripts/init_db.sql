@@ -26,9 +26,16 @@ CREATE TABLE IF NOT EXISTS students (
     email VARCHAR(255) UNIQUE,
     major VARCHAR(100),
     grade VARCHAR(50),
+    role VARCHAR(20) NOT NULL DEFAULT 'student',
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    last_login TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+-- students.role 索引（管理员筛选 / 学生筛选）
+CREATE INDEX IF NOT EXISTS idx_students_role ON students(role);
+CREATE INDEX IF NOT EXISTS idx_students_is_active ON students(is_active);
 
 CREATE TABLE IF NOT EXISTS student_profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -143,3 +150,29 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session
 \echo '   students / student_profiles / document_chunks'
 \echo '   resources / learning_paths / exercises'
 \echo '   chat_sessions / chat_messages / learning_records'
+
+-- 7. 初始化默认管理员账号（密码: admin123）
+-- bcrypt 哈希: $2b$12$aUqTTt5KCfd1zGXqZoQaieRPYuoNXKCM/do3wrjcEK4yCqEij/yUS
+-- 注意: PostgreSQL 的单引号字符串里直接写 $ 字符是安全的，不会被插值
+-- 使用 ON CONFLICT 避免重复插入报错
+INSERT INTO students (id, student_no, password_hash, name, email, role, is_active)
+VALUES (
+    'a0000000-0000-0000-0000-000000000001',
+    'admin',
+    '$2b$12$aUqTTt5KCfd1zGXqZoQaieRPYuoNXKCM/do3wrjcEK4yCqEij/yUS',
+    '系统管理员',
+    'admin@zhishu.local',
+    'admin',
+    true
+)
+ON CONFLICT (student_no) DO UPDATE SET
+    password_hash = EXCLUDED.password_hash,
+    role = EXCLUDED.role,
+    is_active = EXCLUDED.is_active,
+    updated_at = now();
+
+\echo ''
+\echo '👤 默认管理员账号已就绪:'
+\echo '   学号: admin'
+\echo '   密码: admin123'
+\echo '   角色: admin'
