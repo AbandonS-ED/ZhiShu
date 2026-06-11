@@ -20,7 +20,7 @@ const geistMono = localFont({
 })
 
 // 不需要 AppShell（Sidebar + Header）的路由
-const NO_SHELL_ROUTES = ['/login']
+const NO_SHELL_ROUTES = ['/login', '/admin']
 
 function isNoShell(pathname: string | null): boolean {
   if (!pathname) return false

@@ -17,66 +17,111 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 ZhiShu/
 ├── frontend/                        # Next.js 14.2.5 + Tailwind 3.4 + TypeScript
-│   ├── src/app/                     # 8 页面：/ /login /duihua /profile /resources /path /tiku /pinggu
-│   │   ├── layout.tsx               # 模板风 .app 布局：Sidebar + Main
-│   │   ├── page.tsx                 # / 仪表盘（'use client'）
-│   │   ├── globals.css              # 模板设计系统（米色/墨黑/琥珀）
-│   │   ├── login/page.tsx           # 登录/注册页（含 Tab 切换、密码校验、自动跳转）
-│   │   ├── login/layout.tsx         # 登录页独立布局（无 Sidebar）
-│   │   ├── duihua/page.tsx          # SSE 流式 + Master Agent 路由 + 会话管理
-│   │   ├── profile/page.tsx         # 6 维画像 + AI 弹窗（真实数据派生）
-│   │   ├── resources/page.tsx       # SSE 流式生成 + API 资源合并网格
-│   │   ├── path/page.tsx            # DAG 路径 + SSE 流式
-│   │   ├── tiku/page.tsx            # 练习题 + SSE 流式
-│   │   └── pinggu/page.tsx          # AI 评估（图表数据驱动）
-│   ├── src/components/layout/
-│   │   ├── Sidebar.tsx              # 7 项菜单 + 用户信息 + 退出按钮
-│   │   └── Header.tsx               # 60px 玻璃拟态 + 动态页面标题 + 退出按钮
+│   ├── src/app/                     # 学生端 8 页面 + 管理端 9 页面 + 2 布局
+│   │   ├── layout.tsx               # 学生端全局布局（Sidebar + Main，/admin 跳过）
+│   │   ├── globals.css              # 设计系统（米色/墨黑/琥珀，含 admin 样式）
+│   │   ├── page.tsx                 # / 仪表盘
+│   │   ├── login/                   # 登录/注册页（独立布局）
+│   │   ├── duihua/  profile/  resources/  path/  tiku/  pinggu/  # 7 个学生页面
+│   │   └── admin/                   # ⭐ 管理后台（独立布局 + 权限拦截）
+│   │       ├── layout.tsx           # 管理后台布局（admin-sb + admin-hd + 退出）
+│   │       ├── page.tsx             # /admin 仪表盘
+│   │       ├── login/               # /admin/login 管理员登录
+│   │       ├── users/               # /admin/users 用户管理（含批量删除）
+│   │       ├── resources/           # /admin/resources 资源管理
+│   │       ├── exercises/           # /admin/exercises 练习题
+│   │       ├── paths/               # /admin/paths 学习路径
+│   │       ├── chats/               # /admin/chats 对话记录
+│   │       ├── documents/           # /admin/documents 知识库
+│   │       └── agents/              # /admin/agents Agent 监控
+│   ├── src/components/layout/        # 学生端 Sidebar + Header
 │   ├── src/lib/
 │   │   ├── api.ts                   # API 客户端（9 模块 + auth，自动带 token）
 │   │   ├── student.ts               # student_id 本地存储（zhishu_student）
-│   │   └── utils.ts                 # cn() + escapeHtml() + markdownToHtml() + extractAnswer()
-│   ├── src/app/profile/ChatModal.tsx # 对话式画像提取弹窗
+│   │   ├── utils.ts                 # cn() + escapeHtml() + markdownToHtml() + extractAnswer()
+│   │   ├── admin/context.tsx        # 管理后台共享状态（AdminProvider + useAdmin）
+│   │   └── admin/components.tsx     # 管理后台共享组件（AdminCheckbox + BatchDeleteBar + useSelection）
 │   ├── src/stores/appStore.ts       # Zustand store（暂未使用）
 │   ├── src/types/index.ts           # TS 类型契约（暂未使用）
-│   ├── src/app/fonts/               # 本地 woff 字体
 │   └── .npmrc                       # npmmirror 国内镜像
-├── backend/                         # FastAPI + 9 表 + 8 Agent + 27 唯一 API + 12 Service
+├── backend/                         # FastAPI + 9 表 + 8 Agent + 9 Router + 12 Service
 │   ├── app/main.py                  # 9 router 注册 + lifespan 初始化
-│   ├── app/api/                     # 9 router（含 auth，27 端点）
-│   ├── app/core/                    # config.py / database.py / dependencies.py / security.py / celery_config.py
-│   ├── app/models/                  # 9 个 Model（students 含 password_hash）
+│   ├── app/api/                     # 9 router（auth / profile / resource / path / tutor / chat / mindmap / dashboard / evaluation）
+│   ├── app/core/
+│   │   ├── config.py                # Settings（MINIMAX_* + SPARK_* + JWT_SECRET + LLM_PROVIDER）
+│   │   ├── database.py              # async SQLAlchemy + pgvector 可选
+│   │   ├── dependencies.py          # UUID 校验 + get_current_user 门禁
+│   │   ├── security.py              # bcrypt 密码哈希 + JWT 生成/验证
+│   │   └── celery_config.py         # Celery 配置（未启动 worker）
+│   ├── app/models/                  # 9 个 Model
+│   │   ├── student.py               # 学生/管理员（student_no + password_hash + role + is_active + last_login）
+│   │   ├── student_profile.py       # 6 维 JSONB 画像 + 版本控制
+│   │   ├── document_chunk.py        # RAG 文档分块（embedding 用 JSONB 占位）
+│   │   ├── resource.py              # 学习资源
+│   │   ├── learning_path.py         # DAG 学习路径
+│   │   ├── exercise.py              # 练习题
+│   │   ├── chat_session.py          # 聊天会话
+│   │   ├── chat_message.py          # 聊天消息
+│   │   └── learning_record.py       # 学习行为记录（F5 评估）
 │   ├── app/agents/                  # 8 Agent + StateGraph 编排
 │   │   ├── state.py                 # AgentState TypedDict + IntentType
 │   │   ├── communicator.py          # MessageBus pub/sub
+│   │   ├── profile_agent.py         # 对话式 6 维画像提取
+│   │   ├── document_agent.py        # 知识讲解 + 代码 + 音频脚本 + 防幻觉验证
+│   │   ├── exercise_agent.py        # 自适应练习题生成 + 防幻觉验证
+│   │   ├── path_agent.py            # 学习路径规划（DAG）
+│   │   ├── tutor_agent.py           # RAG 智能问答 + 多轮上下文
+│   │   ├── mindmap_agent.py         # 思维导图 Mermaid 生成
+│   │   ├── audio_agent.py           # 音频脚本生成
 │   │   └── master_agent.py          # LangGraph StateGraph 13 节点
 │   ├── app/services/                # 12 个服务
-│   ├── scripts/init_db.sql          # 手动建库 + 建表脚本（含 password_hash 列）
-│   └── tests/                       # 7 个 test_*.py（119 pytest）+ smoke_test.py + 6 个 debug_*.py
-├── docs/                            # 赛题需求 / 设计文档 / 开发流程 / 运维测试 / 交付物
+│   │   ├── minimax_client.py        # httpx 直接调用 MiniMax-M3
+│   │   ├── minimax_langchain.py     # LangChain BaseChatModel 封装
+│   │   ├── spark_client.py          # 讯飞星火 V4 客户端
+│   │   ├── anti_hallucination.py    # 三层防幻觉验证
+│   │   ├── content_safety.py        # 内容安全
+│   │   ├── document_parser.py       # 文档解析器
+│   │   ├── embedding_service.py     # 向量化服务
+│   │   ├── evaluation_service.py    # 效果评估
+│   │   ├── json_parser.py           # JSON 解析工具
+│   │   ├── reranker.py              # LLM 语义重排
+│   │   ├── text_chunker.py          # 语义切片器
+│   │   └── vector_store.py          # pgvector 检索 + JSONB 降级
+│   ├── scripts/
+│   │   ├── init_db.sql              # 9 张表 + 索引 + admin 账号种子数据
+│   │   └── init_admin.py            # 自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号
+│   └── tests/                       # smoke_test.py + 7 个 pytest（119 测试）+ 6 个 debug
+├── docs/                            # 设计文档 / 开发流程 / 交付物 / 赛题需求
+│   ├── 设计文档/
+│   │   ├── 项目设计文档.md            # v2.0 完整版
+│   │   ├── 登录注册方案.md            # 登录注册实现方案
+│   │   ├── 多智能体协同升级方案-LangGraph-StateGraph.md
+│   │   └── 管理后台设计文档.md        # ⭐ 管理后台（27 API + 9 页面）
+│   ├── 开发流程/  前端设计/  运维测试/  交付物/  资料/  赛题需求/
 ├── 开发进度.md                       # 实时进度跟踪
 ├── AGENTS.md                        # 团队协作文档
 ├── CLAUDE.md                        # 本文件
-├── SMOKE_TEST_REPORT.md             # 冒烟测试记录
+├── SMOKE_TEST_REPORT.md             # 冒烟测试记录（4 次）
 ├── README.md                        # 项目 README
-└── docker-compose.yml               # postgres+pgvector / redis / minio
+└── docker-compose.yml               # postgres+pgvector / redis / minio（未启用）
 ```
 
 **实际状态（2026-06-11）**：
 
-- ✅ 前端 8 页面 **1:1 复刻模板** + **8/8 全部接入 API**（含登录/注册页）
+- ✅ **学生端 8 页面** 1:1 复刻模板 + 8/8 全部接入 API（含登录/注册）
+- ✅ **管理后台 9 页面** 1:1 复刻 `houtai.html` 模板 + 批量删除 + 搜索筛选 + 详情弹窗
 - ✅ 后端完整：**9 表 + 8 Agent + 27 唯一 API 端点** + **12 Service**（含 3 个 auth 端点）
-- ✅ **P0 全部 10 个问题已修复**（UUID 校验 / learning_records 建表+recordAction / embed_text 拼写 / 前端 3 页面硬编码替换）
-- ✅ **登录注册系统**：bcrypt 密码哈希 + JWT 验证 + 全路由门禁（24 个业务端点全部保护）
+- ✅ **登录注册系统**：bcrypt + JWT + 全 24 个业务端点门禁
+- ✅ **管理后台权限**：`role` 字段 + `is_active` + `last_login` + 独立 token (`zhishu_admin_token`)
+- ✅ **P0 全部 10 个问题已修复**
 - ✅ MiniMax-M3 LLM 端到端验证通过
-- ✅ **LangGraph StateGraph 多智能体编排**（13 节点）
-- ✅ **防幻觉三层验证**（N3 必做项）
-- ✅ **SSE 流式输出**（4 个流式端点）
-- ✅ **RAG 管道**（文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排）
-- ✅ **练习题 dual-format 流式**（markdown + JSON 双输出）
-- ✅ **端到端冒烟测试**4 次验证：2026-06-09 / 2026-06-10 17:29 / 2026-06-10 20:30 / 2026-06-11
-- ✅ **119 pytest 全过**（test_agents 31 + test_state_graph 25 + test_anti_hallucination 19 + test_json_parser 11 + test_message_bus 12 + test_strip_think 11 + test_api 10）
-- ✅ **多轮对话上下文**：最近 10 条消息传给 LLM
+- ✅ **LangGraph StateGraph 13 节点编排**
+- ✅ **防幻觉三层验证** + 4 个 SSE 流式端点
+- ✅ **RAG 管道**（document_parser → text_chunker → embedding → vector_store.search → reranker）
+- ✅ **练习题 dual-format 流式**（markdown + JSON 同传）
+- ✅ **端到端冒烟测试 4 次 9/9 PASS**
+- ✅ **119 pytest 全过**
+- ✅ **多轮对话上下文**（最近 10 条消息）
 
 ## 技术栈（已锁定，不要换）
 
@@ -194,6 +239,10 @@ cd frontend && npm install && npm run dev / build / lint
 - ✅ SSE stream 方法全部加 Authorization 头（2026-06-11）
 - ✅ `chat.py` StateGraph final_state 累积 bug 修复（2026-06-11）
 - ✅ 多轮对话上下文支持（2026-06-11）
+- ✅ **管理后台前端 9 页面 + 学生端布局隔离**（2026-06-11）：`/admin` 路由独立 layout，独立 token `zhishu_admin_token`，与学生端 `zhishu_token` 隔离
+- ✅ **管理后台后端权限基础设施**（2026-06-11）：`students` 表加 `role/is_active/last_login` 字段、`StudentDTO` 返回 role、`/auth/login` 检查 is_active、记录 last_login、`init_admin.py` Python 脚本（自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号）
+- ✅ **管理后台批量删除**（2026-06-11）：6 个列表页（users/resources/exercises/paths/chats/documents）支持多选 + 批量删除，含 `AdminCheckbox`、`BatchDeleteBar`、`useSelection` 共享组件
+- ✅ **管理后台登出按钮统一样式**（2026-06-11）：底部加登出按钮（与学生端一致），移除 Header 右上角重复按钮
 
 ## 架构与功能要点
 
@@ -209,7 +258,7 @@ intent_recognition → task_planning → conditional_route
 
 ```
 注册：POST /auth/register → bcrypt 哈希密码 → 存入 students.password_hash → 返回 JWT
-登录：POST /auth/login → bcrypt 校验密码 → 返回 JWT
+登录：POST /auth/login → bcrypt 校验密码 → 检查 is_active → 记录 last_login → 返回 JWT
 验证：Authorization: Bearer <token> → decode_token() → get_current_user() 依赖
 门禁：24 个业务端点全部加 Depends(get_current_user) + student_id 所有权校验
 公开：/auth/login、/auth/register、/mindmap/examples（无需 token）
@@ -218,6 +267,23 @@ intent_recognition → task_planning → conditional_route
 - 密码哈希：`bcrypt`（`core/security.py`）
 - JWT：标准 HS256 格式，7 天过期，密钥从 `JWT_SECRET` 环境变量读取
 - 前端：`api.ts` 的 `request()` 自动带 `Authorization: Bearer` 头，401 自动跳登录页
+
+### 管理后台系统（2026-06-11）
+
+```
+路由：/admin/* (前缀匹配，与学生端完全隔离)
+布局：admin/layout.tsx 跳过 RootLayout 的 AppShell（Sidebar + Header）
+Token：zhishu_admin_token（与学生端 zhishu_token 隔离，避免误操作）
+登录：/admin/login → 调用 /auth/login → 校验 role === 'admin' → 存 zhishu_admin_user
+权限：role 字段（student / admin）+ is_active 软删除 + last_login 记录
+登出：admin/layout.tsx 底部登出按钮（与学生端样式一致）→ 清 token → 跳 /admin/login
+```
+
+- 数据库：`students` 表加 `role/is_active/last_login` 字段 + `idx_students_role` 索引
+- 初始化：运行 `venv\Scripts\python scripts\init_admin.py`（自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号）
+- 默认管理员：`student_no=admin`, `password=admin123`, `role=admin`
+- 前端共享：`lib/admin/context.tsx`（AdminProvider + useAdmin）+ `lib/admin/components.tsx`（AdminCheckbox + BatchDeleteBar + useSelection）
+- 批量删除：6 个列表页（users/resources/exercises/paths/chats/documents）支持多选 + 二次确认 + 取消选择
 
 ### 请求处理流程
 

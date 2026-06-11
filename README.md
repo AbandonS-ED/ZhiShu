@@ -1,53 +1,68 @@
 # 智枢(SmartHub) - 多智能体个性化学习资源生成系统
 
 > 第十五届中国软件杯 A3 赛题。基于大模型的个性化学习资源生成与学习多智能体系统。  
-> **最新状态**：2026-06-11 登录注册系统完成（bcrypt + JWT + 全路由门禁），119 pytest 全过，4 次冒烟验证通过。
+> **最新状态（2026-06-11）**：登录注册系统 + 管理后台（9 页面） + 批量删除全部完成。119 pytest 全过，4 次冒烟验证通过，管理员账号 `admin/admin123` 已就绪。
 
 ## 技术栈
 
-- **前端**: Next.js 14.2.5 + Tailwind 3.4 + TypeScript（纯自定义 CSS）
-- **后端**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg + 8 Agent + 27 唯一 API + 12 Service
-- **Agent**: LangGraph StateGraph 13 节点编排 + 8 个 Agent（全部实现）
-- **LLM**: MiniMax-M3（开发）→ 讯飞星火 V4（上线前切换，改 1 个环境变量）
-- **数据库**: PostgreSQL 18 + Redis（本地安装）
-- **防幻觉**: PatternDetector + SourceValidator + LLMValidator 三层验证（N3 必做项）
-- **RAG**: 文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排（已实现 5 个 Service）
-- **SSE**: 4 个 SSE 流式端点（含 dual-format 协议）
+- **前端**: Next.js 14.2.5 + Tailwind 3.4 + TypeScript（纯自定义 CSS，无 UI 组件库）
+- **后端**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg + 8 Agent + 9 Router + 12 Service
+- **Agent**: LangGraph StateGraph 13 节点编排 + 7 子 Agent（Profile/Document/Exercise/Path/Tutor/MindMap/Audio + Master 调度）
+- **LLM**: MiniMax-M3（开发）→ 讯飞星火 V4（上线前切换，改 1 个环境变量 `LLM_PROVIDER=spark`）
+- **数据库**: PostgreSQL 18 + JSONB（向量用 JSONB 占位，pgvector 扩展未安装）
+- **认证**: bcrypt 密码哈希 + JWT（HS256，7 天过期）+ 全 24 个业务端点门禁
+- **防幻觉（N3 必做项）**: PatternDetector + SourceValidator + LLMValidator 三层验证
+- **RAG**: 文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排（5 个 Service）
+- **SSE**: 4 个真流式端点（含 dual-format 协议，markdown + JSON 同传）
+- **管理后台**: `/admin` 路由前缀，独立布局、独立 token（`zhishu_admin_token`），与学生端完全隔离
 
 ## 项目结构
 
 ```
 ZhiShu/
-├── frontend/              # 8 页面 Next.js 前端（全部已联调后端）
+├── frontend/                      # Next.js 前端（17 学生页 + 9 管理页 + 2 布局 + 3 lib + 2 store）
 │   └── src/
-│       ├── app/             # 8 路由（/ /login /duihua /profile /resources /path /tiku /pinggu）
-│       ├── components/layout/  # Sidebar + Header（含退出按钮）
-│       ├── lib/             # api.ts（自动带 token）/ student.ts / utils.ts
-│       ├── stores/          # Zustand（未使用）
-│       └── types/           # TS 接口（未使用）
-├── backend/               # FastAPI 完整后端
+│       ├── app/
+│       │   ├── layout.tsx           # 全局布局（Sidebar + Header，/admin 跳过）
+│       │   ├── globals.css          # 设计系统（米色/墨黑/琥珀，含 admin 样式）
+│       │   ├── page.tsx             # / 仪表盘
+│       │   ├── login/               # 登录注册页（独立布局）
+│       │   ├── duihua/  profile/  resources/  path/  tiku/  pinggu/  # 7 个学生页面
+│       │   └── admin/               # ⭐ 管理后台（独立布局 + 权限拦截）
+│       │       ├── layout.tsx       # 管理后台布局（侧边栏 + Header + 登出）
+│       │       ├── page.tsx         # 仪表盘
+│       │       ├── login/           # 管理员登录
+│       │       ├── users/  resources/  exercises/  paths/  chats/  documents/  agents/  # 8 个管理页面（含批量删除）
+│       ├── components/layout/        # 学生端 Sidebar + Header
+│       ├── lib/                     # api.ts（自动带 token）/ student.ts / utils.ts
+│       │                            # admin/context.tsx + admin/components.tsx
+│       ├── stores/                  # Zustand（已建未用）
+│       └── types/                   # TS 接口（已建未用）
+├── backend/                       # FastAPI 完整后端
 │   └── app/
-│       ├── main.py          # 9 router + lifespan
-│       ├── api/             # 9 router（含 auth，27 端点）
-│       ├── agents/          # 8 Agent + StateGraph + MessageBus
-│       ├── models/          # 9 Model（students 含 password_hash）
-│       ├── services/        # 12 Service
-│       └── core/            # config.py / database.py / dependencies.py / security.py / celery_config.py
-├── tests/                 # smoke_test.py + 7 个 pytest 文件（119 测试）
-├── docs/                  # 设计文档 / 开发流程 / 交付物 / 赛题需求
-├── 开发进度.md              # 实时进度跟踪
-├── AGENTS.md              # 团队协作文档
-├── CLAUDE.md              # 项目技术文档
-├── SMOKE_TEST_REPORT.md   # 四次冒烟测试记录
-├── docker-compose.yml     # postgres+pgvector / redis / minio
-└── .env.example           # 环境变量模板
+│       ├── main.py                 # 9 router + lifespan
+│       ├── api/                    # 9 router（auth / profile / resource / path / tutor / chat / mindmap / dashboard / evaluation）
+│       ├── agents/                 # 8 Agent + StateGraph + MessageBus
+│       ├── models/                 # 9 Model（students 含 password_hash + role + is_active + last_login）
+│       ├── services/               # 12 Service
+│       └── core/                   # config / database / dependencies / security / celery_config
+├── tests/                         # smoke_test.py + 7 个 pytest（119 测试）+ 6 个 debug
+├── docs/                          # 设计文档 / 开发流程 / 运维测试 / 交付物 / 赛题需求
+├── scripts/                       # init_db.sql + init_admin.py
+├── 开发进度.md                      # 实时进度跟踪
+├── AGENTS.md                      # 团队协作文档
+├── CLAUDE.md                      # 项目技术文档
+├── SMOKE_TEST_REPORT.md           # 冒烟测试记录
+├── docker-compose.yml             # postgres+pgvector / redis / minio
+└── .env.example                   # 环境变量模板
 ```
 
 ## 快速开始
 
 ```bash
-# 1. 初始化数据库（只需一次）
+# 1. 初始化数据库 + 管理员账号（只需一次）
 psql -U postgres -f backend/scripts/init_db.sql
+cd backend && venv\Scripts\python scripts\init_admin.py
 
 # 2. 后端（默认 8001）
 cd backend
@@ -61,31 +76,39 @@ npm install
 npm run dev     # http://localhost:3000
 
 # 4. 单元测试（119 pytest）
-cd backend
-python -m pytest tests/ -v
+cd backend && python -m pytest tests/ -v
 
-# 5. 端到端冒烟测试
-cd backend
-python -m tests.smoke_test
+# 5. 端到端冒烟测试（4 次 9/9 PASS）
+cd backend && python -m tests.smoke_test
 ```
 
-## 进度
+## 演示入口
+
+```bash
+学生端:  http://localhost:3000            （注册 → 登录 → 使用全部功能）
+管理端:  http://localhost:3000/admin/login  （admin / admin123 登录）
+API 文档: http://localhost:8001/docs
+```
+
+## 进度总览
 
 | 模块 | 状态 |
 |------|------|
-| 前端 8 页面 | ✅ 已完成（模板复刻 + 全部联调后端，含登录注册页） |
-| 后端 9 表 + 8 Agent + 27 唯一 API + 12 Service | ✅ 已完成 |
-| **登录注册系统** | **✅ 已完成**（bcrypt 密码哈希 + JWT + 全路由门禁） |
-| **P0 全部 10 个问题** | **✅ 已修复（UUID 校验/建表/embed_text/3 页面硬编码）** |
-| **单元测试** | **✅ 119 个 pytest 测试 PASS** |
-| **端到端冒烟测试** | **✅ 4 次验证：9/9 API 200** |
-| F1 对话式画像 | ✅ 后端+前端完成 |
-| F2 多智能体资源生成 | ✅ StateGraph 编排 + 4 Agent 联调 + dual-format 流式 |
-| F3 学习路径 | ✅ 后端+前端完成（7/14/30 天可配） |
-| N3 防幻觉 + 流式 | ✅ 防幻觉三层 + 4 个 SSE 流式端点 |
-| F4 智能辅导 | ✅ Tutor Agent RAG 接入完成 |
-| F5 效果评估 | ✅ 行为记录 + 统计 + 报告 |
-| 部署与交付 | ⚠️ Docker 配置完成但本地裸跑 |
+| **前端 8 学生页** | ✅ 已完成（模板 1:1 复刻 + 全部联调后端） |
+| **前端 9 管理页** | ✅ 已完成（含批量删除、搜索筛选、详情弹窗、DAG 可视化） |
+| **后端 9 表 + 8 Agent + 9 Router + 12 Service** | ✅ 已完成 |
+| **登录注册系统** | ✅ 已完成（bcrypt + JWT + 全 24 业务端点门禁） |
+| **管理后台权限** | ✅ 已完成（role 字段 + is_active + last_login + bcrypt） |
+| **P0 全部 10 个问题** | ✅ 已修复 |
+| **单元测试** | ✅ 119 个 pytest 全 PASS |
+| **端到端冒烟测试** | ✅ 4 次验证 9/9 API 200 |
+| F1 对话式画像 | ✅ 后端+前端完成（35% 评分项） |
+| F2 多智能体资源生成 | ✅ StateGraph 13 节点 + 7 子 Agent（45% 评分项） |
+| F3 学习路径 | ✅ 后端+前端完成（7/14/30 天可配，DAG 可视化） |
+| N3 防幻觉 + 流式 | ✅ 三层防幻觉 + 4 个 SSE 流式端点 |
+| F4 智能辅导 | ✅ Tutor Agent RAG 接入（embedding + vector_store + reranker） |
+| F5 效果评估 | ✅ learning_records + 统计 + 报告 |
+| 部署与交付 | ⚠️ Docker 配置完成但本地裸跑，LLM 比赛前需切讯飞星火 V4 |
 
 ## 评分项状态
 
@@ -95,6 +118,7 @@ python -m tests.smoke_test
 | P0 | F2 多智能体资源生成 | 45% | ✅ |
 | P1 | F3 路径 / N3 防幻觉+流式 | 必做 | ✅ |
 | P2 | F4 智能辅导 / F5 效果评估 | 加分 | ✅ |
-| 硬约束 | LLM 必须用讯飞星火 V4 | — | ⚠️ 当前 MiniMax-M3，**比赛前需切换** |
+| 加分 | 管理后台 | 加分 | ✅ |
+| 硬约束 | LLM 必须用讯飞星火 V4 | — | ⚠️ 当前 MiniMax-M3，**比赛前 1 个环境变量切换** |
 
-详情见 [`开发进度.md`](开发进度.md)、[`AGENTS.md`](AGENTS.md)、[`CLAUDE.md`](CLAUDE.md)、[`SMOKE_TEST_REPORT.md`](SMOKE_TEST_REPORT.md)。
+详情见 [`开发进度.md`](开发进度.md)、[`AGENTS.md`](AGENTS.md)、[`CLAUDE.md`](CLAUDE.md)、[`SMOKE_TEST_REPORT.md`](SMOKE_TEST_REPORT.md)、[`docs/设计文档/管理后台设计文档.md`](docs/设计文档/管理后台设计文档.md)。

@@ -1,63 +1,112 @@
 # AGENTS.md — 智枢 (ZhiShu)
 
-中国软件杯 A3 赛题：多智能体个性化学习资源生成系统。详细架构见 `CLAUDE.md`，设计文档见 `docs/设计文档/`，进度见 `开发进度.md`。
+中国软件杯 A3 赛题：多智能体个性化学习资源生成系统。
+
+**首次进入先读**：`README.md`（项目概览）→ `CLAUDE.md`（架构 + 已修复 + 踩坑）→ `开发进度.md`（实时进度 + 演示路径）。更细的模块设计在 `docs/设计文档/`。
 
 ## 硬约束
 
-- **LLM**：开发用 MiniMax-M3（`.env` 配 `MINIMAX_API_KEY`），比赛上线前切讯飞星火 V4：`LLM_PROVIDER=spark` + `SPARK_API_KEY=xxx`
-- **讯飞鉴权**：`Authorization: Bearer {api_key}`，**不拼 api_secret**
-- **禁用** Google Fonts / Vercel / Sentry / OpenAI（中国不可达）。字体走 `frontend/src/app/fonts/` 本地 woff + `next/font/local`
-- **pip** 加 `-i https://pypi.tuna.tsinghua.edu.cn/simple`；npm 已配 `npmmirror`（`frontend/.npmrc`）
-- **勿提交** `.env` / API 密钥 / `venv/` / `node_modules/`
+- **LLM**：开发用 MiniMax-M3，base_url `https://api.minimax.chat/v1`（**没有 `i`**，不是 `minimaxi`）。比赛上线前切讯飞星火 V4：`LLM_PROVIDER=spark` + `SPARK_API_KEY=xxx`。讯飞鉴权：`Authorization: Bearer {api_key}`，**不拼 api_secret**。
+- **禁用** Google Fonts / Vercel / Sentry / OpenAI（中国不可达）。字体走 `frontend/src/app/fonts/` 本地 woff + `next/font/local`。
+- **pip** 加 `-i https://pypi.tuna.tsinghua.edu.cn/simple`；npm 走 `frontend/.npmrc` 的 `registry.npmmirror.com`。
+- **勿提交** `.env` / API 密钥 / `venv/` / `node_modules/`（`.gitignore` 已配，提交前再扫一眼）。
+- **bcrypt 锁版本**：`backend/requirements.txt` 写 `bcrypt>=4.0.0`，克隆后第一次 `pip install` 即可。**不要引入 passlib**（与新版 bcrypt 后端冲突），项目里只用 `import bcrypt`。
 
-## 命令
+## 仓库结构
+
+```
+ZhiShu/
+├── frontend/   Next.js 14.2.5 + Tailwind + 自定义 CSS（无 UI 组件库）
+│   └── src/app/
+│       ├── layout.tsx           全局布局，NO_SHELL_ROUTES=['/login','/admin']
+│       ├── globals.css           学生端 + 管理端（admin-* 命名空间隔离）样式
+│       ├── {page}.tsx            学生端 7 页面 + login
+│       └── admin/                管理后台：独立 layout + 9 页面 + lib/admin/* 共享组件
+├── backend/    FastAPI + SQLAlchemy 2.0 async + 8 Agent
+│   ├── app/
+│   │   ├── main.py               9 router 注册 + lifespan
+│   │   ├── api/                  9 router（auth/profile/resource/path/tutor/chat/mindmap/dashboard/evaluation）
+│   │   ├── agents/               master_agent.py (StateGraph 13 节点) + 7 子 Agent + state + communicator
+│   │   ├── models/               9 个 SQLAlchemy Model
+│   │   ├── services/             12 个 Service（LLM 客户端 / 防幻觉 / RAG / 安全）
+│   │   └── core/                 config / database / security (bcrypt+JWT) / dependencies (门禁) / celery_config (未启用)
+│   ├── scripts/
+│   │   ├── init_db.sql           建库 + 9 张表 + 12 索引 + admin 种子
+│   │   └── init_admin.py         ⭐ 自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号
+│   ├── tests/                    smoke_test.py + 7 pytest (119) + 6 debug
+│   ├── pytest.ini                asyncio_mode=auto, testpaths=tests
+│   └── requirements.txt
+├── docs/                          设计文档 / 开发流程 / 运维测试 / 交付物 / 资料 / 赛题需求
+├── 开发进度.md / SMOKE_TEST_REPORT.md
+└── docker-compose.yml             postgres+pgvector / redis / minio（全部未启用）
+```
+
+**前端 `package.json` 装了但未使用**（不要新增依赖）：`@radix-ui/*`（6 个）、`class-variance-authority`、`clsx`、`tailwind-merge`、`lucide-react`、`reactflow`、`mermaid`、`recharts`、`react-markdown`、`react-syntax-highlighter`、`rehype-highlight`、`zustand`、`swr`。模板 1:1 复刻用纯自定义 CSS，不引 UI 库。
+
+## 命令（按顺序）
 
 ```bash
-# 数据库初始化（只需一次）
+# 1. 首次建库 + 表（只需一次）
 psql -U postgres -f backend/scripts/init_db.sql
 
-# 后端（Swagger: http://localhost:8001/docs）
-cd backend && python -m venv venv && venv\Scripts\activate
+# 2. 初始化/重置管理员账号（只需一次，可重复跑；PowerShell 调 init_admin.py 绕开 $2b$ 插值坑）
+cd backend && venv\Scripts\python scripts\init_admin.py
+# → 创建/更新 admin / admin123 / role=admin
+
+# 3. 后端（必须 8001，不要 8000：Windows 端口僵尸 socket 坑）
+cd backend
+python -m venv venv && venv\Scripts\activate
 pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8001   # 必须 8001
+uvicorn app.main:app --host 0.0.0.0 --port 8001   # Swagger: http://localhost:8001/docs
 
-# 测试（119 pytest，需 PG 5432 + Redis 6379）
-cd backend && python -m pytest tests/test_*.py -v
+# 4. 前端
+cd frontend && npm install
+npm run dev       # http://localhost:3000（学生端）
+# http://localhost:3000/admin/login（管理端，admin/admin123）
 
-# 端到端冒烟测试 (9 API)
-cd backend && python -m tests.smoke_test
-
-# 前端（http://localhost:3000）
-cd frontend && npm install && npm run dev / build / lint
+# 5. 测试（不需要 Redis；pytest 用真 PG）
+cd backend && python -m pytest tests/ -v            # 119 个测试
+cd backend && python -m tests.smoke_test            # 端到端 9 API（耗时 5-10 分钟）
+cd frontend && npm run lint                          # 0 errors
+cd frontend && npm run build                         # 17 路由编译
 ```
+
+**启动顺序**：必须先起后端，前端才能登录。否则 `/auth/login` 报网络错误。
+
+## 路由隔离（容易踩）
+
+- 根 `app/layout.tsx` 维护 `NO_SHELL_ROUTES=['/login','/admin']`，让 admin 跳过学生端 Sidebar/Header，走自己的 `admin/layout.tsx`。**新增独立路由时**记得把前缀加进 `NO_SHELL_ROUTES`。
+- **学生端 token**：`zhishu_token` / `zhishu_student`（JSON 对象含 `id`）/ `zhishu_refresh_token`。
+- **管理端 token**：`zhishu_admin_token` / `zhishu_admin_user`。**两套完全隔离**，避免管理员误操作学生数据。
 
 ## 踩过的坑（不修会卡住）
 
 - **`.next` 缓存损坏**：`npm run build` 后切 `npm run dev` 报 `Cannot find module` → 杀 node → `Remove-Item frontend/.next -Recurse` → 重启。
-- **Windows 8000 端口僵尸 socket**：进程死后端口还被内核占着，taskkill 看不到。**直接用 8001**，同步改 `frontend/src/lib/api.ts:5` BASE_URL。
-- **MiniMax base URL**：`https://api.minimax.chat/v1`（没有 `i`，不是 `minimaxi`）。
-- **pgvector 扩展未装**：Python 包已装，PostgreSQL 扩展未装。`embedding` 暂用 JSONB 占位，向量检索降级为 Python 余弦相似度。
-- **PowerShell 终端 GBK**：LLM 输出含 emoji 会让 `print` 报 `UnicodeEncodeError`。smoke_test 脚本已用 `io.TextIOWrapper(..., errors="replace")` 兜底。
+- **Windows 8000 端口僵尸 socket**：进程死后端口还被内核占着，`taskkill` / `Get-NetTCPConnection` 都看不到。**直接用 8001**，同步改 `frontend/src/lib/api.ts:5` 的 `BASE_URL`。
+- **PowerShell `$2b$` 变量插值**：在 PowerShell 命令行直接传 `'$2b$12$...'` 会被 shell 解析为变量，破坏 bcrypt 哈希。**用 `init_admin.py` 绕开**。
+- **PowerShell 终端 GBK**：LLM 输出含 emoji 会让 `print` 报 `UnicodeEncodeError`。`smoke_test.py` 已用 `io.TextIOWrapper(..., errors="replace")` 兜底。
 - **CRLF/LF 警告**：Windows 正常现象，不要修。
-- **`chat.py` event_generator 必须独立 `async_session()`**：复用请求 session 会导致流式期间锁住表，写操作 hang。
-- **`passlib` + `bcrypt` 版本不兼容**：passlib 的 bcrypt 后端跟新版 bcrypt 冲突。直接用 `bcrypt` 库，不用 passlib。
-- **`.next` 缓存 + `.next/static/css` 动画缺失**：`globals.css` 缺 `@keyframes fadeIn` 导致登录页右侧表单 `opacity:0` 不可见。加 keyframes 定义即可。
-- **`chat.py` StateGraph `final_state` 累积 bug**：`astream` 只返回每个节点的输出，`final_state = node_output` 会丢失之前节点的结果。必须用 `final_state.update(node_output)` 累积。见 `chat.py:213-229`。
-- **SSE stream 方法漏带 token**：`chatApi.stream()` / `resourceApi.generateStream()` / `exerciseApi.generateStream()` / `pathApi.generateStream()` 用原生 `fetch` 没带 `Authorization` 头，401 全部失败。每个 stream 方法都要手动加 `token`。
-- **`student.ts` localStorage key**：登录数据存在 `zhishu_student`（JSON 对象含 `id`），不是 `zhishu_student_id`（随机 UUID）。`getStudentId()` 必须从 `zhishu_student` 读取。
+- **pgvector 扩展未装**：Python 包已装，PostgreSQL 扩展未装。`embedding` 暂用 JSONB 占位，向量检索降级为 Python 余弦相似度。
+- **`chat.py` event_generator 必须独立 `async_session()`**（`chat.py:108-112`）：复用请求 session 会导致流式期间锁住表，写操作 hang。RAG 检索用 `db_async_session()` 独立 session。
+- **`chat.py` StateGraph `final_state` 累积 bug**（`chat.py:230-248`）：`astream` 只返回每个节点的输出，`final_state = node_output` 会丢失之前节点的结果。**必须用 `final_state.update(node_output)` 累积**。
+- **SSE stream 方法漏带 token**：`chatApi.stream()` / `resourceApi.generateStream()` / `exerciseApi.generateStream()` / `pathApi.generateStream()` 用原生 `fetch`，**每个都要手动加 `Authorization: Bearer ${token}`**，否则 401 全失败。
+- **`student.ts` localStorage key**：登录数据存 `zhishu_student`（JSON 对象含 `id`），**不是** `zhishu_student_id`（随机 UUID，老版本）。`getStudentId()` 必须从 `zhishu_student` 读取再 `JSON.parse`。
+- **`.next` 缓存 + `.next/static/css` 动画缺失**：`globals.css` 缺 `@keyframes fadeIn` 导致登录页右侧表单 `opacity:0` 不可见。已有 keyframes 兜底。
+- **根 layout 与 `/admin` 共用**：Next.js 根 `layout.tsx` 会被所有路由继承，**`NO_SHELL_ROUTES` 必须加 `/admin`** 让 admin 走自己的 layout，否则学生端 Sidebar 也会显示。
 
 ## 架构要点
 
 - **9 router / 27 唯一 API / 8 Agent / 9 Model / 12 Service / 119 pytest**
-- **请求路由**：`_quick_route()` 关键词匹配 → 匹配到走对应 handler，没匹配到走 StateGraph（Master Agent）。短消息（<15字）默认走 tutor 真流式。
-- **StateGraph 多智能体编排**（`backend/app/agents/master_agent.py`）：13 节点 LangGraph StateGraph（intent_recognition → task_planning → conditional_route → 7 子 Agent → result_aggregation → response_generation）。`tutor/chat` 走原路径真逐 token 流式，其他意图走 StateGraph。
-- **多轮对话上下文**：`_handle_tutor_chat_stream` 和 `tutor_agent.answer()` 都传 `history`（最近 10 条）给 LLM。assistant 消息在 DB 里是 JSON，需要解析出 `answer` 字段。
-- **`<think>` 标签过滤**：流式期间必须用 `_strip_think` 状态机，否则会吞前端渲染。
-- **防幻觉**：6 个 Agent 都接 `anti_hallucination.validate()`（Document/Exercise 走完整三层，Profile/Path/MindMap/Tutor 走 `skip_llm=True` 快速模式）。
-- **RAG**：`tutor.py` 的 `/ask` 和 `chat/stream` 的 tutor 分支都走 embedding + vector_store.search + reranker，`document_chunks` 表 embedding 用 JSONB 占位。
-- **SSE 流式**：4 个真流式端点 + 1 个伪流式端点。所有 stream 方法必须手动加 `Authorization` 头。
-- **登录注册**：`bcrypt` 密码哈希 + `JWT` 验证（`core/security.py`），全 24 个业务端点加 `get_current_user` 门禁。前端 `api.ts` 的 `request()` 自动带 token，401 自动跳登录页。`/auth/login` 和 `/auth/register` 不触发 401 自动跳转。
-- **会话删除**：`DELETE /chat/sessions/{session_id}` 删会话及所有消息，含所有权校验。
+- **请求路由**（`chat.py:493-540`）：`_quick_route()` 关键词匹配 → 匹配到走对应 handler，没匹配到走 StateGraph（Master Agent）。**短消息（<15字）默认走 tutor 真流式**。
+- **StateGraph 编排**（`agents/master_agent.py`）：13 节点 LangGraph（intent_recognition → task_planning → conditional_route → 7 子 Agent → result_aggregation → response_generation）。**tutor/chat 走原路径真逐 token 流式**（`chat.py:97-205`），其他意图走 StateGraph（`chat.py:212-287`）。
+- **多轮对话上下文**：`_handle_tutor_chat_stream` 和 `tutor_agent.answer()` 都传 `history`（最近 10 条）给 LLM。assistant 消息在 DB 里是 JSON（`{"type":"tutor","data":{...}}`），需要解析出 `answer` 字段（`chat.py:131-141`）。
+- **`<think>` 标签过滤**：`chat.py:45-72` 的 `_strip_think` 状态机是流式期间**必须**的，否则会吞前端渲染。
+- **防幻觉**（`services/anti_hallucination.py`）：6 个 Agent 都接 `validate()`（Document/Exercise 走完整三层，Profile/Path/MindMap/Tutor 走 `skip_llm=True` 快速模式）。
+- **RAG 管道**：`document_parser` → `text_chunker` → `embedding_service` → `vector_store.search`（pgvector + JSONB fallback）→ `reranker`。`tutor.py` 的 `/ask` 和 `chat/stream` 的 tutor 分支都走完整流程。
+- **SSE 流式**：4 个真流式端点（chat/stream、resource/generate/stream、resource/exercises/generate/stream、path/generate/stream）+ 1 个伪流式。所有 stream 方法**必须手动加 `Authorization` 头**。
+- **登录注册**（`core/security.py`）：`bcrypt` 密码哈希 + JWT（HS256，7 天过期，密钥从 `JWT_SECRET` 环境变量读取）。全 24 个业务端点加 `Depends(get_current_user)` 门禁（`core/dependencies.py`）。前端 `api.ts` 的 `request()` 自动带 token，401 自动跳登录页。**`/auth/login` 和 `/auth/register` 不触发 401 自动跳转**（`api.ts:27`）。
+- **管理后台**：`/admin` 路由独立 layout（`NO_SHELL_ROUTES`），token 隔离（`zhishu_admin_token`），admin 账号用 `role='admin'` 字段校验，禁用通过 `is_active=false` 实现。批量删除通过共享 `useSelection` Hook + `BatchDeleteBar` 组件（`lib/admin/components.tsx`）。
+- **会话删除**：`DELETE /chat/sessions/{session_id}` 删会话及所有消息（`chat.py:434-457`），含所有权校验。
 
 ## P1 未修（注意）
 
@@ -67,8 +116,11 @@ cd frontend && npm install && npm run dev / build / lint
 - 13 处 `alert()`
 - `print()` 代替 logging（10+ 处）
 - 防幻觉正则太激进
-- `profile_agent` 调 LLM 报 `'HumanMessage' object is not subscriptable`
+- 管理后台 27 个 API 还没实现（设计文档 `docs/设计文档/管理后台设计文档.md`），前端 9 页面用硬编码数据（演示用）
 
 ## 提交规范
 
-`feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `test:`。涉及评分项（流式/防幻觉/多智能体）的改动附 1-2 句说明。
+- `feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `test:` 开头。
+- 涉及评分项（流式/防幻觉/多智能体/RAG）的改动附 1-2 句说明。
+- 单测改动需 119 pytest 仍然全过；前端改动需 `npm run lint` 0 errors + `npm run build` 17 路由编译成功。
+- 比赛前**必做**：`.env` 改 `LLM_PROVIDER=spark` + 配 `SPARK_API_KEY`，跑一次 `tests/smoke_test` 验证讯飞星火路径。

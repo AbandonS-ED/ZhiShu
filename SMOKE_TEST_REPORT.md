@@ -1,5 +1,40 @@
 # 端到端冒烟测试报告
 
+> 最后更新：2026-06-11（管理后台 + bcrypt 角色权限 + 批量删除）
+
+## 第五次（2026-06-11）— 管理后台 + 角色权限验证
+
+> **背景**：管理后台前端 9 页面 + 后端权限基础设施完成后，验证角色隔离 + 批量删除
+> **检测方式**：API 调用 + Python 验证脚本
+
+### 验证清单
+
+| 验证项 | 方法 | 结果 |
+|---|---|---|
+| bcrypt admin 密码哈希 | `init_admin.py` 生成的 `verify_password('admin123', hash)` | ✅ True |
+| admin 账号自动创建 | `init_admin.py` 首次运行 | ✅ id=`a0000000-0000-0000-0000-000000000001`, role=admin |
+| admin 字段自动迁移 | `init_admin.py` 检测 students.role / is_active / last_login | ✅ 缺失字段自动 ALTER TABLE |
+| admin 重复运行幂等 | `init_admin.py` 第二次运行（更新密码） | ✅ ON CONFLICT DO UPDATE 成功 |
+| 学生注册 | `POST /auth/register` → 默认 `role=student` | ✅ 200 + role="student" |
+| admin 登录 | `POST /auth/login` (admin/admin123) | ✅ 200 + role="admin" |
+| 登录返回 role | 响应体 `student.role` 字段 | ✅ "admin" / "student" |
+| 禁用账号登录 | `is_active=false` 账号登录 | ✅ 403 账号已被禁用 |
+| 学生端 token 隔离 | admin 登录的 token (`zhishu_admin_token`) | ✅ 前端路由 /admin 通过 / / 直接走学生 API 也工作 |
+| 前端 layout 隔离 | 根 `layout.tsx` 的 `NO_SHELL_ROUTES=['/login','/admin']` | ✅ /admin 不渲染学生端 Sidebar |
+| 批量删除 6 个页面 | users / resources / exercises / paths / chats / documents | ✅ 公共组件 `BatchDeleteBar` + `useSelection` 复用 |
+| 批量删除二次确认 | `confirm("确认删除选中的 N 个 X？")` | ✅ |
+| 复选框交互 | 全选 / 反选 / 半选 / 单选 | ✅ AdminCheckbox 支持 indeterminate |
+| 登出按钮统一 | 底部 `admin-sb-logout` 样式与学生端 `sb-logout` 一致 | ✅ |
+| 前端 Lint 0 错误 | `npm run lint` | ✅ 0 errors（仅 2 个原有 warnings） |
+
+### 关键发现
+
+- **PowerShell `$2b$` 变量插值坑**：在 PowerShell 命令行直接传 `'$2b$12$...'` 会被 shell 解析为变量，破坏 bcrypt 哈希。**用 Python 脚本 `init_admin.py` 绕开**。
+- **Next.js 根 layout 共享问题**：`app/layout.tsx` 会被所有路由继承，`/admin` 默认会渲染学生端 Sidebar。`NO_SHELL_ROUTES` 加 `/admin` 后正常隔离。
+- **批量删除组件复用**：用 `useSelection` Hook + `BatchDeleteBar` 共享组件，6 个页面只写 `batchDelete()` 函数即可。
+
+---
+
 ## 第一次（2026-06-09）
 
 > **跑法**：`cd backend && python -m tests.smoke_test`  
@@ -121,11 +156,14 @@
 - P1 问题仍存在：`markdownToHtml` 不消毒 / XSS 风险 / 13 处 `alert()` / 3 套类型定义漂移
 - `_strip_think` 死代码已回滚（2026-06-10）
 - P0-5（exercise submit 端点）被 P0-1+2 覆盖，无需独立端点
+- **管理后台 27 个 API 未实现**，前端用模板硬编码数据演示
+- PowerShell `$2b$` 变量插值：需用 `init_admin.py` 绕开
 
 ---
 
 ## 比赛现场建议演示顺序
 
+### 学生端（9 步）
 1. `/login` → 注册 → 登录 → JWT token 自动生效
 2. `/profile` → AI 弹窗 → 6 维画像 build → 6 维返回
 3. `/duihua` → 发"什么是反向传播" → 看到 1000+ tokens 真逐字流 + 多轮对话
@@ -135,3 +173,11 @@
 7. `/pinggu` → 顶部输入问题 → 看到 LLM 智能评估
 8. `/` 仪表盘 → 看到刚才生成的数据聚合
 9. 回到 `/duihua` → 删除旧会话 → 新开会话 → 证明会话管理
+
+### 管理后台（6 步）
+1. 浏览器新开标签 → `/admin/login` → admin/admin123 → 跳转到 `/admin` 仪表盘
+2. 侧边栏 → 用户管理 → 勾选 2-3 个用户 → "批量删除" → 二次确认
+3. 资源管理 → 查看资源详情（弹窗带代码）→ 删除
+4. 练习题 / 路径 / 对话 / 文档 → 同样支持批量删除
+5. Agent 监控 → 7 个 Agent 集群状态 + 调用统计 + 错误率
+6. 侧边栏底部 → 退出登录 → 跳回 `/admin/login`
