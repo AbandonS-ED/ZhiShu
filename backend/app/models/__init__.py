@@ -4,11 +4,13 @@ from app.models.document_chunk import DocumentChunk
 from app.models.resource import Resource
 from app.models.learning_path import LearningPath
 from app.models.exercise import Exercise
+from app.models.exercise_bank import ExerciseBank
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
+from app.models.learning_record import LearningRecord
 
 __all__ = [
     "Student", "StudentProfile", "DocumentChunk",
-    "Resource", "LearningPath", "Exercise",
-    "ChatSession", "ChatMessage",
+    "Resource", "LearningPath", "Exercise", "ExerciseBank",
+    "ChatSession", "ChatMessage", "LearningRecord",
 ]

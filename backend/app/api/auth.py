@@ -1,5 +1,8 @@
-"""Auth API — 登录 / 注册 / 查询用户"""
+"""Auth API — 登录 / 注册 / 查询 / 更新用户"""
 import uuid
+from datetime import datetime, timezone
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
@@ -37,7 +40,7 @@ class RegisterRequest(BaseModel):
     student_no: str
     password: str
     name: str = ""
-    email: str = ""
+    email: Optional[str] = None
     major: str = ""
 
     @field_validator("student_no")
@@ -55,6 +58,47 @@ class RegisterRequest(BaseModel):
             raise ValueError("密码至少 6 位")
         return v
 
+    @field_validator("email")
+    @classmethod
+    def _email_fmt(cls, v):
+        v = (v or "").strip()
+        if v and ("@" not in v or "." not in v.split("@")[-1]):
+            raise ValueError("邮箱格式不正确")
+        return v or None
+
+
+class UpdateMeRequest(BaseModel):
+    name: str = ""
+    email: str = ""
+
+    @field_validator("name")
+    @classmethod
+    def _name_len(cls, v: str) -> str:
+        v = (v or "").strip()
+        if v and len(v) > 100:
+            raise ValueError("姓名不能超过 100 字符")
+        return v
+
+    @field_validator("email")
+    @classmethod
+    def _email_fmt(cls, v: str) -> str:
+        v = (v or "").strip()
+        if v and ("@" not in v or "." not in v.split("@")[-1]):
+            raise ValueError("邮箱格式不正确")
+        return v
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def _pwd_len(cls, v: str) -> str:
+        if not v or len(v) < 6:
+            raise ValueError("新密码至少 6 位")
+        return v
+
 
 class StudentDTO(BaseModel):
     id: str
@@ -62,13 +106,30 @@ class StudentDTO(BaseModel):
     name: str = ""
     email: str = ""
     major: str = ""
+    grade: str = ""
     role: str = "student"
+    created_at: str = ""
+    last_login: str = ""
 
 
 class AuthResponse(BaseModel):
     token: str
     refresh_token: str
     student: StudentDTO
+
+
+def _to_dto(s: Student) -> StudentDTO:
+    return StudentDTO(
+        id=str(s.id),
+        student_no=s.student_no or "",
+        name=s.name or "",
+        email=s.email or "",
+        major=s.major or "",
+        grade=s.grade or "",
+        role=s.role or "student",
+        created_at=s.created_at.isoformat() if s.created_at else "",
+        last_login=s.last_login.isoformat() if s.last_login else "",
+    )
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -86,25 +147,13 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not student.is_active:
         raise HTTPException(status_code=403, detail="账号已被禁用，请联系管理员")
 
-    from datetime import datetime, timezone
     student.last_login = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(student)
 
     token = create_token(str(student.id))
     refresh = create_refresh_token(str(student.id))
-    return AuthResponse(
-        token=token,
-        refresh_token=refresh,
-        student=StudentDTO(
-            id=str(student.id),
-            student_no=student.student_no or "",
-            name=student.name or "",
-            email=student.email or "",
-            major=student.major or "",
-            role=student.role or "student",
-        ),
-    )
+    return AuthResponse(token=token, refresh_token=refresh, student=_to_dto(student))
 
 
 @router.post("/register", response_model=AuthResponse)
@@ -112,8 +161,7 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Student).where(Student.student_no == req.student_no)
     )
-    student = result.scalar_one_or_none()
-    if student:
+    if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="该学号已注册")
 
     student = Student(
@@ -132,23 +180,59 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
     token = create_token(str(student.id))
     refresh = create_refresh_token(str(student.id))
-    return AuthResponse(
-        token=token,
-        refresh_token=refresh,
-        student=StudentDTO(
-            id=str(student.id),
-            student_no=student.student_no or "",
-            name=student.name or "",
-            email=student.email or "",
-            major=student.major or "",
-            role=student.role or "student",
-        ),
-    )
+    return AuthResponse(token=token, refresh_token=refresh, student=_to_dto(student))
+
+
+@router.get("/me", response_model=StudentDTO)
+async def get_me(user: Student = Depends(get_current_user)):
+    """获取当前登录用户信息"""
+    return _to_dto(user)
+
+
+@router.put("/me", response_model=StudentDTO)
+async def update_me(
+    req: UpdateMeRequest,
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    """更新当前登录用户信息"""
+    if req.email:
+        result = await db.execute(
+            select(Student).where(Student.email == req.email, Student.id != user.id)
+        )
+        if result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="该邮箱已被使用")
+
+    if req.name:
+        user.name = req.name
+    user.email = req.email.strip() or None
+    user.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(user)
+    return _to_dto(user)
+
+
+@router.post("/change-password")
+async def change_password(
+    req: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    """修改当前用户密码"""
+    if not verify_password(req.old_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="当前密码不正确")
+    if req.old_password == req.new_password:
+        raise HTTPException(status_code=400, detail="新密码不能与旧密码相同")
+
+    user.password_hash = hash_password(req.new_password)
+    user.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    return {"message": "密码修改成功"}
 
 
 @router.get("/me/{student_id}", response_model=StudentDTO)
 async def me(student_id: str, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
-    """查询当前登录用户信息"""
+    """查询指定用户信息（保留向后兼容）"""
     if str(user.id) != student_id:
         raise HTTPException(status_code=403, detail="只能查看自己的信息")
     try:
@@ -159,11 +243,4 @@ async def me(student_id: str, db: AsyncSession = Depends(get_db), user: Student 
     student = result.scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=404, detail="学生不存在")
-    return StudentDTO(
-        id=str(student.id),
-        student_no=student.student_no or "",
-        name=student.name or "",
-        email=student.email or "",
-        major=student.major or "",
-        role=student.role or "student",
-    )
+    return _to_dto(student)

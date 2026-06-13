@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, Integer, Float, func
+from sqlalchemy import Column, String, DateTime, Integer, Float, Boolean, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.core.database import Base
 
@@ -20,4 +20,5 @@ class Exercise(Base):
     knowledge_point = Column(String(200), nullable=True)
     student_answer = Column(String(2000), nullable=True)
     is_correct = Column(Float, nullable=True)  # 0-1 score
+    source = Column(String(20), default="ai")  # ai / bank（从题库抽取的）
     created_at = Column(DateTime(timezone=True), server_default=func.now())
