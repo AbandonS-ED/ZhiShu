@@ -2,7 +2,6 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 
-// 模板页面标题映射（来自 7 个模板的 script titles + 标题）
 const pageTitles: Record<string, { title: string; sub: string }> = {
   '/': { title: '仪表盘', sub: '欢迎回来' },
   '/duihua': {
@@ -29,6 +28,10 @@ const pageTitles: Record<string, { title: string; sub: string }> = {
     title: '学习评估',
     sub: '效果分析报告',
   },
+  '/setting': {
+    title: '设置',
+    sub: '个人信息 · 账号安全',
+  },
 }
 
 function getPageInfo(pathname: string) {
@@ -40,13 +43,6 @@ export function Header() {
   const pathname = usePathname()
   const router = useRouter()
   const { title, sub } = getPageInfo(pathname)
-
-  function handleLogout() {
-    localStorage.removeItem('zhishu_token')
-    localStorage.removeItem('zhishu_refresh_token')
-    localStorage.removeItem('zhishu_student')
-    router.push('/login')
-  }
 
   return (
     <header className="hdr">
@@ -60,17 +56,10 @@ export function Header() {
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
         </button>
-        <button className="hdr-btn" aria-label="设置">
+        <button className="hdr-btn" aria-label="设置" onClick={() => router.push('/setting')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <circle cx="12" cy="12" r="3" />
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </button>
-        <button className="hdr-btn" aria-label="退出登录" onClick={handleLogout} title="退出登录">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
           </svg>
         </button>
       </div>

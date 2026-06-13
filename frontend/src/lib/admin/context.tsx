@@ -14,7 +14,7 @@ export const PANELS: Record<PanelId, PanelMeta> = {
   pDash:  { id: 'pDash',  title: '管理仪表盘',     sub: '系统概览 · 数据统计' },
   pUsers: { id: 'pUsers', title: '用户管理',       sub: '用户列表 · 搜索 · 详情' },
   pRes:   { id: 'pRes',   title: '资源管理',       sub: 'AI 生成资源列表' },
-  pEx:    { id: 'pEx',    title: '练习题管理',     sub: '题目列表 · 按用户筛选' },
+  pEx:    { id: 'pEx',    title: '题库管理',       sub: '公共题库 · 新增 · 编辑 · 批量导入' },
   pPath:  { id: 'pPath',  title: '学习路径',       sub: '路径列表 · DAG 可视化' },
   pChat:  { id: 'pChat',  title: '对话记录',       sub: '会话列表 · 消息详情' },
   pDoc:   { id: 'pDoc',   title: '知识库管理',     sub: '文档分块列表' },

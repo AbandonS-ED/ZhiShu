@@ -1565,3 +1565,33 @@ body.auth-mode .auth-root{min-height:100vh}
 .admin-batch-count{color:var(--ink);font-weight:500}
 .admin-batch-count b{color:var(--warm);font-weight:600;margin:0 2px}
 .admin-batch-hint{color:var(--ink-3);font-size:11.5px}
+
+/* ═══ SETTINGS PAGE ═══ */
+.set-page{padding:24px;max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+.set-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:24px}
+.set-card.readonly{opacity:.82}
+.set-card-hd{margin-bottom:18px}
+.set-card-hd h2{font-size:15px;font-weight:600;margin-bottom:4px}
+.set-card-hd p{font-size:12.5px;color:var(--ink-3)}
+.set-field{margin-bottom:14px}
+.set-field label{display:block;font-size:13px;color:var(--ink-2);margin-bottom:5px;font-weight:500}
+.set-field input{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:var(--r-xs);background:var(--bg);color:var(--ink);font-size:14px;box-sizing:border-box;transition:border-color .15s}
+.set-field input:focus{outline:none;border-color:var(--ink-2)}
+.set-field input:disabled{background:var(--ink-6);color:var(--ink-3);cursor:not-allowed}
+.set-msg{font-size:13px;padding:8px 12px;border-radius:var(--r-xs);margin-bottom:14px;animation:emerge .15s var(--ease)}
+.set-msg.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.set-msg.err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.set-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.set-btn{padding:8px 18px;border-radius:var(--r-xs);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;border:none}
+.set-btn.primary{background:var(--ink);color:var(--bg)}
+.set-btn.primary:hover{opacity:.88}
+.set-btn.primary:disabled{opacity:.5;cursor:not-allowed}
+.set-btn.ghost{background:transparent;color:var(--ink-3);border:1px solid var(--line)}
+.set-btn.ghost:hover{background:var(--ink-6)}
+.set-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.set-info-item{display:flex;flex-direction:column;gap:2px}
+.set-info-label{font-size:12px;color:var(--ink-3)}
+.set-info-val{font-size:14px;font-weight:500}
+.set-loading{padding:40px;text-align:center;color:var(--ink-3);font-size:14px}
+
+@media(max-width:600px){.set-page{padding:12px}.set-card{padding:16px}.set-info-grid{grid-template-columns:1fr}}
