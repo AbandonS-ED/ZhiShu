@@ -23,8 +23,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     } catch {
       msg = await res.text().catch(() => res.statusText)
     }
-    // token 过期/无效 → 清 localStorage，跳登录页（仅非登录/注册接口触发）
-    if (res.status === 401 && typeof window !== 'undefined' && !path.startsWith('/auth/')) {
+    // token 过期/无效 → 清 localStorage，跳登录页（白名单：login/register 不触发）
+    if (res.status === 401 && typeof window !== 'undefined'
+        && !path.startsWith('/auth/login') && !path.startsWith('/auth/register')) {
       localStorage.removeItem('zhishu_token')
       localStorage.removeItem('zhishu_refresh_token')
       localStorage.removeItem('zhishu_student')
@@ -458,13 +459,17 @@ export const evaluationApi = {
     }),
 }
 
-// ===== Auth (登录 / 注册) =====
+// ===== Auth (登录 / 注册 / 设置) =====
 export interface AuthStudent {
   id: string
   student_no: string
   name?: string
   email?: string
   major?: string
+  grade?: string
+  role?: string
+  created_at?: string
+  last_login?: string
 }
 
 export interface AuthResponse {
@@ -487,6 +492,17 @@ export const authApi = {
     major?: string
   }) =>
     request<AuthResponse>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getMe: () => request<AuthStudent>('/auth/me', { method: 'GET' }),
+  updateMe: (data: { name?: string; email?: string }) =>
+    request<AuthStudent>('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+  changePassword: (data: { old_password: string; new_password: string }) =>
+    request<{ message: string }>('/auth/change-password', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
