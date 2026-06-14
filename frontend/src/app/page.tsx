@@ -1,15 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { getStudentId } from '@/lib/student'
 
 export default function Home() {
   const [stats, setStats] = useState<any>(null)
   const [courses, setCourses] = useState<any[]>([])
 
   useEffect(() => {
+    const sid = getStudentId()
+    if (!sid) return
     import('@/lib/api').then(({ dashboardApi }) => {
-      dashboardApi.getStats().then(setStats).catch(console.error)
-      dashboardApi.getCourses().then((data) => setCourses(data.courses)).catch(console.error)
+      dashboardApi.getStats(sid).then(setStats).catch(console.error)
+      dashboardApi.getCourses(sid).then((data) => setCourses(data.courses)).catch(console.error)
     })
   }, [])
 
