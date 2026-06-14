@@ -1,5 +1,7 @@
 # AGENTS.md — 智枢 (ZhiShu)
 
+> 最后更新：2026-06-14（端点 33 / StateGraph 10 节点 / 5 维画像 / 114 pytest）
+
 中国软件杯 A3 赛题：多智能体个性化学习资源生成系统。
 
 **首次进入先读**：`README.md`（项目概览）→ `CLAUDE.md`（架构 + 已修复 + 踩坑）→ `开发进度.md`（实时进度 + 演示路径）。更细的模块设计在 `docs/设计文档/`。
@@ -11,6 +13,7 @@
 - **pip** 加 `-i https://pypi.tuna.tsinghua.edu.cn/simple`；npm 走 `frontend/.npmrc` 的 `registry.npmmirror.com`。
 - **勿提交** `.env` / API 密钥 / `venv/` / `node_modules/`（`.gitignore` 已配，提交前再扫一眼）。
 - **bcrypt 锁版本**：`backend/requirements.txt` 写 `bcrypt>=4.0.0`，克隆后第一次 `pip install` 即可。**不要引入 passlib**（与新版 bcrypt 后端冲突），项目里只用 `import bcrypt`。
+- **端口**：后端用 **8001**（不要 8000），前端用 3000。`api.ts:5` 的 `BASE_URL` 已同步。
 
 ## 仓库结构
 
@@ -20,21 +23,22 @@ ZhiShu/
 │   └── src/app/
 │       ├── layout.tsx           全局布局，NO_SHELL_ROUTES=['/login','/admin']
 │       ├── globals.css           学生端 + 管理端（admin-* 命名空间隔离）样式
-│       ├── {page}.tsx            学生端 8 页面（含 setting）+ login
+│       ├── {page}.tsx            学生端 9 页面（含 setting）+ login
 │       └── admin/                管理后台：独立 layout + 9 页面 + lib/admin/* 共享组件
 ├── backend/    FastAPI + SQLAlchemy 2.0 async + 8 Agent
 │   ├── app/
 │   │   ├── main.py               10 router 注册 + lifespan
-│   │   ├── api/                  10 router（auth/profile/resource/path/tutor/chat/mindmap/dashboard/evaluation/admin_exercises）
-│   │   ├── agents/               master_agent.py (StateGraph 13 节点) + 7 子 Agent + state + communicator
-│   │   ├── models/               10 个 SQLAlchemy Model（含 exercise_bank + learning_record）
+│   │   ├── api/                  10 router（auth/profile/resource/path/tutor/chat/mindmap/dashboard/evaluation/admin_exercises）= 33 唯一端点
+│   │   ├── agents/               master_agent.py (StateGraph 10 节点) + 7 子 Agent + initial_assessment_agent + state + communicator
+│   │   ├── models/               11 个 SQLAlchemy Model（含 exercise_bank + learning_record + learning_activity_log）
 │   │   ├── services/             12 个 Service（LLM 客户端 / 防幻觉 / RAG / 安全）
 │   │   └── core/                 config / database / security (bcrypt+JWT) / dependencies (门禁) / celery_config (未启用)
 │   ├── scripts/
-│   │   ├── init_db.sql           建库 + 10 张表 + 14 索引 + admin 种子
+│   │   ├── init_db.sql           建库 + 11 张表 + 14 索引 + admin 种子
 │   │   ├── init_admin.py         ⭐ 自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号
-│   │   └── migrate_exercise_bank.sql  练习题库迁移（已合并到 init_db.sql）
-│   ├── tests/                    smoke_test.py + 7 pytest (119) + 6 debug
+│   │   ├── migrate_exercise_bank.sql  练习题库迁移（已合并到 init_db.sql）
+│   │   └── run_migration.py      通用迁移执行器
+│   ├── tests/                    smoke_test.py + 7 pytest (114) + 6 debug
 │   ├── pytest.ini                asyncio_mode=auto, testpaths=tests
 │   └── requirements.txt
 ├── docs/                          设计文档 / 开发流程 / 运维测试 / 交付物 / 资料 / 赛题需求
@@ -42,7 +46,7 @@ ZhiShu/
 └── docker-compose.yml             postgres+pgvector / redis / minio（全部未启用）
 ```
 
-**前端 `package.json` 装了但未使用**（不要新增依赖）：`@radix-ui/*`（6 个）、`class-variance-authority`、`clsx`、`tailwind-merge`、`lucide-react`、`reactflow`、`mermaid`、`recharts`、`react-markdown`、`react-syntax-highlighter`、`rehype-highlight`、`zustand`、`swr`。模板 1:1 复刻用纯自定义 CSS，不引 UI 库。
+**前端 `package.json` 装了但未使用**（不要新增依赖）：`@radix-ui/*`（6 个）、`class-variance-authority`、`clsx`、`tailwind-merge`、`lucide-react`、`reactflow`、`mermaid`、`recharts`、`react-markdown`、`react-syntax-highlighter`、`rehype-highlight`、`zustand`、`swr`。模板 1:1 复刻用纯自定义 CSS，不引 UI 库。**zustand 已接入 Sidebar 实时刷新 student**。
 
 ## 命令（按顺序）
 
@@ -66,7 +70,7 @@ npm run dev       # http://localhost:3000（学生端）
 # http://localhost:3000/admin/login（管理端，admin/admin123）
 
 # 5. 测试（不需要 Redis；pytest 用真 PG；pytest.ini 配了 asyncio_mode=auto）
-cd backend && python -m pytest tests/ -v            # 119 个测试
+cd backend && python -m pytest tests/ -v            # 114 个测试
 cd backend && python -m tests.smoke_test            # 端到端 9 API（耗时 5-10 分钟）
 cd frontend && npm run lint                          # 0 errors
 cd frontend && npm run build                         # 18 路由编译
@@ -97,21 +101,23 @@ cd frontend && npm run build                         # 18 路由编译
 
 ## 架构要点
 
-- **10 router / 39 唯一 API / 8 Agent / 10 Model / 12 Service / 119 pytest**
+- **10 router / 33 唯一 API / 8 Agent / 11 Model / 12 Service + MessageBus / 114 pytest**
 - **请求路由**（`chat.py`）：`_quick_route()` 关键词匹配 → 匹配到走对应 handler，没匹配到走 StateGraph（Master Agent）。**短消息（<15字）默认走 tutor 真流式**。
-- **StateGraph 编排**（`agents/master_agent.py`）：13 节点 LangGraph（intent_recognition → task_planning → conditional_route → 7 子 Agent → result_aggregation → response_generation）。**tutor/chat 走原路径真逐 token 流式**，其他意图走 StateGraph。
+- **StateGraph 编排**（`agents/master_agent.py`）：**10 节点** LangGraph（intent_recognition → task_planning → conditional_route → 5 个 Agent 节点（document / mindmap / exercise / path / tutor）→ result_aggregation → response_generation）。`run_audio_agent` 节点存在但通常不被路由。**tutor/chat 走原路径真逐 token 流式**，其他意图走 StateGraph。
+- **5 维学生画像**（`initial_assessment_agent.py`）：理解力 / 记忆力 / 应用转化 / 想象力 / 专注力，每个维度含 `score` (0-100) + `confidence` (0-1)。**wyy 重构于 2026-06-13**，替换旧的 `profile_agent`。
 - **多轮对话上下文**：`_handle_tutor_chat_stream` 和 `tutor_agent.answer()` 都传 `history`（最近 10 条）给 LLM。assistant 消息在 DB 里是 JSON（`{"type":"tutor","data":{...}}`），需要解析出 `answer` 字段。
 - **`<think>` 标签过滤**：`chat.py` 的 `_strip_think` 状态机是流式期间**必须**的，否则会吞前端渲染。
 - **防幻觉**（`services/anti_hallucination.py`）：6 个 Agent 都接 `validate()`（Document/Exercise 走完整三层，Profile/Path/MindMap/Tutor 走 `skip_llm=True` 快速模式）。
 - **RAG 管道**：`document_parser` → `text_chunker` → `embedding_service` → `vector_store.search`（pgvector + JSONB fallback）→ `reranker`。`tutor.py` 的 `/ask` 和 `chat/stream` 的 tutor 分支都走完整流程。
-- **SSE 流式**：4 个真流式端点（chat/stream、resource/generate/stream、resource/exercises/generate/stream、path/generate/stream）+ 1 个伪流式。所有 stream 方法**必须手动加 `Authorization` 头**。
+- **SSE 流式**：4 个真流式端点（chat/stream、resource/generate/stream、resource/exercises/generate/stream、path/generate/stream）+ 1 个伪流式（profile/assess/stream）。所有 stream 方法**必须手动加 `Authorization` 头**。
 - **登录注册**（`core/security.py`）：`bcrypt` 密码哈希 + JWT（HS256，7 天过期，密钥从 `JWT_SECRET` 环境变量读取）。全 33 个业务端点加 `Depends(get_current_user)` 门禁（`core/dependencies.py`）。前端 `api.ts` 的 `request()` 自动带 token，401 自动跳登录页。**`/auth/login` 和 `/auth/register` 不触发 401 自动跳转**。
 - **管理后台**：`/admin` 路由独立 layout（`NO_SHELL_ROUTES`），token 隔离（`zhishu_admin_token`），admin 账号用 `role='admin'` 字段校验，禁用通过 `is_active=false` 实现。批量删除通过共享 `useSelection` Hook + `BatchDeleteBar` 组件（`lib/admin/components.tsx`）。管理端题库 CRUD 通过 `admin_exercises.py` 6 个端点实现。
 - **会话删除**：`DELETE /chat/sessions/{session_id}` 删会话及所有消息，含所有权校验。
+- **公共题库**：`exercise_bank` 表（11 字段 + 3 索引），admin 端点 `/api/v1/admin/exercises/*`（6 端点），学生端 `/resource/exercises/pool` 合并 `exercise_bank` + `exercises` 表随机抽题。
 
 ## 提交规范
 
 - `feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `test:` 开头。
 - 涉及评分项（流式/防幻觉/多智能体/RAG）的改动附 1-2 句说明。
-- 单测改动需 119 pytest 仍然全过；前端改动需 `npm run lint` 0 errors + `npm run build` 18 路由编译成功。
+- 单测改动需 114 pytest 仍然全过；前端改动需 `npm run lint` 0 errors + `npm run build` 18 路由编译成功。
 - 比赛前**必做**：`.env` 改 `LLM_PROVIDER=spark` + 配 `SPARK_API_KEY`，跑一次 `tests/smoke_test` 验证讯飞星火路径。

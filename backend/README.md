@@ -1,15 +1,17 @@
 # 智枢(SmartHub) Backend
 
+> 最后更新：2026-06-14（端点 33 / StateGraph 10 节点 / 5 维画像 / 114 pytest）
+
 基于 FastAPI + 8 Agent 的多智能体学习资源生成系统后端。
 
 ## 技术栈
 
 - **框架**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg
-- **Agent**: 7 个子 Agent + Master Agent 编排器（LangGraph StateGraph 13 节点）
+- **Agent**: 7 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）
 - **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 33 业务端点门禁
 - **角色**: `role` 字段（student / admin）+ `is_active` 软删除 + `last_login` 记录
 - **LLM**: MiniMax-M3（开发）→ 讯飞星火 V4（上线前切换 `LLM_PROVIDER=spark`）
-- **数据库**: PostgreSQL 18 + 10 张表 + 14 索引 + JSONB（embedding 占位）+ Redis（当前未使用）
+- **数据库**: PostgreSQL 18 + **11 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（当前未使用）
 
 ## 快速开始
 
@@ -40,7 +42,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 backend/
 ├── app/
-│   ├── main.py              # 入口（10 个 router + lifespan 初始化）
+│   ├── main.py              # 入口（10 个 router + lifespan 初始化）= 33 唯一端点
 │   ├── api/                 # 10 个 router：auth / profile / resource / path / tutor / chat / mindmap / dashboard / evaluation / admin_exercises
 │   ├── core/
 │   │   ├── config.py        # Settings（MINIMAX_* + SPARK_* + JWT_SECRET + LLM_PROVIDER）
@@ -48,9 +50,9 @@ backend/
 │   │   ├── security.py      # 密码哈希（bcrypt）+ JWT 生成/验证
 │   │   ├── dependencies.py  # UUID 校验 + get_current_user 门禁
 │   │   └── celery_config.py # Celery 配置（未启用）
-│   ├── models/              # 10 个 Model
+│   ├── models/              # 11 个 Model
 │   │   ├── student.py       # ⭐ 学生/管理员（student_no + password_hash + role + is_active + last_login）
-│   │   ├── student_profile.py # 6 维 JSONB 画像 + 版本控制
+│   │   ├── student_profile.py # **5 维** JSONB 画像（理解力/记忆力/应用转化/想象力/专注力 + confidence）
 │   │   ├── document_chunk.py  # RAG 文档分块（embedding 用 JSONB 占位）
 │   │   ├── resource.py      # 学习资源
 │   │   ├── learning_path.py # DAG 学习路径
@@ -58,18 +60,19 @@ backend/
 │   │   ├── exercise_bank.py # 公共题库（admin 创建）
 │   │   ├── chat_session.py  # 聊天会话
 │   │   ├── chat_message.py  # 聊天消息
-│   │   └── learning_record.py # 学习行为记录（F5 评估）
+│   │   ├── learning_record.py # 学习行为记录（F5 评估）
+│   │   └── learning_activity_log.py # 学习行为日志（wyy 独占）
 │   ├── agents/              # 8 个 Agent
 │   │   ├── state.py           # AgentState TypedDict + IntentType（11 种意图）
 │   │   ├── communicator.py    # MessageBus pub/sub
-│   │   ├── profile_agent.py   # 对话式 6 维画像提取
+│   │   ├── initial_assessment_agent.py  # 对话式 **5 维** 画像评估（替换旧 profile_agent）
 │   │   ├── document_agent.py  # 知识讲解 + 代码 + 音频脚本 + 防幻觉验证
 │   │   ├── exercise_agent.py  # 自适应练习题生成 + 防幻觉验证
 │   │   ├── path_agent.py      # 学习路径规划（DAG）
 │   │   ├── tutor_agent.py     # RAG 智能问答 + 多轮上下文
 │   │   ├── mindmap_agent.py   # 思维导图 Mermaid 生成
 │   │   ├── audio_agent.py     # 音频脚本生成
-│   │   └── master_agent.py    # LangGraph StateGraph 13 节点
+│   │   └── master_agent.py    # LangGraph StateGraph **10 节点**
 │   └── services/
 │       ├── minimax_client.py     # httpx OpenAI 兼容格式客户端
 │       ├── minimax_langchain.py  # LangChain BaseChatModel 封装
@@ -84,17 +87,20 @@ backend/
 │       ├── text_chunker.py       # 语义切片器（800字限制 + 重叠窗口）
 │       └── vector_store.py       # pgvector 检索 + JSONB 降级方案
 ├── scripts/
-│   ├── init_db.sql          # 手动建库 + 建表 SQL 脚本（10 张表 + 14 索引 + admin 种子数据）
+│   ├── init_db.sql          # 手动建库 + 建表 SQL 脚本（**11 张表** + 14 索引 + admin 种子数据）
 │   ├── init_admin.py        # ⭐ 自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号
-│   └── migrate_exercise_bank.sql # 练习题库迁移（已合并到 init_db.sql）
-├── tests/                   # smoke_test.py（端到端）+ 7 个 pytest 文件（119 个测试）+ 6 个 debug 脚本
+│   ├── migrate_exercise_bank.sql # 练习题库迁移（已合并到 init_db.sql）
+│   └── run_migration.py     # 通用迁移执行器
+├── tests/                   # smoke_test.py（端到端）+ 7 个 pytest 文件（**114** 个测试）+ 6 个 debug 脚本
 ├── pytest.ini               # asyncio_mode=auto, testpaths=tests
 ├── Dockerfile               # ⚠️ 未实际使用，后端本地裸跑
 ├── requirements.txt
 └── .env                     # API Key（已 gitignore）
 ```
 
-## API 路由（39 个端点）
+## API 路由（33 个唯一端点）
+
+> 唯一端点 = 唯一路径 + 方法组合。`backend/app/main.py` 注册 10 router，含 `/` 和 `/health` 根路由。
 
 ### 认证（auth.py）— 6 个端点
 
@@ -111,8 +117,8 @@ backend/
 
 | 方法 | 路径 | 门禁 | 说明 |
 |------|------|------|------|
-| POST | `/api/v1/profile/build` | ✅ | 从对话构建/更新画像 |
-| GET | `/api/v1/profile/{student_id}` | ✅ | 获取当前画像 |
+| POST | `/api/v1/profile/assess/stream` | ✅ | **SSE 流式 5 维画像评估**（Initial Assessment Agent） |
+| GET | `/api/v1/profile/me` | ✅ | 获取当前学生画像 |
 
 ### 资源生成（resource.py）— 7 个端点
 
@@ -209,12 +215,12 @@ backend/
 
 ## 数据库
 
-10 张表 + 14 个索引（开发阶段去掉外键约束）：
+**11 张表 + 14 个索引**（开发阶段去掉外键约束）：
 
 | 表名 | 用途 | 索引 |
 |------|------|------|
 | `students` | **学生/管理员**（student_no + password_hash + role + is_active + last_login） | `student_no` UNIQUE + `idx_students_role` + `idx_students_is_active` |
-| `student_profiles` | 6 维 JSONB 画像 + 版本控制 | `idx_student_profiles_student_id` |
+| `student_profiles` | **5 维** JSONB 画像（理解力/记忆力/应用转化/想象力/专注力 + confidence） | `idx_student_profiles_student_id` |
 | `document_chunks` | RAG 文档分块（embedding JSONB 占位） | — |
 | `resources` | 生成的学习资源 | `idx_resources_student_id` |
 | `learning_paths` | DAG 学习路径 | `idx_learning_paths_student_id` |
@@ -223,6 +229,7 @@ backend/
 | `chat_sessions` | 聊天会话 | `idx_chat_sessions_student_id` |
 | `chat_messages` | 聊天消息 | `idx_chat_messages_session_id` |
 | `learning_records` | 学习行为记录（F5 评估） | `idx_learning_records_student_id` + `idx_learning_records_action` + `idx_learning_records_created_at` |
+| `learning_activity_logs` | 学习行为日志（wyy 独占） | — |
 
 ## 认证与权限
 
@@ -240,6 +247,7 @@ backend/
 - Celery 异步任务未启用（`app/core/celery_config.py` 已存在但未跑 worker）
 - PowerShell `$2b$` 变量插值：bcrypt 哈希不能直接在 PowerShell 命令行传，**用 `scripts/init_admin.py` 绕开**
 - `LearningRecord` 已在 `models/__init__.py` 导出（2026-06-13 修复）
+- 后端端口**必须 8001**（不要 8000：Windows 端口僵尸 socket 坑）。改端口要同步改 `frontend/src/lib/api.ts:5` 的 `BASE_URL`
 
 ## 测试
 
@@ -249,23 +257,24 @@ cd backend
 # ⭐ 端到端冒烟测试 (9 API 验证，四次 9/9 PASS)
 python -m tests.smoke_test
 
-# 单元 + 集成（119 个 pytest 测试）
+# 单元 + 集成（**114** 个 pytest 测试）
 pytest tests/ -v
 ```
 
 **实际测试文件**（`backend/tests/`）：
 
-| 文件 | 大小 | 用途 |
-|------|------|------|
-| ⭐ `smoke_test.py` | 13.3 KB | **端到端冒烟**，9 API 全 200 |
-| `test_agents.py` | 7.7 KB | 31 个 Agent 单元测试 |
-| `test_anti_hallucination.py` | 4.3 KB | 防幻觉三层（PatternDetector / SourceValidator / LLMValidator） |
-| `test_json_parser.py` | 2.1 KB | JSON 解析工具 |
-| `test_api.py` | 2.3 KB | API 最小集成测试 |
-| `test_state_graph.py` | — | StateGraph 25 个测试 |
-| `test_strip_think.py` | — | think 标签过滤 11 个测试 |
-| `test_message_bus.py` | — | MessageBus 12 个测试 |
-| `debug_*.py` | 6 个 | 调试脚本（exercise / mindmap / path / resource） |
+| 文件 | 大小 | 用途 | 测试数 |
+|------|------|------|--------|
+| ⭐ `smoke_test.py` | 13.3 KB | **端到端冒烟**，9 API 全 200 | — |
+| `test_agents.py` | 7.7 KB | Agent 单元测试 | 27 |
+| `test_anti_hallucination.py` | 4.3 KB | 防幻觉三层（PatternDetector / SourceValidator / LLMValidator） | 19 |
+| `test_api.py` | 2.3 KB | API 最小集成测试 | 10 |
+| `test_json_parser.py` | 2.1 KB | JSON 解析工具 | 11 |
+| `test_message_bus.py` | 5.7 KB | MessageBus pub/sub | 12 |
+| `test_state_graph.py` | 7.5 KB | StateGraph 节点/边/conditional_route | 24 |
+| `test_strip_think.py` | 2.2 KB | think 标签过滤 | 11 |
+| `debug_*.py` | 6 个 | 调试脚本（exercise / mindmap / path / resource） | — |
+| **合计** | | | **114** |
 
 最新测试报告见 `../SMOKE_TEST_REPORT.md`。
 

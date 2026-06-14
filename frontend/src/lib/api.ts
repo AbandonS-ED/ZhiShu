@@ -1,6 +1,6 @@
 // 智枢 API 客户端
 // 后端 baseURL: http://localhost:8000
-const BASE_URL = 'http://localhost:8000/api/v1'
+const BASE_URL = 'http://localhost:8001/api/v1'
 
 // 通用 fetch 封装（自动带 token）
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
