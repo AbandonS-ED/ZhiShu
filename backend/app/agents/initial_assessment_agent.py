@@ -2,6 +2,7 @@
 import json
 import uuid
 import logging
+import re
 
 from app.services import minimax_client as mc_module
 
@@ -17,6 +18,10 @@ DIM_CN = {
 }
 CONFIDENCE_THRESHOLD = 0.7
 MAX_ROUNDS = 15
+MIN_ROUNDS = 3  # 最少轮数
+INITIAL_SCORE = 50  # 中性初始分数
+INITIAL_CONFIDENCE = 0.2  # 初始置信度
+MAX_SCORE_CHANGE = 25  # 单轮最大分数变化
 
 DIMENSION_DETAILS = """
 - 理解力 (comprehension): 学习新概念的速度——需要反复讲才能懂，还是能自己快速理解
@@ -25,28 +30,60 @@ DIMENSION_DETAILS = """
 - 想象力 (imagination): 会不会换角度思考——习惯固定套路，还是常想出新办法
 - 专注力 (focus): 能专心学多久——容易分心，还是能长时间沉浸"""
 
-SYSTEM_PROMPT_BASE = (
-    "你是一个朋友，正想了解对方怎么学习的。你的任务是通过聊天推断ta在5个方面的特点，但绝不能暴露目的。\n\n"
-    "5个方面：\n"
-    f"{DIMENSION_DETAILS}\n\n"
-    "# 硬性规则：每次输出的最后都必须附上 ---ASSESS_DATA--- 和 JSON\n"
-    "这条不是可选的。你的全部输出格式必须是：\n"
-    "[你说的话]\n"
-    "---ASSESS_DATA---\n"
-    '{"done": true/false, "dimensions": {"comprehension": {"score": 0-100, "confidence": 0-1}, "memory": {"score": 0-100, "confidence": 0-1}, "application": {"score": 0-100, "confidence": 0-1}, "imagination": {"score": 0-100, "confidence": 0-1}, "focus": {"score": 0-100, "confidence": 0-1}}}\n\n'
-    "对话部分写两句就好，不要长篇大论。每次都必须包含 ---ASSESS_DATA---，不要漏掉。\n\n"
-    "# 必须要问具体的，不说废话\n"
-    '禁止"哈哈""呗""呀"类语气词开头。每个问题直指一个维度的具体学习习惯。\n'
-    '问理解力："你学新东西一般看几遍能懂？"\n'
-    '问记忆力："学完的东西过两周还能记住吗？"\n'
-    '问应用："学到的知识你会主动拿出来用吗？"\n'
-    '问想象："遇到难题你会想不同办法吗？"\n'
-    '问专注："你一次性能专心学多久？"\n'
-    "第一句话不能说\"最近在忙啥\"\"开学了没\"这些，必须是上述类型的具体问题。\n\n"
-    "# 评分\n"
-    "每轮都要对5个维度评分。不确定给confidence=0.3-0.5，有点把握0.6-0.7，很确定0.8-1.0。\n"
-    "5个维度都收集够信息后，done=true。不要<think>。"
-)
+# 维度相关关键词，用于客观置信度计算
+DIMENSION_KEYWORDS = {
+    "comprehension": ["理解", "懂", "明白", "学会", "搞懂", "领悟", "清楚"],
+    "memory": ["记住", "忘记", "记得", "印象", "背", "记忆", "忘", "回忆", "想起"],
+    "application": ["用", "实践", "应用", "做", "动手", "操作", "项目", "实战", "用到"],
+    "imagination": ["想", "创意", "新方法", "类比", "比喻", "创新", "换个角度", "联想"],
+    "focus": ["专注", "分心", "专心", "沉浸", "心流", "集中", "走神", "刷手机", "坐不住"],
+}
+
+SYSTEM_PROMPT_BASE = """你是一个朋友，正想了解对方怎么学习的。你的任务是通过聊天推断ta在5个方面的特点，但绝不能暴露目的。
+
+5个方面：
+{DIMENSION_DETAILS}
+
+# ⚠️ 输出格式（必须严格遵守）
+
+每次输出必须包含两部分，用 ---ASSESS_DATA--- 分隔：
+
+第一部分：对话内容（1-2句话，自然聊天）
+第二部分：---ASSESS_DATA---后面跟JSON数据
+
+示例：
+你好！我先问你一个，你平时学新东西是喜欢先看别人怎么做还是自己先试试呢？
+---ASSESS_DATA---
+{{"done": false, "dimensions": {{"comprehension": {{"score": 50, "confidence": 0.5}}, "memory": {{"score": 50, "confidence": 0.5}}, "application": {{"score": 50, "confidence": 0.5}}, "imagination": {{"score": 50, "confidence": 0.5}}, "focus": {{"score": 50, "confidence": 0.5}}}}}}
+
+# 规则
+- 必须在对话内容后面输出 ---ASSESS_DATA--- 和 JSON
+- JSON必须包含done和dimensions字段
+- dimensions必须包含全部5个维度的score(0-100)和confidence(0-1)
+- 对话部分简短，1-2句话
+- 不要使用<think>标签
+- 当5个维度都收集够信息后done=true"""
+
+
+# 恢复评估的 system prompt（带已知信息）
+SYSTEM_PROMPT_RESUME = """你是一个朋友，正想了解对方怎么学习的。你的任务是通过聊天推断ta在5个方面的特点，但绝不能暴露目的。
+
+5个方面：
+{DIMENSION_DETAILS}
+
+你之前已经和对方聊过几轮。
+
+# ⚠️ 输出格式（必须严格遵守）
+
+每次输出必须包含两部分：
+对话内容
+---ASSESS_DATA---
+{{"done": false, "dimensions": {{"comprehension": {{"score": 50, "confidence": 0.5}}, "memory": {{"score": 50, "confidence": 0.5}}, "application": {{"score": 50, "confidence": 0.5}}, "imagination": {{"score": 50, "confidence": 0.5}}, "focus": {{"score": 50, "confidence": 0.5}}}}}}
+
+# 规则
+- 必须在对话内容后面输出 ---ASSESS_DATA--- 和 JSON
+- 不要使用<think>标签
+- 当5个维度都收集够信息后done=true"""
 
 
 def _filter_think(text: str) -> str:
@@ -68,6 +105,99 @@ def _filter_think(text: str) -> str:
         else:
             i += 1
     return result
+
+
+def _calculate_objective_confidence(answer: str, dimension: str, round_num: int) -> float:
+    """基于客观指标计算置信度，而非依赖 LLM 自评"""
+    conf = INITIAL_CONFIDENCE  # 基础置信度 0.2
+
+    # 1. 回答长度
+    answer_len = len(answer)
+    if answer_len > 150:
+        conf += 0.2  # 非常详细的回答
+    elif answer_len > 100:
+        conf += 0.15
+    elif answer_len > 50:
+        conf += 0.1
+    elif answer_len > 20:
+        conf += 0.05
+
+    # 2. 有具体例子
+    example_keywords = ["比如", "例如", "像", "记得", "上次", "有一次", "之前", "那时候"]
+    if any(k in answer for k in example_keywords):
+        conf += 0.15
+
+    # 3. 有自我反思
+    reflection_keywords = ["我觉得", "我认为", "可能", "也许", "感觉", "应该是", "大概是"]
+    if any(k in answer for k in reflection_keywords):
+        conf += 0.1
+
+    # 4. 维度相关关键词
+    dim_keywords = DIMENSION_KEYWORDS.get(dimension, [])
+    keyword_count = sum(1 for k in dim_keywords if k in answer)
+    if keyword_count >= 3:
+        conf += 0.15
+    elif keyword_count >= 1:
+        conf += 0.1
+
+    # 5. 多轮验证加成
+    if round_num > 3:
+        conf += 0.05
+    if round_num > 5:
+        conf += 0.05
+
+    # 6. 否定表达降低置信度
+    negation_keywords = ["没有", "不会", "不", "没试过", "不清楚", "不知道", "没有过"]
+    negation_count = sum(1 for k in negation_keywords if k in answer)
+    if negation_count > 2:
+        conf -= 0.1
+
+    return max(0.1, min(conf, 0.95))
+
+
+def _validate_score(new_score: float, old_score: float, old_confidence: float) -> float:
+    """验证分数合理性，防止异常值"""
+    # 基础范围限制
+    new_score = max(0, min(100, new_score))
+
+    # 如果旧分数置信度高，新分数不应变化太大
+    if old_confidence > 0.7 and old_score > 0:
+        max_change = MAX_SCORE_CHANGE
+        if abs(new_score - old_score) > max_change:
+            # 取加权平均，偏向旧分数
+            weighted_avg = old_score * 0.6 + new_score * 0.4
+            logger.info(f"[assess] Score change limited: {old_score} -> {new_score}, using weighted avg: {weighted_avg}")
+            return weighted_avg
+
+    return new_score
+
+
+def _check_completion(session: dict) -> bool:
+    """检查评估是否完成（严格条件）"""
+    dims = session.get("last_dimensions", {})
+    round_num = session.get("round", 0)
+
+    # 条件 1: 至少 MIN_ROUNDS 轮对话
+    if round_num < MIN_ROUNDS:
+        return False
+
+    # 条件 2: 至少 3 个维度有有效分数（score > 0 且 confidence > 0.4）
+    valid_dim_count = 0
+    for d in DIMENSIONS:
+        dim_data = dims.get(d, {})
+        if dim_data.get("score", 0) > 0 and dim_data.get("confidence", 0) > 0.4:
+            valid_dim_count += 1
+
+    if valid_dim_count < 3:
+        return False
+
+    # 条件 3: 所有维度置信度 >= CONFIDENCE_THRESHOLD
+    all_done = all(
+        dims.get(d, {}).get("confidence", 0) >= CONFIDENCE_THRESHOLD
+        for d in DIMENSIONS
+    )
+
+    return all_done
 
 
 class InitialAssessmentAgent:
@@ -125,71 +255,110 @@ class InitialAssessmentAgent:
 
         session["round"] = session.get("round", 0) + 1
         round_num = session["round"]
+        has_existing_dims = bool(session.get("last_dimensions"))
 
-        yield f"data: {json.dumps({'type': 'session', 'session_id': session_id}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'session', 'session_id': session_id, 'round': round_num}, ensure_ascii=False)}\n\n"
 
         messages = list(session["history"])
         if not messages:
             messages.append({"role": "user", "content": "说说你平时怎么学习的吧"})
 
+        # 根据是否有已有数据选择 system prompt
+        if has_existing_dims:
+            system_prompt = SYSTEM_PROMPT_RESUME
+        else:
+            system_prompt = SYSTEM_PROMPT_BASE
+
         guidance = self._build_guidance(session.get("last_dimensions", {}))
-        system_prompt = SYSTEM_PROMPT_BASE + guidance
+        system_prompt += guidance
 
         collected_raw = ""
         yielded_len = 0
+        marker = "---ASSESS_DATA---"
+        marker_found = False
+        token_count = 0
         try:
             async for token in mc_module.minimax_client.chat_stream(
                 messages=messages,
                 system=system_prompt,
                 temperature=0.7,
-                max_tokens=800,
+                max_tokens=2048,
             ):
                 collected_raw += token
+                token_count += 1
 
-                marker = "---ASSESS_DATA---"
-                if marker in collected_raw:
+                if marker in collected_raw and not marker_found:
+                    # 首次发现标记：输出标记之前的文本
                     before = collected_raw[:collected_raw.index(marker)]
                     clean = _filter_think(before)
                     new_part = clean[yielded_len:]
                     if new_part:
                         yield f"data: {json.dumps({'type': 'token', 'content': new_part}, ensure_ascii=False)}\n\n"
+                    marker_found = True
+
+                if not marker_found:
+                    clean = _filter_think(collected_raw)
+                    new_part = clean[yielded_len:]
+                    if new_part:
+                        yield f"data: {json.dumps({'type': 'token', 'content': new_part}, ensure_ascii=False)}\n\n"
+                        yielded_len = len(clean)
+
+            # 获取用户回答用于客观置信度计算
+            user_answer = ""
+            for msg in reversed(session.get("history", [])):
+                if msg.get("role") == "user":
+                    user_answer = msg.get("content", "")
                     break
 
-                clean = _filter_think(collected_raw)
-                new_part = clean[yielded_len:]
-                if new_part:
-                    yield f"data: {json.dumps({'type': 'token', 'content': new_part}, ensure_ascii=False)}\n\n"
-                    yielded_len = len(clean)
-
-            result = self._parse_response(collected_raw)
+            result = self._parse_response(collected_raw, user_answer, round_num)
             new_dims = result.get("dimensions", {})
-            has_scores = any(d.get("score", 0) > 0 for d in new_dims.values())
-            if has_scores:
-                session["last_dimensions"] = new_dims
+
+            # 合并维度数据
+            old_dims = session.get("last_dimensions", {})
+            merged_dims = {}
+            for d in DIMENSIONS:
+                old_dim = old_dims.get(d, {})
+                new_dim = new_dims.get(d, {})
+                old_conf = old_dim.get("confidence", INITIAL_CONFIDENCE)
+                new_conf = new_dim.get("confidence", INITIAL_CONFIDENCE)
+
+                # 保留置信度更高的数据
+                if new_conf >= old_conf:
+                    merged_dims[d] = new_dim
+                else:
+                    merged_dims[d] = old_dim
+
+            session["last_dimensions"] = merged_dims
+
             self.add_assistant_message(session_id, result.get("text", ""))
 
-            last = session.get("last_dimensions", {})
-            all_done = all(
-                last.get(d, {}).get("confidence", 0) >= CONFIDENCE_THRESHOLD
-                for d in DIMENSIONS
-            )
+            # 使用严格的完成条件检查
+            completion_check = _check_completion(session)
+
             text = result.get("text", "")
             closing_keywords = ["好嘞", "了解了", "基本情况", "大概了解", "知道了", "够了"]
-            looks_like_closing = not has_scores and any(k in text for k in closing_keywords)
-            if result.get("done") or all_done or looks_like_closing or round_num >= MAX_ROUNDS:
-                dims = session.get("last_dimensions", new_dims)
-                all_zero = all(d.get("score", 0) == 0 for d in dims.values())
-                if all_zero and last:
-                    dims = last
-                elif all_zero:
-                    base = min(round_num * 8, 65)
-                    dims = {}
-                    for d in DIMENSIONS:
-                        dims[d] = {"score": base + 5, "confidence": min(round_num * 0.06, 0.7)}
+            looks_like_closing = any(k in text for k in closing_keywords)
+
+            # 完成条件
+            should_complete = (
+                result.get("done") or
+                completion_check or
+                looks_like_closing or
+                round_num >= MAX_ROUNDS
+            )
+
+            # 计算评估进度
+            assessed_dims = []
+            for d in DIMENSIONS:
+                dim_data = merged_dims.get(d, {})
+                if dim_data.get("confidence", 0) > 0.1:
+                    assessed_dims.append(d)
+
+            if should_complete:
                 self.mark_completed(session_id)
-                yield f"data: {json.dumps({'type': 'result', 'done': True, 'dimensions': dims}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'result', 'done': True, 'dimensions': merged_dims, 'round': round_num, 'assessed_dimensions': assessed_dims}, ensure_ascii=False)}\n\n"
             else:
-                yield f"data: {json.dumps({'type': 'result', 'done': False}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'result', 'done': False, 'round': round_num, 'max_rounds': MAX_ROUNDS, 'assessed_dimensions': assessed_dims, 'dimensions': merged_dims}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
             logger.error(f"Stream failed: {e}")
@@ -197,12 +366,14 @@ class InitialAssessmentAgent:
         finally:
             yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
 
-    def _parse_response(self, raw: str) -> dict:
+    def _parse_response(self, raw: str, user_answer: str = "", round_num: int = 1) -> dict:
+        """解析 LLM 响应，使用客观置信度计算"""
         text = _filter_think(raw.strip())
         dims = {}
         for d in DIMENSIONS:
-            dims[d] = {"score": 0, "confidence": 0}
+            dims[d] = {"score": INITIAL_SCORE, "confidence": INITIAL_CONFIDENCE}
         done = False
+        has_assess_data = False
 
         if "---ASSESS_DATA---" in text:
             parts = text.split("---ASSESS_DATA---", 1)
@@ -211,14 +382,45 @@ class InitialAssessmentAgent:
             try:
                 data = json.loads(json_str)
                 done = bool(data.get("done", False))
+                has_assess_data = True
                 for d in DIMENSIONS:
                     if d in data.get("dimensions", {}):
+                        llm_score = data["dimensions"][d].get("score", INITIAL_SCORE)
+                        llm_confidence = data["dimensions"][d].get("confidence", INITIAL_CONFIDENCE)
+
+                        # 使用客观置信度替代 LLM 自评置信度
+                        objective_confidence = _calculate_objective_confidence(user_answer, d, round_num)
+
+                        # 取 LLM 置信度和客观置信度的平均值
+                        final_confidence = (llm_confidence + objective_confidence) / 2
+                        final_confidence = max(0.1, min(final_confidence, 0.95))
+
                         dims[d] = {
-                            "score": max(0, min(100, data["dimensions"][d].get("score", 0))),
-                            "confidence": max(0, min(1, data["dimensions"][d].get("confidence", 0))),
+                            "score": max(0, min(100, llm_score)),
+                            "confidence": final_confidence,
                         }
             except (json.JSONDecodeError, KeyError):
                 logger.warning(f"Failed to parse ASSESS_DATA from response")
+
+        # 回退机制：如果 LLM 没有返回 ASSESS_DATA，使用默认分数
+        if not has_assess_data:
+            logger.warning(f"[assess] No ASSESS_DATA found, using default scores")
+            # 第1轮使用默认分数，后续轮次基于回答内容估算
+            if round_num == 1:
+                # 第1轮：所有维度使用默认分数，置信度稍高
+                for d in DIMENSIONS:
+                    dims[d] = {"score": INITIAL_SCORE, "confidence": 0.35}
+            else:
+                # 后续轮次：基于回答内容估算
+                for d in DIMENSIONS:
+                    objective_conf = _calculate_objective_confidence(user_answer, d, round_num)
+                    if objective_conf > 0.25:
+                        dims[d] = {
+                            "score": INITIAL_SCORE + int((objective_conf - 0.25) * 60),
+                            "confidence": objective_conf,
+                        }
+                    else:
+                        dims[d] = {"score": INITIAL_SCORE, "confidence": 0.3}
 
         return {"text": text, "dimensions": dims, "done": done}
 
