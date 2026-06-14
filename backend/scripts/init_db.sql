@@ -170,11 +170,23 @@ CREATE INDEX IF NOT EXISTS idx_exercises_student_id ON exercises(student_id);
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_student_id ON chat_sessions(student_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id);
 
+CREATE TABLE IF NOT EXISTS learning_activity_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL,
+    subject VARCHAR(100),
+    activity_type VARCHAR(30) NOT NULL,
+    payload JSONB NOT NULL DEFAULT '{}',
+    triggered_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_learning_activity_logs_student_id ON learning_activity_logs(student_id);
+CREATE INDEX IF NOT EXISTS idx_learning_activity_logs_type ON learning_activity_logs(activity_type);
+
 -- 6. 完成
-\echo '✅ 数据库 zhishu 初始化完成，共 10 张表 + 14 个索引'
+\echo '✅ 数据库 zhishu 初始化完成，共 11 张表 + 16 个索引'
 \echo '   students / student_profiles / document_chunks'
 \echo '   resources / learning_paths / exercises / exercise_bank'
 \echo '   chat_sessions / chat_messages / learning_records'
+\echo '   learning_activity_logs'
 
 -- 7. 初始化默认管理员账号（密码: admin123）
 -- bcrypt 哈希: $2b$12$aUqTTt5KCfd1zGXqZoQaieRPYuoNXKCM/do3wrjcEK4yCqEij/yUS

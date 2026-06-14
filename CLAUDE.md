@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **课程切入点**：人工智能导论
 - **主仓库**：<https://github.com/AbandonS-ED/ZhiShu>
 
-## 仓库现状（2026-06-14）
+## 仓库现状（2026-06-15）
 
 ```
 ZhiShu/
@@ -112,7 +112,7 @@ ZhiShu/
 └── docker-compose.yml               # postgres+pgvector / redis / minio（未启用）
 ```
 
-**实际状态（2026-06-14）**：
+**实际状态（2026-06-15）**：
 
 - ✅ **学生端 9 页面** 1:1 复刻模板 + 9/9 全部接入 API（含登录/注册 + 设置页）
 - ✅ **管理后台 9 页面** 1:1 复刻 `houtai.html` 模板 + 批量删除 + 搜索筛选 + 详情弹窗 + **题库 CRUD 已实联 admin_exercises API**
@@ -131,6 +131,13 @@ ZhiShu/
 - ✅ **多轮对话上下文**（最近 10 条消息）
 - ✅ **公共题库系统**（`exercise_bank` 表 + 6 admin 端点 + `/resource/exercises/pool` 题池合并随机抽题）
 - ✅ **用户设置页面**（`/setting`：信息编辑 + 修改密码 + 账号信息展示）
+- ✅ **对话页出题 → 题库页做题**（StateGraph exercise 保存 DB + 跳转链接 + ?kp= 自动聚焦）
+- ✅ **题库页隐藏/清空**（localStorage 隐藏 + 侧边栏恢复 + 清空列表 + ConfirmDialog）
+- ✅ **AI 出题数量可选**（分段选择器 5/10/15/20，后端支持 1-50）
+- ✅ **答案格式三层防护**（Prompt 规范 + 后端 normalize_answer + 前端 parseAnswer 容错）
+- ✅ **题库去重 + 限容**（difflib 相似度 >0.85 判重，每知识点最多 20 道 AI 题）
+- ✅ **对话历史 JSON 解析**（前端加载 assistant 消息时自动解析 `answer` 字段）
+- ✅ **对话页刷新修复**（sessionId 持久化 + loadSession 渲染修复 + DB content 列改 TEXT）
 
 ## 技术栈（已锁定，不要换）
 
@@ -195,7 +202,6 @@ cd frontend && npm install && npm run dev / build / lint
 
 ### P1 — 未修
 
-- **`chat_message.content` 存 JSON 字符串** → 历史消息显示原始 JSON
 - **防幻觉正则太激进**（"Hinton 在 2006 年..." 会被判幻觉）
 - **引用匹配逻辑错误**（UUID vs "[1]" 永远不匹配）
 - **`print()` 代替 logging**（10+ 处）
@@ -213,7 +219,6 @@ cd frontend && npm install && npm run dev / build / lint
 ### P2 — 清理项
 
 - 缺外键约束
-- `chat_messages.content VARCHAR(10000)` 太小
 - `Resource.resource_type` 永远存 "knowledge"
 - dashboard `learning_hours` 是 heuristic
 - `gen_random_uuid()` 需 pgcrypto
@@ -231,7 +236,7 @@ cd frontend && npm install && npm run dev / build / lint
 - ✅ MindMap Agent 加重试
 - ✅ 防幻觉扩展到 6 个 Agent
 - ✅ smoke_test 修复（TIMEOUT 120s, StepFailed）
-- ✅ StateGraph 从 if-else 升级为 13 节点编排
+- ✅ StateGraph 从 if-else 升级为 10 节点编排
 - ✅ UUID 校验统一依赖（2026-06-10）
 - ✅ `_strip_think` 死代码回滚（2026-06-10）
 - ✅ profile/resources/pinggu 硬编码替换（2026-06-10）
@@ -256,6 +261,14 @@ cd frontend && npm install && npm run dev / build / lint
 - ✅ **`profile_agent` → `initial_assessment_agent` 重构**（2026-06-13）：5 维画像 + confidence，wyy 合并 PR
 - ✅ **`models/learning_activity_log.py` 新模型**（2026-06-13）：wyy 独占，学习行为日志
 - ✅ **MD 全量同步**（2026-06-14）：端点 39→33、节点 13→10、端口 8000→8001、测试 119→114
+- ✅ **对话页出题 → 题库页做题**（2026-06-15）：StateGraph exercise 保存 DB + 跳转链接 + ?kp= 自动聚焦
+- ✅ **题库页隐藏/清空**（2026-06-15）：localStorage 隐藏 + 侧边栏恢复 + 清空列表 + ConfirmDialog
+- ✅ **AI 出题数量可选**（2026-06-15）：分段选择器 5/10/15/20，后端支持 1-50
+- ✅ **答案格式三层防护**（2026-06-15）：Prompt 规范 + 后端 normalize_answer + 前端 parseAnswer 容错
+- ✅ **题库去重 + 限容**（2026-06-15）：difflib 相似度 >0.85 判重，每知识点最多 20 道 AI 题
+- ✅ **对话历史 JSON 解析**（2026-06-15）：前端加载 assistant 消息时自动解析 answer 字段
+- ✅ **首页 dashboard student_id 修复**（2026-06-15）：传入真实 student_id 而非硬编码默认值
+- ✅ **对话页刷新修复**（2026-06-15）：① sessionId localStorage 持久化（刷新自动恢复上次会话）② loadSession 渲染修复（rendered 统一 false + strip think 标签 + JSON 解析失败兜底）③ chat_messages.content VARCHAR(10000) → TEXT（避免长回复截断）
 
 ## 架构与功能要点
 

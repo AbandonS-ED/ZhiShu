@@ -1,6 +1,6 @@
 # AGENTS.md — 智枢 (ZhiShu)
 
-> 最后更新：2026-06-14（端点 33 / StateGraph 10 节点 / 5 维画像 / 114 pytest）
+> 最后更新：2026-06-15（端点 33 / StateGraph 10 节点 / 5 维画像 / 114 pytest / 对话页刷新修复）
 
 中国软件杯 A3 赛题：多智能体个性化学习资源生成系统。
 
@@ -96,6 +96,9 @@ cd frontend && npm run build                         # 18 路由编译
 - **`chat.py` StateGraph `final_state` 累积 bug**：`astream` 只返回每个节点的输出，`final_state = node_output` 会丢失之前节点的结果。**必须用 `final_state.update(node_output)` 累积**。
 - **SSE stream 方法漏带 token**：`chatApi.stream()` / `resourceApi.generateStream()` / `exerciseApi.generateStream()` / `pathApi.generateStream()` 用原生 `fetch`，**每个都要手动加 `Authorization: Bearer ${token}`**，否则 401 全失败。
 - **`student.ts` localStorage key**：登录数据存 `zhishu_student`（JSON 对象含 `id`），**不是** `zhishu_student_id`（随机 UUID，老版本）。`getStudentId()` 必须从 `zhishu_student` 读取再 `JSON.parse`。
+- **对话页刷新丢失会话**：`sessionId` 存在 React state 中，刷新即丢失。**必须用 localStorage 持久化**（`zhishu_chat_session`），组件挂载时自动调用 `loadSession` 恢复。
+- **`loadSession` 渲染问题**：从 DB 加载历史消息时，`rendered` 必须统一为 `false`，让 `markdownToHtml` 始终渲染。如果 `rendered=true`，markdown 原文会直接显示（不含 HTML 渲染）。
+- **`chat_messages.content` VARCHAR(10000) 截断**：长回复的 JSON 超过 10000 字符时 PostgreSQL 报错，消息无法保存。**必须改为 `Text` 类型**。迁移：`ALTER TABLE chat_messages ALTER COLUMN content TYPE TEXT`。
 - **`.next` 缓存 + `.next/static/css` 动画缺失**：`globals.css` 缺 `@keyframes fadeIn` 导致登录页右侧表单 `opacity:0` 不可见。已有 keyframes 兜底。
 - **根 layout 与 `/admin` 共用**：Next.js 根 `layout.tsx` 会被所有路由继承，**`NO_SHELL_ROUTES` 必须加 `/admin`** 让 admin 走自己的 layout，否则学生端 Sidebar 也会显示。
 
@@ -103,9 +106,10 @@ cd frontend && npm run build                         # 18 路由编译
 
 - **10 router / 33 唯一 API / 8 Agent / 11 Model / 12 Service + MessageBus / 114 pytest**
 - **请求路由**（`chat.py`）：`_quick_route()` 关键词匹配 → 匹配到走对应 handler，没匹配到走 StateGraph（Master Agent）。**短消息（<15字）默认走 tutor 真流式**。
-- **StateGraph 编排**（`agents/master_agent.py`）：**10 节点** LangGraph（intent_recognition → task_planning → conditional_route → 5 个 Agent 节点（document / mindmap / exercise / path / tutor）→ result_aggregation → response_generation）。`run_audio_agent` 节点存在但通常不被路由。**tutor/chat 走原路径真逐 token 流式**，其他意图走 StateGraph。
+- **StateGraph 编排**（`agents/master_agent.py`）：**10 节点** LangGraph（intent_recognition → task_planning → conditional_route → 6 个 Agent 节点（document / mindmap / exercise / path / tutor / audio）→ result_aggregation → response_generation）。**tutor/chat 走原路径真逐 token 流式**，其他意图走 StateGraph。
+- **对话页出题 → 题库页做题**：对话页 StateGraph exercise 意图生成题目后，自动保存到 `exercises` 表（含去重 + 限容 20 道），回复末尾追加 `[👉 点击前往题库作答](/tiku?kp=xxx)` 跳转链接。题库页读取 `?kp=` 参数自动填入知识点。
 - **5 维学生画像**（`initial_assessment_agent.py`）：理解力 / 记忆力 / 应用转化 / 想象力 / 专注力，每个维度含 `score` (0-100) + `confidence` (0-1)。**wyy 重构于 2026-06-13**，替换旧的 `profile_agent`。
-- **多轮对话上下文**：`_handle_tutor_chat_stream` 和 `tutor_agent.answer()` 都传 `history`（最近 10 条）给 LLM。assistant 消息在 DB 里是 JSON（`{"type":"tutor","data":{...}}`），需要解析出 `answer` 字段。
+- **多轮对话上下文**：`_handle_tutor_chat_stream` 和 `tutor_agent.answer()` 都传 `history`（最近 10 条）给 LLM。assistant 消息在 DB 里是 JSON（`{"type":"tutor","data":{...}}`），前端加载历史时自动解析 `answer` 字段。**对话页 sessionId 持久化 localStorage**，刷新后自动恢复上次会话。
 - **`<think>` 标签过滤**：`chat.py` 的 `_strip_think` 状态机是流式期间**必须**的，否则会吞前端渲染。
 - **防幻觉**（`services/anti_hallucination.py`）：6 个 Agent 都接 `validate()`（Document/Exercise 走完整三层，Profile/Path/MindMap/Tutor 走 `skip_llm=True` 快速模式）。
 - **RAG 管道**：`document_parser` → `text_chunker` → `embedding_service` → `vector_store.search`（pgvector + JSONB fallback）→ `reranker`。`tutor.py` 的 `/ask` 和 `chat/stream` 的 tutor 分支都走完整流程。
@@ -114,6 +118,10 @@ cd frontend && npm run build                         # 18 路由编译
 - **管理后台**：`/admin` 路由独立 layout（`NO_SHELL_ROUTES`），token 隔离（`zhishu_admin_token`），admin 账号用 `role='admin'` 字段校验，禁用通过 `is_active=false` 实现。批量删除通过共享 `useSelection` Hook + `BatchDeleteBar` 组件（`lib/admin/components.tsx`）。管理端题库 CRUD 通过 `admin_exercises.py` 6 个端点实现。
 - **会话删除**：`DELETE /chat/sessions/{session_id}` 删会话及所有消息，含所有权校验。
 - **公共题库**：`exercise_bank` 表（11 字段 + 3 索引），admin 端点 `/api/v1/admin/exercises/*`（6 端点），学生端 `/resource/exercises/pool` 合并 `exercise_bank` + `exercises` 表随机抽题。
+- **题库页隐藏/清空**：纯前端 localStorage 实现（`HIDDEN_KEY = 'zhishu_hidden_exercises'`）。每道题右下角 ✕ 隐藏，侧边栏"已隐藏"卡片恢复，"清空列表"批量隐藏所有可见题。`ConfirmDialog` 替代原生 `confirm()`。
+- **AI 出题数量**：题库页分段选择器（5/10/15/20 道），后端 `ExerciseGenRequest.count` 支持 1-50，`exercise_agent` 系统提示已移除硬编码范围。
+- **答案格式三层防护**：Prompt 规范（choice→字母 A/B/C/D，judge→正确/错误）→ 后端 `normalize_answer()` 归一化 → 前端 `parseAnswer()` 容错（✔√✗✘/t/f/是否/1/0）。
+- **题库去重 + 限容**：`_is_duplicate_question()` 用 difflib 相似度 >0.85 判重，`_cap_exercises()` 每知识点最多 20 道 AI 题（超限删最旧）。
 
 ## 提交规范
 
