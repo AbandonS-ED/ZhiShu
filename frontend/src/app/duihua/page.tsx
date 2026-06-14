@@ -22,6 +22,8 @@ interface GenResource {
   status: 'done' | 'running' | 'waiting'
 }
 
+const SESSION_STORAGE_KEY = 'zhishu_chat_session'
+
 const defaultSuggestions = [
   { text: '讲解 A* 搜索算法的原理', tag: '搜索', tagClass: 'tag-info' },
   { text: 'CNN 卷积神经网络原理', tag: 'CV', tagClass: 'tag-green' },
@@ -43,6 +45,7 @@ export default function DuihuaPage() {
   const msgsRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<(() => void) | null>(null)
   const studentId = getStudentId()
+  const loadedSessionRef = useRef(false)
 
   // 组件卸载时中断 SSE
   useEffect(() => {
@@ -55,9 +58,19 @@ export default function DuihuaPage() {
     }
   }, [messages])
 
-  // 加载会话列表
+  // 加载会话列表 + 自动恢复上次会话
   useEffect(() => {
-    chatApi.getSessions(studentId).then(setSessions).catch(() => {})
+    chatApi.getSessions(studentId).then((list) => {
+      setSessions(list)
+      // 自动恢复上次会话
+      if (!loadedSessionRef.current) {
+        loadedSessionRef.current = true
+        const savedSid = localStorage.getItem(SESSION_STORAGE_KEY)
+        if (savedSid && list.some((s) => s.id === savedSid)) {
+          loadSession(savedSid)
+        }
+      }
+    }).catch(() => {})
   }, [studentId])
 
   // 加载画像（右侧知识点）
@@ -68,11 +81,33 @@ export default function DuihuaPage() {
   // 切换会话时加载历史消息
   const loadSession = useCallback(async (sid: string) => {
     setSessionId(sid)
+    localStorage.setItem(SESSION_STORAGE_KEY, sid)
     setMessages([])
     setGenResources([])
     try {
       const msgs = await chatApi.getMessages(sid)
-      setMessages(msgs.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })))
+      setMessages(msgs.map((m) => {
+        let content = m.content
+        // assistant 消息在 DB 里是 JSON，需要解析出 answer/final_response
+        if (m.role === 'assistant') {
+          try {
+            const data = JSON.parse(content)
+            const inner = data.data || data
+            if (inner.answer) {
+              content = inner.answer
+            } else if (inner.final_response) {
+              content = inner.final_response
+            }
+          } catch {
+            // JSON 解析失败（截断/格式异常），尝试从纯文本中提取可读内容
+            content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+          }
+          // 统一 strip <think> 标签残留
+          content = content.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<\/?think>/g, '').trim()
+        }
+        // rendered 始终 false → 让渲染代码统一走 markdownToHtml
+        return { role: m.role as 'user' | 'assistant', content, rendered: false }
+      }))
     } catch {
       // 会话可能没有历史消息
     }
@@ -81,6 +116,7 @@ export default function DuihuaPage() {
   // 新建会话
   const newSession = () => {
     setSessionId(null)
+    localStorage.removeItem(SESSION_STORAGE_KEY)
     setMessages([])
     setGenResources([])
   }
@@ -121,6 +157,7 @@ export default function DuihuaPage() {
           const newSid = e.session_id || null
           if (newSid) {
             setSessionId(newSid)
+            localStorage.setItem(SESSION_STORAGE_KEY, newSid)
             chatApi.getSessions(studentId).then(setSessions).catch(() => {})
           }
         }
