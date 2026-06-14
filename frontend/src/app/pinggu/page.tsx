@@ -127,10 +127,21 @@ function TrendChart({ data }: { data: { day: string; val: number }[] }) {
   const W = 520, H = 220
   const pad = { t: 20, r: 20, b: 30, l: 40 }
   const cw = W - pad.l - pad.r, ch = H - pad.t - pad.b
+
+  // 处理空数据或单点数据
+  if (!data || data.length === 0) {
+    return (
+      <svg className="line-chart" viewBox={`0 0 ${W} ${H}`}>
+        <text x={W / 2} y={H / 2} textAnchor="middle" fill="#A8A29E" fontSize="14">暂无数据</text>
+      </svg>
+    )
+  }
+
   const maxVal = Math.max(...data.map((d) => d.val), 0.1) * 1.2
+  const xStep = data.length > 1 ? cw / (data.length - 1) : cw
 
   const points = data.map((d, i) => ({
-    x: pad.l + (cw / (data.length - 1)) * i,
+    x: pad.l + xStep * i,
     y: pad.t + ch - (ch * d.val / maxVal),
   }))
 
