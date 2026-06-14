@@ -6,6 +6,7 @@ import { getStudentId } from '@/lib/student'
 import { markdownToHtml } from '@/lib/utils'
 
 const BASE_URL = 'http://localhost:8001/api/v1'
+const HIDDEN_KEY = 'zhishu_hidden_exercises'
 
 interface Exercise {
   exercise_id: string
@@ -62,8 +63,8 @@ function parseAnswer(ex: Exercise): number | boolean | string | null {
   }
   if (ex.type === 'judge' && typeof ex.answer === 'string') {
     const v = ex.answer.trim().toLowerCase()
-    if (v === 'true' || v === '正确' || v === '对') return true
-    if (v === 'false' || v === '错误' || v === '错') return false
+    if (v === 'true' || v === 't' || v === '正确' || v === '对' || v === '✔' || v === '√' || v === '是' || v === '1') return true
+    if (v === 'false' || v === 'f' || v === '错误' || v === '错' || v === '✗' || v === '✘' || v === '否' || v === '0') return false
   }
   return ex.answer ?? null
 }
@@ -78,21 +79,50 @@ function checkJudge(ex: Exercise, selected: boolean): boolean {
   return ans === selected
 }
 
+function ConfirmDialog({ message, onConfirm, onCancel }: { message: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="modal-overlay show" onClick={onCancel}>
+      <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-hd"><h3>确认操作</h3></div>
+        <div className="modal-bd" style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--ink)' }}>{message}</div>
+        <div className="modal-ft" style={{ justifyContent: 'flex-end', gap: 8 }}>
+          <button className="btn btn-sm" onClick={onCancel}>取消</button>
+          <button className="btn btn-sm btn-solid" style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={onConfirm}>确认</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function TikuPage() {
   const [tab, setTab] = useState<string>('all')
   const [answers, setAnswers] = useState<Record<string, Answer>>({})
   const [recentLog, setRecentLog] = useState<RecentItem[]>([])
   const [revealed, setRevealed] = useState<Set<string>>(new Set())
   const [genInput, setGenInput] = useState('')
+  const [genCount, setGenCount] = useState(5)
   const [generating, setGenerating] = useState(false)
   const [genResult, setGenResult] = useState('')
   const [exercises, setExercises] = useState<Exercise[]>([])
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
+  const [showHidden, setShowHidden] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [confirmDlg, setConfirmDlg] = useState<{ message: string; onConfirm: () => void } | null>(null)
 
-  // 从题池加载
+  // 从 URL 读取 ?kp=xxx，自动填入知识点输入框
+  useEffect(() => {
+    const kp = new URLSearchParams(window.location.search).get('kp')
+    if (kp) setGenInput(kp)
+  }, [])
+
+  // 从题池加载 + 读隐藏列表
   useEffect(() => {
     const sid = getStudentId()
     if (!sid) { setLoading(false); return }
+    try {
+      const raw = localStorage.getItem(HIDDEN_KEY)
+      if (raw) setHiddenIds(new Set(JSON.parse(raw)))
+    } catch {}
     fetch(`${BASE_URL}/resource/exercises/pool?student_id=${sid}&count=30`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('zhishu_token') || ''}` },
     })
@@ -104,27 +134,33 @@ export default function TikuPage() {
       .catch(() => setLoading(false))
   }, [])
 
+  const hideExercise = useCallback((id: string) => {
+    setHiddenIds((prev) => {
+      const next = new Set(prev)
+      next.add(id)
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify(Array.from(next)))
+      return next
+    })
+  }, [])
+
+  const restoreHidden = useCallback(() => {
+    setHiddenIds(new Set())
+    setShowHidden(false)
+    localStorage.removeItem(HIDDEN_KEY)
+  }, [])
+
   // AI 出题
   const generateExercises = () => {
     if (!genInput.trim() || generating) return
     setGenerating(true)
     setGenResult('正在生成...')
 
-    let firstToken = true
     exerciseApi.generateStream(
       getStudentId(),
       genInput.trim(),
       (e) => {
         if (e.type === 'progress' && e.message) {
           setGenResult(e.message)
-        }
-        if (e.type === 'token' && e.content) {
-          if (firstToken) {
-            setGenResult(e.content)
-            firstToken = false
-          } else {
-            setGenResult((prev) => prev + e.content)
-          }
         }
         if (e.type === 'result' && e.data) {
           const data = e.data
@@ -156,14 +192,17 @@ export default function TikuPage() {
           setGenerating(false)
         }
       },
-      5
+      genCount
     )
   }
 
-  const filtered = tab === 'all' ? exercises : exercises.filter((e) => e.type === tab)
+  const hiddenFiltered = exercises.filter((e) => !hiddenIds.has(e.exercise_id))
+  const visibleExercises = showHidden ? exercises : hiddenFiltered
+  const filtered = visibleExercises.filter((e) => tab === 'all' || e.type === tab)
+  const hiddenCount = exercises.length - hiddenFiltered.length
 
   // Stats
-  const total = exercises.length
+  const total = visibleExercises.length
   const answeredCount = Object.keys(answers).length
   const correctCount = Object.values(answers).filter((a) => a.correct === true).length
   const pct = answeredCount ? Math.round((correctCount / answeredCount) * 100) : 0
@@ -171,7 +210,7 @@ export default function TikuPage() {
 
   // Topics
   const topics: Record<string, { total: number; correct: number; answered: number }> = {}
-  exercises.forEach((ex) => {
+  visibleExercises.forEach((ex) => {
     const kp = ex.knowledge_point || '未分类'
     if (!topics[kp]) topics[kp] = { total: 0, correct: 0, answered: 0 }
     topics[kp].total++
@@ -248,13 +287,23 @@ export default function TikuPage() {
     })
   }, [])
 
-  const resetAll = useCallback(() => {
-    if (!Object.keys(answers).length) return
-    if (!confirm('确定要清除所有答题记录并重新开始？')) return
-    setAnswers({})
-    setRecentLog([])
-    setRevealed(new Set())
-  }, [answers])
+  const doClear = useCallback(() => {
+    const ids = visibleExercises.map((e) => e.exercise_id)
+    if (!ids.length) return
+    setConfirmDlg({
+      message: `确定要清空当前列表（${ids.length} 道题）？可以在侧边栏恢复`,
+      onConfirm: () => {
+        setHiddenIds((prev) => {
+          const next = new Set(prev)
+          ids.forEach((id) => next.add(id))
+          localStorage.setItem(HIDDEN_KEY, JSON.stringify(Array.from(next)))
+          return next
+        })
+        setShowHidden(false)
+        setConfirmDlg(null)
+      },
+    })
+  }, [visibleExercises])
 
   const circ = 364.4
   const ringColor = answerPct >= 80 ? 'var(--success)' : answerPct >= 40 ? 'var(--warm)' : 'var(--ink-3)'
@@ -266,18 +315,84 @@ export default function TikuPage() {
   return (
     <>
       {/* AI 生成面板 */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0', padding: 12, background: 'var(--brand-soft)', borderRadius: 8 }}>
-        <span style={{ fontSize: 14, fontWeight: 600 }}>AI 出题：</span>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0', padding: 14, background: 'var(--brand-soft)', borderRadius: 10, border: '1px solid var(--border)' }}>
+        <span style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap' }}>AI 出题</span>
         <input
           value={genInput}
           onChange={e => setGenInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && generateExercises()}
           placeholder="输入知识点（如：反向传播、决策树）"
           disabled={generating}
-          style={{ flex: 1, padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface)' }}
+          style={{
+            flex: 1,
+            padding: '7px 14px',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--r-xs, 6px)',
+            background: 'var(--surface)',
+            fontSize: 14,
+            outline: 'none',
+            transition: 'border-color 0.2s',
+          }}
         />
-        <button onClick={generateExercises} disabled={generating || !genInput.trim()} style={{ padding: '6px 16px', background: 'var(--brand)', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-          {generating ? '生成中...' : '出 5 题'}
+
+        {/* Segmented count selector */}
+        <div style={{
+          display: 'inline-flex',
+          borderRadius: 'var(--r-xs, 6px)',
+          border: '1px solid var(--border)',
+          overflow: 'hidden',
+          background: 'var(--surface)',
+          flexShrink: 0,
+        }}>
+          {[5, 10, 15, 20].map((n, i) => {
+            const active = genCount === n
+            return (
+              <button
+                key={n}
+                onClick={() => setGenCount(n)}
+                disabled={generating}
+                style={{
+                  padding: '6px 14px',
+                  border: 'none',
+                  borderRight: i < 3 ? '1px solid var(--border)' : 'none',
+                  background: active ? 'var(--brand)' : 'transparent',
+                  color: active ? 'white' : 'var(--ink-2)',
+                  cursor: generating ? 'not-allowed' : 'pointer',
+                  fontSize: 13,
+                  fontWeight: active ? 600 : 400,
+                  transition: 'all 0.2s ease',
+                  outline: 'none',
+                  position: 'relative',
+                  lineHeight: 1,
+                }}
+                onMouseEnter={e => {
+                  if (!active) e.currentTarget.style.background = 'var(--bg-subtle, rgba(0,0,0,0.04))'
+                }}
+                onMouseLeave={e => {
+                  if (!active) e.currentTarget.style.background = 'transparent'
+                }}
+              >
+                {n} 道
+              </button>
+            )
+          })}
+        </div>
+
+        <button
+          onClick={generateExercises}
+          disabled={generating || !genInput.trim()}
+          className="btn btn-solid"
+          style={{
+            padding: '7px 18px',
+            borderRadius: 'var(--r-xs, 6px)',
+            whiteSpace: 'nowrap',
+            fontSize: 14,
+            opacity: (generating || !genInput.trim()) ? 0.6 : 1,
+            cursor: (generating || !genInput.trim()) ? 'not-allowed' : 'pointer',
+            transition: 'opacity 0.2s',
+          }}
+        >
+          {generating ? '生成中...' : '生成'}
         </button>
       </div>
       {genResult && (
@@ -324,12 +439,12 @@ export default function TikuPage() {
                 </button>
               ))}
             </div>
-            <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={resetAll}>
+            <button className="btn btn-sm" style={{ marginLeft: 'auto', color: 'var(--danger)' }} onClick={doClear}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
-                <polyline points="23 4 23 10 17 10" />
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
               </svg>
-              重新答题
+              清空列表
             </button>
           </div>
 
@@ -448,6 +563,8 @@ export default function TikuPage() {
                     {isAnswered && (
                       <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => resetOne(ex.exercise_id)}>重做此题</button>
                     )}
+                    <button className="btn btn-sm" style={{ color: 'var(--danger)', marginLeft: isAnswered ? 4 : 'auto' }}
+                      onClick={() => hideExercise(ex.exercise_id)} title="隐藏此题">✕</button>
                   </div>
                 </div>
               )
@@ -498,6 +615,32 @@ export default function TikuPage() {
             </div>
           </div>
 
+          {/* Hidden management */}
+          {hiddenCount > 0 && (
+            <div className="card">
+              <div className="card-hd"><h3>已隐藏</h3></div>
+              <div className="card-bd">
+                <div style={{ fontSize: 13, color: 'var(--ink-3)', marginBottom: 8 }}>
+                  共 {hiddenCount} 道题被隐藏
+                </div>
+                {!showHidden ? (
+                  <button className="btn btn-sm" onClick={() => setShowHidden(true)}>
+                    显示已隐藏题目
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button className="btn btn-sm" onClick={() => setShowHidden(false)}>
+                      返回正常视图
+                    </button>
+                    <button className="btn btn-sm" style={{ color: 'var(--danger)' }} onClick={restoreHidden}>
+                      全部恢复
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Recent */}
           <div className="card">
             <div className="card-hd"><h3>最近答题</h3></div>
@@ -522,6 +665,13 @@ export default function TikuPage() {
           </div>
         </div>
       </div>
+      {confirmDlg && (
+        <ConfirmDialog
+          message={confirmDlg.message}
+          onConfirm={confirmDlg.onConfirm}
+          onCancel={() => setConfirmDlg(null)}
+        />
+      )}
     </>
   )
 }
