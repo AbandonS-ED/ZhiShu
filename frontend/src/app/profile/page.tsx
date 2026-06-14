@@ -4,11 +4,12 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Brain, BookOpen, Wrench, Sparkles, Target,
   ArrowRight, Send, X, ChevronRight,
-  ChevronDown, Award
+  ChevronDown, Award, RefreshCw, Info, TrendingUp,
+  AlertTriangle, CheckCircle, XCircle
 } from 'lucide-react'
 import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js'
 import { Radar } from 'react-chartjs-2'
-import { profileApi } from '@/lib/api'
+import { profileApi, type AssessmentStatus } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend)
@@ -23,14 +24,244 @@ const DIMS: { key: string; label: string; icon: typeof Brain; color: string; des
   { key: 'focus', label: '专注力', icon: Target, color: '#EF4444', desc: '持续集中注意力、深度投入的能力' },
 ]
 
+const DIM_CN: Record<string, string> = {
+  comprehension: '理解力',
+  memory: '记忆力',
+  application: '应用转化',
+  imagination: '想象力',
+  focus: '专注力',
+}
+
 function dimColor(key: string): string { return DIMS.find(d => d.key === key)?.color || '#78716C' }
 function dimLabel(key: string): string { return DIMS.find(d => d.key === key)?.label || key }
 
-function levelMeta(score: number): { label: string; color: string; bg: string } {
-  if (score >= 85) return { label: '卓越', color: '#065F46', bg: '#D1FAE5' }
-  if (score >= 70) return { label: '良好', color: '#92400E', bg: '#FEF3C7' }
-  if (score >= 50) return { label: '中等', color: '#1E40AF', bg: '#DBEAFE' }
-  return { label: '需提升', color: '#991B1B', bg: '#FEE2E2' }
+function levelMeta(score: number): { label: string; color: string; bg: string; advice: string } {
+  if (score >= 85) return { label: '卓越', color: '#065F46', bg: '#D1FAE5', advice: '保持优秀表现，可以挑战更高难度的内容' }
+  if (score >= 70) return { label: '良好', color: '#92400E', bg: '#FEF3C7', advice: '基础扎实，可以通过实践进一步提升' }
+  if (score >= 50) return { label: '中等', color: '#1E40AF', bg: '#DBEAFE', advice: '有提升空间，建议加强练习和总结' }
+  return { label: '需提升', color: '#991B1B', bg: '#FEE2E2', advice: '建议从基础开始，循序渐进地学习' }
+}
+
+function confidenceMeta(conf: number): { label: string; color: string } {
+  if (conf >= 0.8) return { label: '高置信', color: '#065F46' }
+  if (conf >= 0.6) return { label: '较置信', color: '#92400E' }
+  if (conf >= 0.4) return { label: '一般', color: '#1E40AF' }
+  return { label: '待补充', color: '#991B1B' }
+}
+
+// ═══ CUSTOM DIALOG COMPONENTS ═══
+
+interface ConfirmDialogProps {
+  open: boolean
+  title: string
+  message: string
+  confirmText?: string
+  cancelText?: string
+  type?: 'danger' | 'warning' | 'info'
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+function ConfirmDialog({
+  open, title, message, confirmText = '确认', cancelText = '取消',
+  type = 'danger', onConfirm, onCancel
+}: ConfirmDialogProps) {
+  if (!open) return null
+
+  const iconMap = {
+    danger: <AlertTriangle size={26} color="#b09191" />,
+    warning: <AlertTriangle size={26} color="#c47a3a" />,
+    info: <Info size={26} color="#8a9ba8" />
+  }
+
+  const bgColorMap = {
+    danger: 'rgba(176,145,145,0.12)',
+    warning: 'rgba(196,122,58,0.12)',
+    info: 'rgba(138,155,168,0.12)'
+  }
+
+  const btnColorMap = {
+    danger: { bg: '#b09191', hover: '#9a7b7b' },
+    warning: { bg: '#c47a3a', hover: '#a86830' },
+    info: { bg: '#8a9ba8', hover: '#738591' }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 100,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(28,25,23,0.3)', backdropFilter: 'blur(6px)',
+      animation: 'fadeIn 0.2s ease',
+    }}>
+      <div style={{
+        width: 380, maxWidth: '90vw',
+        background: '#ffffff', borderRadius: 'var(--r, 14px)',
+        boxShadow: 'var(--shadow-lg, 0 20px 60px rgba(0,0,0,0.08))',
+        overflow: 'hidden', animation: 'modalIn 0.25s ease',
+        border: '1px solid var(--line, #e7e5e4)',
+      }}>
+        {/* Icon */}
+        <div style={{
+          padding: '32px 32px 0', display: 'flex', justifyContent: 'center',
+        }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 'var(--r-sm, 10px)',
+            background: bgColorMap[type],
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {iconMap[type]}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: '20px 32px', textAlign: 'center' }}>
+          <h3 style={{
+            fontSize: 17, fontWeight: 600, color: 'var(--ink, #1c1917)',
+            marginBottom: 8, fontFamily: "'Inter', sans-serif",
+          }}>
+            {title}
+          </h3>
+          <p style={{
+            fontSize: 13.5, color: 'var(--ink-2, #57534e)', lineHeight: 1.6,
+            margin: 0,
+          }}>
+            {message}
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div style={{
+          padding: '0 24px 24px', display: 'flex', gap: 10,
+          justifyContent: 'center',
+        }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1, padding: '11px 18px',
+              background: 'var(--bg, #f5f5f4)', color: 'var(--ink-2, #57534e)',
+              border: '1px solid var(--line, #e7e5e4)',
+              borderRadius: 'var(--r-xs, 7px)', fontSize: 13.5, fontWeight: 500,
+              cursor: 'pointer', transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'var(--line, #e7e5e4)'
+              e.currentTarget.style.borderColor = 'var(--ink-4, #d6d3d1)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'var(--bg, #f5f5f4)'
+              e.currentTarget.style.borderColor = 'var(--line, #e7e5e4)'
+            }}
+          >
+            {cancelText}
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              flex: 1, padding: '11px 18px',
+              background: btnColorMap[type].bg, color: '#fff',
+              border: 'none',
+              borderRadius: 'var(--r-xs, 7px)', fontSize: 13.5, fontWeight: 500,
+              cursor: 'pointer', transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = btnColorMap[type].hover}
+            onMouseLeave={e => e.currentTarget.style.background = btnColorMap[type].bg}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface AlertDialogProps {
+  open: boolean
+  title: string
+  message: string
+  type?: 'success' | 'error' | 'info'
+  onClose: () => void
+}
+
+function AlertDialog({ open, title, message, type = 'info', onClose }: AlertDialogProps) {
+  if (!open) return null
+
+  const iconMap = {
+    success: <CheckCircle size={26} color="#059669" />,
+    error: <XCircle size={26} color="#b09191" />,
+    info: <Info size={26} color="#8a9ba8" />
+  }
+
+  const bgColorMap = {
+    success: 'rgba(5,150,105,0.10)',
+    error: 'rgba(176,145,145,0.12)',
+    info: 'rgba(138,155,168,0.12)'
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 100,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(28,25,23,0.3)', backdropFilter: 'blur(6px)',
+      animation: 'fadeIn 0.2s ease',
+    }}>
+      <div style={{
+        width: 360, maxWidth: '90vw',
+        background: '#ffffff', borderRadius: 'var(--r, 14px)',
+        boxShadow: 'var(--shadow-lg, 0 20px 60px rgba(0,0,0,0.08))',
+        overflow: 'hidden', animation: 'modalIn 0.25s ease',
+        border: '1px solid var(--line, #e7e5e4)',
+      }}>
+        {/* Icon */}
+        <div style={{
+          padding: '32px 32px 0', display: 'flex', justifyContent: 'center',
+        }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 'var(--r-sm, 10px)',
+            background: bgColorMap[type],
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            {iconMap[type]}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: '20px 32px', textAlign: 'center' }}>
+          <h3 style={{
+            fontSize: 17, fontWeight: 600, color: 'var(--ink, #1c1917)',
+            marginBottom: 8, fontFamily: "'Inter', sans-serif",
+          }}>
+            {title}
+          </h3>
+          <p style={{
+            fontSize: 13.5, color: 'var(--ink-2, #57534e)', lineHeight: 1.6,
+            margin: 0,
+          }}>
+            {message}
+          </p>
+        </div>
+
+        {/* Actions */}
+        <div style={{
+          padding: '0 24px 24px',
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              width: '100%', padding: '11px 18px',
+              background: 'var(--ink, #1c1917)', color: '#fff',
+              border: 'none',
+              borderRadius: 'var(--r-xs, 7px)', fontSize: 13.5, fontWeight: 500,
+              cursor: 'pointer', transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--ink-2, #57534e)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'var(--ink, #1c1917)'}
+          >
+            知道了
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ═══ SVG CIRCLE PROGRESS ═══
@@ -126,12 +357,81 @@ function RadarChart({ scores, size = 340 }: { scores: Record<string, number>; si
   )
 }
 
+// ═══ ANALYSIS REPORT ═══
+
+function AnalysisReport({ scores, confidence }: { scores: Record<string, number>; confidence: Record<string, number> }) {
+  const avgScore = Math.round(DIMS.reduce((s, d) => s + (scores[d.key] || 0), 0) / DIMS.length)
+
+  // 找出最强和最弱的维度
+  const sorted = DIMS.map(d => ({ key: d.key, score: scores[d.key] || 0, conf: confidence[d.key] || 0 }))
+    .sort((a, b) => b.score - a.score)
+  const strongest = sorted[0]
+  const weakest = sorted[sorted.length - 1]
+
+  // 计算需要补充评估的维度
+  const lowConfDims = sorted.filter(s => s.conf < 0.5)
+
+  return (
+    <div style={{
+      background: '#fff', borderRadius: 16, border: '1px solid #E7E5E4',
+      padding: '24px', marginBottom: 20,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+        <TrendingUp size={18} color="#6366F1" />
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1C1917', margin: 0 }}>
+          能力分析报告
+        </h3>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+        <div style={{ padding: 12, background: '#F5F5F4', borderRadius: 10 }}>
+          <div style={{ fontSize: 11, color: '#A8A29E', marginBottom: 4 }}>综合评分</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#1C1917' }}>{avgScore}</div>
+          <div style={{ fontSize: 11, color: levelMeta(avgScore).color }}>{levelMeta(avgScore).label}</div>
+        </div>
+        <div style={{ padding: 12, background: '#D1FAE5', borderRadius: 10 }}>
+          <div style={{ fontSize: 11, color: '#065F46', marginBottom: 4 }}>最强维度</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#065F46' }}>{dimLabel(strongest.key)}</div>
+          <div style={{ fontSize: 11, color: '#065F46' }}>{strongest.score}分</div>
+        </div>
+        <div style={{ padding: 12, background: '#FEE2E2', borderRadius: 10 }}>
+          <div style={{ fontSize: 11, color: '#991B1B', marginBottom: 4 }}>待提升</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#991B1B' }}>{dimLabel(weakest.key)}</div>
+          <div style={{ fontSize: 11, color: '#991B1B' }}>{weakest.score}分</div>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 13, color: '#57534E', lineHeight: 1.7 }}>
+        <p style={{ marginBottom: 8 }}>
+          <strong>整体评价：</strong>{levelMeta(avgScore).advice}
+        </p>
+        <p style={{ marginBottom: 8 }}>
+          <strong>优势领域：</strong>你的{dimLabel(strongest.key)}表现优秀（{strongest.score}分），
+          {levelMeta(strongest.score).advice}
+        </p>
+        <p style={{ marginBottom: 8 }}>
+          <strong>提升建议：</strong>{dimLabel(weakest.key)}是目前的薄弱环节（{weakest.score}分），
+          {levelMeta(weakest.score).advice}
+        </p>
+        {lowConfDims.length > 0 && (
+          <p style={{ marginBottom: 0, color: '#92400E' }}>
+            <Info size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+            以下维度评估置信度较低，建议重新评估：{lowConfDims.map(d => dimLabel(d.key)).join('、')}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ═══ DIMENSION CARD ═══
 
-function DimensionCard({ dimKey, label, icon: Icon, color, desc, score }: {
-  dimKey: string; label: string; icon: typeof Brain; color: string; desc: string; score: number
+function DimensionCard({ dimKey, label, icon: Icon, color, desc, score, confidence }: {
+  dimKey: string; label: string; icon: typeof Brain; color: string; desc: string; score: number; confidence: number
 }) {
   const level = levelMeta(score)
+  const conf = confidenceMeta(confidence)
+
   return (
     <div style={{
       background: '#fff',
@@ -152,15 +452,15 @@ function DimensionCard({ dimKey, label, icon: Icon, color, desc, score }: {
         }}>
           <Icon size={18} color={color} />
         </div>
-        <div>
+        <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#1C1917' }}>{label}</div>
           <div style={{ fontSize: 10.5, color: '#A8A29E' }}>{desc}</div>
         </div>
-        <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+        <div style={{ textAlign: 'right' }}>
           <ScoreRing score={score} color={color} size={60} strokeW={5} />
         </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{ fontSize: 12, color: '#57534E' }}>
           水平：<span style={{ color: level.color, fontWeight: 600 }}>{level.label}</span>
         </div>
@@ -176,6 +476,17 @@ function DimensionCard({ dimKey, label, icon: Icon, color, desc, score }: {
           }} />
         </div>
       </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 11, color: '#A8A29E' }}>
+          {level.advice}
+        </div>
+        <div style={{
+          fontSize: 10, padding: '2px 8px', borderRadius: 10,
+          background: `${conf.color}14`, color: conf.color, fontWeight: 500,
+        }}>
+          {conf.label} ({Math.round(confidence * 100)}%)
+        </div>
+      </div>
     </div>
   )
 }
@@ -183,24 +494,42 @@ function DimensionCard({ dimKey, label, icon: Icon, color, desc, score }: {
 // ═══ ASSESSMENT CHAT (MODAL) ═══
 
 function AssessmentModal({
-  onComplete, onClose,
+  onComplete, onClose, resumeSessionId, existingDims,
 }: {
   onComplete: (scores: Record<string, number>) => void
   onClose: () => void
+  resumeSessionId?: string
+  existingDims?: Record<string, { score: number; confidence: number }>
 }) {
   const [messages, setMessages] = useState<{ role: string; content: string }[]>([])
   const [input, setInput] = useState('')
-  const [sessionId, setSessionId] = useState('')
+  const [sessionId, setSessionId] = useState(resumeSessionId || '')
   const [loading, setLoading] = useState(false)
-  const [started, setStarted] = useState(false)
+  const [started, setStarted] = useState(!!resumeSessionId)
   const [done, setDone] = useState(false)
   const [streaming, setStreaming] = useState(false)
+  const [round, setRound] = useState(0)
+  const [maxRounds] = useState(15)
+  const [assessedDims, setAssessedDims] = useState<string[]>([])
   const chatEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const streamingRef = useRef(false)
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
   useEffect(() => { if (started && !done && !streaming) inputRef.current?.focus() }, [started, done, streaming, messages.length])
+
+  // 如果是恢复评估，显示已有信息摘要
+  useEffect(() => {
+    if (existingDims && Object.keys(existingDims).length > 0) {
+      const summary = Object.entries(existingDims)
+        .map(([k, v]) => `${DIM_CN[k]}: ${v.score}分`)
+        .join('、')
+      setMessages([{
+        role: 'assistant',
+        content: `我看到你之前已经做了一部分评估（${summary}），让我们继续完成剩余部分。`
+      }])
+    }
+  }, [existingDims])
 
   async function doStream(body: Record<string, string>) {
     streamingRef.current = true
@@ -235,6 +564,7 @@ function AssessmentModal({
 
             if (event.type === 'session') {
               setSessionId(event.session_id)
+              if (event.round) setRound(event.round)
             } else if (event.type === 'token') {
               assistantMsg += event.content
               setMessages(prev => {
@@ -247,6 +577,9 @@ function AssessmentModal({
                 return copy
               })
             } else if (event.type === 'result') {
+              if (event.round) setRound(event.round)
+              if (event.assessed_dimensions) setAssessedDims(event.assessed_dimensions)
+
               if (event.done && event.dimensions) {
                 finalScores = {}
                 for (const [k, v] of Object.entries(event.dimensions)) {
@@ -273,8 +606,8 @@ function AssessmentModal({
 
   async function start() {
     setLoading(true)
+    setStarted(true)  // 先设置 started，让进度显示
     await doStream({})
-    setStarted(true)
     setLoading(false)
   }
 
@@ -311,7 +644,10 @@ function AssessmentModal({
           <div>
             <div style={{ fontSize: 16, fontWeight: 600, color: '#1C1917' }}>个人能力评估</div>
             <div style={{ fontSize: 12, color: '#A8A29E', marginTop: 2 }}>
-              AI 对话式评估 · 约 5-10 分钟
+              {started && round > 0
+                ? `第 ${round}/${maxRounds} 轮 · 已了解 ${assessedDims.length}/5 个维度`
+                : 'AI 对话式评估 · 约 5-10 分钟'
+              }
             </div>
           </div>
           {!loading && (
@@ -329,7 +665,7 @@ function AssessmentModal({
           )}
         </div>
 
-          {!started ? (
+        {!started ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 40, textAlign: 'center' }}>
             <div style={{
               width: 64, height: 64, borderRadius: 16,
@@ -362,7 +698,30 @@ function AssessmentModal({
           </div>
         ) : (
           <>
-
+            {/* Progress indicator */}
+            {started && round > 0 && !done && (
+              <div style={{
+                padding: '8px 20px', background: '#F5F5F4',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {DIMS.map(d => (
+                    <div
+                      key={d.key}
+                      style={{
+                        width: 8, height: 8, borderRadius: '50%',
+                        background: assessedDims.includes(d.key) ? d.color : '#E7E5E4',
+                        transition: 'background 0.3s',
+                      }}
+                      title={d.label}
+                    />
+                  ))}
+                </div>
+                <div style={{ fontSize: 11, color: '#A8A29E' }}>
+                  {assessedDims.length}/5 维度已收集
+                </div>
+              </div>
+            )}
 
             {/* Messages */}
             <div style={{
@@ -440,15 +799,28 @@ export default function ProfilePage() {
   const [scores, setScores] = useState<Record<string, number>>({
     comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0,
   })
+  const [confidence, setConfidence] = useState<Record<string, number>>({
+    comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0,
+  })
   const [status, setStatus] = useState<string>('pending')
   const [loading, setLoading] = useState(true)
   const [showAssess, setShowAssess] = useState(false)
+  const [assessmentStatus, setAssessmentStatus] = useState<AssessmentStatus | null>(null)
+  const [resetting, setResetting] = useState(false)
+
+  // Dialog states
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [showAlertDialog, setShowAlertDialog] = useState(false)
+  const [alertDialog, setAlertDialog] = useState<{ title: string; message: string; type: 'success' | 'error' | 'info' }>({
+    title: '', message: '', type: 'info'
+  })
 
   const studentId = getStudentId()
 
   useEffect(() => {
     if (!studentId) return
     loadProfile()
+    loadAssessmentStatus()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId])
 
@@ -458,6 +830,9 @@ export default function ProfilePage() {
       if (data.dimensions && Object.keys(data.dimensions).length > 0) {
         setScores(prev => ({ ...prev, ...data.dimensions }))
       }
+      if (data.confidence) {
+        setConfidence(prev => ({ ...prev, ...data.confidence }))
+      }
       setStatus(data.assessment_status || 'pending')
     } catch (e) {
       console.error('Failed to load profile', e)
@@ -466,19 +841,65 @@ export default function ProfilePage() {
     }
   }
 
+  async function loadAssessmentStatus() {
+    try {
+      const data = await profileApi.getAssessmentStatus()
+      setAssessmentStatus(data)
+    } catch (e) {
+      console.error('Failed to load assessment status', e)
+    }
+  }
+
   const handleComplete = useCallback((finalScores: Record<string, number>) => {
     setScores(prev => ({ ...prev, ...finalScores }))
     setStatus('completed')
     setShowAssess(false)
+    // 重新加载置信度
+    loadProfile()
+    loadAssessmentStatus()
   }, [])
 
-  const handleClose = useCallback(() => { setShowAssess(false) }, [])
+  const handleClose = useCallback(() => {
+    setShowAssess(false)
+    // 刷新评估状态
+    loadAssessmentStatus()
+  }, [])
+
+  const handleReset = useCallback(async () => {
+    setShowResetConfirm(true)
+  }, [])
+
+  const confirmReset = useCallback(async () => {
+    setShowResetConfirm(false)
+    setResetting(true)
+    try {
+      await profileApi.reset()
+      setScores({ comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0 })
+      setConfidence({ comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0 })
+      setStatus('pending')
+      setAssessmentStatus(null)
+      setShowAssess(true)
+    } catch (e) {
+      console.error('Failed to reset profile', e)
+      setAlertDialog({
+        title: '重置失败',
+        message: '画像重置失败，请稍后重试',
+        type: 'error'
+      })
+      setShowAlertDialog(true)
+    } finally {
+      setResetting(false)
+    }
+  }, [])
 
   const hasScores = Object.values(scores).some(v => v > 0)
   const avgScore = hasScores
     ? Math.round(DIMS.reduce((s, d) => s + (scores[d.key] || 0), 0) / DIMS.length)
     : 0
   const avgLevel = levelMeta(avgScore)
+
+  // 判断是否可以恢复评估
+  const canResume = assessmentStatus?.can_resume && assessmentStatus?.status === 'in_progress'
 
   if (loading) {
     return (
@@ -492,8 +913,34 @@ export default function ProfilePage() {
     <>
       {/* ══ ASSESSMENT MODAL ══ */}
       {showAssess && (
-        <AssessmentModal onComplete={handleComplete} onClose={handleClose} />
+        <AssessmentModal
+          onComplete={handleComplete}
+          onClose={handleClose}
+          resumeSessionId={canResume ? undefined : undefined}
+          existingDims={canResume ? assessmentStatus?.dimensions : undefined}
+        />
       )}
+
+      {/* ══ CONFIRM DIALOG ══ */}
+      <ConfirmDialog
+        open={showResetConfirm}
+        title="重新评估"
+        message="确定要重新评估吗？这将清除当前的所有评估数据，无法恢复。"
+        confirmText="确认重置"
+        cancelText="取消"
+        type="danger"
+        onConfirm={confirmReset}
+        onCancel={() => setShowResetConfirm(false)}
+      />
+
+      {/* ══ ALERT DIALOG ══ */}
+      <AlertDialog
+        open={showAlertDialog}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        type={alertDialog.type}
+        onClose={() => setShowAlertDialog(false)}
+      />
 
       <div style={{ maxWidth: 840, margin: '0 auto', padding: '8px 0 40px' }}>
 
@@ -539,15 +986,38 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {!hasScores && (
-              <button onClick={() => setShowAssess(true)} style={{
-                padding: '10px 24px', background: '#fff', color: '#1C1917',
-                border: 'none', borderRadius: 10, fontSize: 13.5, fontWeight: 500,
-                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-                开始评估 <ArrowRight size={15} />
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              {!hasScores && (
+                <button onClick={() => setShowAssess(true)} style={{
+                  padding: '10px 24px', background: '#fff', color: '#1C1917',
+                  border: 'none', borderRadius: 10, fontSize: 13.5, fontWeight: 500,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  开始评估 <ArrowRight size={15} />
+                </button>
+              )}
+              {canResume && (
+                <button onClick={() => setShowAssess(true)} style={{
+                  padding: '10px 24px', background: '#F59E0B', color: '#fff',
+                  border: 'none', borderRadius: 10, fontSize: 13.5, fontWeight: 500,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  继续评估 <ArrowRight size={15} />
+                </button>
+              )}
+              {hasScores && (
+                <button onClick={handleReset} disabled={resetting} style={{
+                  padding: '10px 16px', background: 'rgba(255,255,255,0.1)', color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, fontSize: 13,
+                  cursor: resetting ? 'default' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  opacity: resetting ? 0.6 : 1,
+                }}>
+                  <RefreshCw size={14} className={resetting ? 'animate-spin' : ''} />
+                  重新评估
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -567,6 +1037,15 @@ export default function ProfilePage() {
                 display: 'flex', alignItems: 'center', gap: 4,
               }}>
                 已评估
+              </span>
+            )}
+            {status === 'in_progress' && (
+              <span style={{
+                fontSize: 11.5, padding: '4px 12px', borderRadius: 20,
+                background: '#FEF3C7', color: '#92400E', fontWeight: 500,
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}>
+                评估中
               </span>
             )}
           </div>
@@ -607,10 +1086,16 @@ export default function ProfilePage() {
                 <DimensionCard
                   key={d.key} dimKey={d.key} label={d.label} icon={d.icon}
                   color={d.color} desc={d.desc} score={scores[d.key] || 0}
+                  confidence={confidence[d.key] || 0}
                 />
               ))}
             </div>
           </div>
+        )}
+
+        {/* ══ ANALYSIS REPORT ══ */}
+        {hasScores && (
+          <AnalysisReport scores={scores} confidence={confidence} />
         )}
 
         {/* ══ KEYFRAMES (added via style tag for modal animation) ══ */}
@@ -619,9 +1104,20 @@ export default function ProfilePage() {
             from { opacity: 0; transform: scale(0.96) translateY(10px); }
             to { opacity: 1; transform: scale(1) translateY(0); }
           }
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
           @keyframes pulse {
             0%, 100% { opacity: 0.4; }
             50% { opacity: 1; }
+          }
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          .animate-spin {
+            animation: spin 1s linear infinite;
           }
         `}</style>
       </div>
