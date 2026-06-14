@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, Integer, func
+from sqlalchemy import Column, String, DateTime, Integer, func, Text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.core.database import Base
 
@@ -11,6 +11,6 @@ class ChatMessage(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     session_id = Column(UUID(as_uuid=True), nullable=False)
     role = Column(String(20), nullable=False)  # user/assistant/system
-    content = Column(String(10000), nullable=False)
+    content = Column(Text, nullable=False)
     metadata_ = Column("metadata", JSONB, default={})
     created_at = Column(DateTime(timezone=True), server_default=func.now())
