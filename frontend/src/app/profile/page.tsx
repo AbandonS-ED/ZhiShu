@@ -1,3 +1,5 @@
+'use client'
+
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   Brain, BookOpen, Wrench, Sparkles, Target,
