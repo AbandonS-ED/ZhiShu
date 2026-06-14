@@ -103,8 +103,28 @@ CREATE TABLE IF NOT EXISTS exercises (
     knowledge_point VARCHAR(200),
     student_answer VARCHAR(2000),
     is_correct FLOAT,
+    source VARCHAR(20) DEFAULT 'ai',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS exercise_bank (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    question VARCHAR(2000) NOT NULL,
+    exercise_type VARCHAR(50) NOT NULL,
+    options JSONB,
+    answer VARCHAR(2000) NOT NULL,
+    explanation VARCHAR(2000),
+    difficulty INTEGER DEFAULT 50,
+    knowledge_point VARCHAR(200),
+    source VARCHAR(20) DEFAULT 'admin',
+    is_active BOOLEAN DEFAULT true,
+    created_by UUID,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE
+);
+CREATE INDEX IF NOT EXISTS idx_exercise_bank_kp ON exercise_bank(knowledge_point);
+CREATE INDEX IF NOT EXISTS idx_exercise_bank_type ON exercise_bank(exercise_type);
+CREATE INDEX IF NOT EXISTS idx_exercise_bank_active ON exercise_bank(is_active);
 
 CREATE TABLE IF NOT EXISTS chat_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -151,9 +171,9 @@ CREATE INDEX IF NOT EXISTS idx_chat_sessions_student_id ON chat_sessions(student
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id);
 
 -- 6. 完成
-\echo '✅ 数据库 zhishu 初始化完成，共 9 张表 + 10 个索引'
+\echo '✅ 数据库 zhishu 初始化完成，共 10 张表 + 14 个索引'
 \echo '   students / student_profiles / document_chunks'
-\echo '   resources / learning_paths / exercises'
+\echo '   resources / learning_paths / exercises / exercise_bank'
 \echo '   chat_sessions / chat_messages / learning_records'
 
 -- 7. 初始化默认管理员账号（密码: admin123）

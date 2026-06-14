@@ -14,6 +14,7 @@ from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.models.resource import Resource
 from app.models.exercise import Exercise
+from app.models.exercise_bank import ExerciseBank
 from app.agents.document_agent import document_agent
 from app.agents.exercise_agent import exercise_agent
 from app.services import minimax_client as mc_module
@@ -472,3 +473,90 @@ async def list_exercises(
         }
         for e in exercises
     ]
+
+
+@router.get("/exercises/pool")
+async def get_exercise_pool(
+    student_id: uuid.UUID = Depends(valid_student_id),
+    knowledge_point: str | None = None,
+    exercise_type: str | None = None,
+    difficulty_min: int | None = None,
+    difficulty_max: int | None = None,
+    count: int = 10,
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    """获取题池：公共题库 + 该学生的 AI 生成题合并"""
+    if user.id != student_id:
+        raise HTTPException(status_code=403, detail="只能查看自己的数据")
+
+    import random
+
+    # 1. 公共题库（exercise_bank, is_active=true）
+    bank_q = select(ExerciseBank).where(ExerciseBank.is_active == True)
+    if knowledge_point:
+        bank_q = bank_q.where(ExerciseBank.knowledge_point == knowledge_point)
+    if exercise_type:
+        bank_q = bank_q.where(ExerciseBank.exercise_type == exercise_type)
+    if difficulty_min is not None:
+        bank_q = bank_q.where(ExerciseBank.difficulty >= difficulty_min)
+    if difficulty_max is not None:
+        bank_q = bank_q.where(ExerciseBank.difficulty <= difficulty_max)
+
+    bank_result = await db.execute(bank_q)
+    bank_rows = bank_result.scalars().all()
+
+    bank_items = [
+        {
+            "exercise_id": str(r.id),
+            "type": r.exercise_type,
+            "question": r.question,
+            "options": r.options,
+            "answer": r.answer,
+            "explanation": r.explanation,
+            "difficulty": r.difficulty,
+            "knowledge_point": r.knowledge_point,
+            "source": "bank",
+        }
+        for r in bank_rows
+    ]
+
+    # 2. 学生自己的 AI 生成题
+    ai_q = select(Exercise).where(Exercise.student_id == student_id)
+    if knowledge_point:
+        ai_q = ai_q.where(Exercise.knowledge_point == knowledge_point)
+    if exercise_type:
+        ai_q = ai_q.where(Exercise.exercise_type == exercise_type)
+    if difficulty_min is not None:
+        ai_q = ai_q.where(Exercise.difficulty >= difficulty_min)
+    if difficulty_max is not None:
+        ai_q = ai_q.where(Exercise.difficulty <= difficulty_max)
+
+    ai_result = await db.execute(ai_q)
+    ai_rows = ai_result.scalars().all()
+
+    ai_items = [
+        {
+            "exercise_id": str(r.id),
+            "type": r.exercise_type,
+            "question": r.question,
+            "options": r.options,
+            "answer": r.answer,
+            "explanation": r.explanation,
+            "difficulty": r.difficulty,
+            "knowledge_point": r.knowledge_point,
+            "source": "ai",
+        }
+        for r in ai_rows
+    ]
+
+    # 3. 合并 + 随机抽题
+    all_items = bank_items + ai_items
+    random.shuffle(all_items)
+    selected = all_items[:count]
+
+    return {
+        "total": len(all_items),
+        "count": len(selected),
+        "exercises": selected,
+    }

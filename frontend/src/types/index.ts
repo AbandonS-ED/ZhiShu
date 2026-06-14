@@ -26,6 +26,10 @@ export interface Student {
   avatar_url?: string
   grade?: string
   major?: string
+  email?: string
+  role?: string
+  created_at?: string
+  last_login?: string
 }
 
 // 知识点

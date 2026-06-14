@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import { useAppStore } from '@/stores/appStore'
 
 type NavItem = {
   href: string
@@ -82,23 +83,20 @@ export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
-  const [userName, setUserName] = useState('未登录')
-  const [userRole, setUserRole] = useState('')
-  const [userAvatar, setUserAvatar] = useState('未')
+  const student = useAppStore((s) => s.student)
+  const setStudent = useAppStore((s) => s.setStudent)
 
   useEffect(() => {
+    if (student) return
     try {
       const raw = localStorage.getItem('zhishu_student')
-      if (raw) {
-        const student = JSON.parse(raw)
-        const name = student.name || student.student_no || '未登录'
-        setUserName(name)
-        setUserAvatar(name.charAt(0))
-        const parts = [student.major, student.grade].filter(Boolean)
-        setUserRole(parts.join(' · ') || '智枢用户')
-      }
+      if (raw) setStudent(JSON.parse(raw))
     } catch {}
-  }, [])
+  }, [student, setStudent])
+
+  const userName = student?.name || student?.student_no || '未登录'
+  const userAvatar = (userName).charAt(0) || '未'
+  const userRole = [student?.major, student?.grade].filter(Boolean).join(' · ') || '智枢用户'
 
   function handleLogout() {
     localStorage.removeItem('zhishu_token')
