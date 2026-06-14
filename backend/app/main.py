@@ -19,8 +19,11 @@ async def lifespan(app: FastAPI):
             base_url=settings.MINIMAX_BASE_URL,
         )
     
-    # 初始化数据库
-    await init_db()
+    # 初始化数据库（数据库不可用时优雅降级）
+    try:
+        await init_db()
+    except Exception as e:
+        print(f"WARNING: 数据库初始化失败 {e}，使用内存模式运行")
     yield
     
     # 关闭客户端

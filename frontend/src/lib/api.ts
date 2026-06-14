@@ -1,8 +1,6 @@
 // 智枢 API 客户端
-// 后端 baseURL: http://localhost:8001
-// (Windows 上 8000 有"僵尸 socket"问题，后端跑在 8001)
-
-const BASE_URL = 'http://localhost:8001/api/v1'
+// 后端 baseURL: http://localhost:8000
+const BASE_URL = 'http://localhost:8000/api/v1'
 
 // 通用 fetch 封装（自动带 token）
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -36,30 +34,34 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 // ===== Profile =====
-export interface ProfileDimensions {
-  knowledge_mastery?: Record<string, number>
-  learning_style?: { visual: number; textual: number; auditory: number; kinesthetic: number }
-  cognitive_level?: { memory: number; understand: number; apply: number; analyze: number }
-  interest?: Record<string, number>
-  weak_topics?: string[]
-  learning_pace?: { daily_hours: number; preferred_time: string; focus_duration: number }
-}
-
 export interface StudentProfile {
-  student_id: string
-  dimensions: ProfileDimensions
-  version: number
-  completeness_score: number
+  dimensions?: Record<string, number>
+  background?: Record<string, unknown>
+  assessment_status?: string
 }
 
 export const profileApi = {
-  build: (student_id: string, messages: Array<{ role: string; content: string }>) =>
-    request<StudentProfile>('/profile/build', {
+  assessStream: (data: { session_id?: string; answer?: string }) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
+    return fetch(`${BASE_URL}/profile/assess/stream`, {
       method: 'POST',
-      body: JSON.stringify({ student_id, messages }),
-    }),
-  get: (student_id: string) => request<StudentProfile>(`/profile/${student_id}`),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data),
+    })
+  },
+
+  getMe: () =>
+    request<{
+      dimensions: Record<string, number>
+      background: Record<string, unknown>
+      assessment_status: string
+    }>('/profile/me'),
 }
+
+// ===== Chat (SSE 流式) =====
 
 // ===== Chat (SSE 流式) =====
 export interface ChatEvent {

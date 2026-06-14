@@ -122,8 +122,6 @@ async def generate_resource(req: ResourceGenRequest, db: AsyncSession = Depends(
     profile_result = await db.execute(
         select(StudentProfile)
         .where(StudentProfile.student_id == uuid.UUID(req.student_id))
-        .where(StudentProfile.is_current == True)
-        .order_by(StudentProfile.version.desc())
         .limit(1)
     )
     profile = profile_result.scalar_one_or_none()
@@ -166,8 +164,6 @@ async def generate_resource_stream(req: ResourceGenRequest, db: AsyncSession = D
     profile_result = await db.execute(
         select(StudentProfile)
         .where(StudentProfile.student_id == uuid.UUID(req.student_id))
-        .where(StudentProfile.is_current == True)
-        .order_by(StudentProfile.version.desc())
         .limit(1)
     )
     profile = profile_result.scalar_one_or_none()
@@ -279,8 +275,6 @@ async def generate_exercises(req: ExerciseGenRequest, db: AsyncSession = Depends
     profile_result = await db.execute(
         select(StudentProfile)
         .where(StudentProfile.student_id == uuid.UUID(req.student_id))
-        .where(StudentProfile.is_current == True)
-        .order_by(StudentProfile.version.desc())
         .limit(1)
     )
     profile = profile_result.scalar_one_or_none()
@@ -339,8 +333,6 @@ async def generate_exercises_stream(req: ExerciseGenRequest, db: AsyncSession = 
     profile_result = await db.execute(
         select(StudentProfile)
         .where(StudentProfile.student_id == uuid.UUID(req.student_id))
-        .where(StudentProfile.is_current == True)
-        .order_by(StudentProfile.version.desc())
         .limit(1)
     )
     profile = profile_result.scalar_one_or_none()

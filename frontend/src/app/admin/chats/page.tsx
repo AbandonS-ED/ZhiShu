@@ -184,10 +184,7 @@ export default function ChatsPage() {
               <div className="admin-cht-m">
                 {modal.item.msg.map((m, i) => {
                   const cls = m.r === 'u' ? 'u' : 'a'
-                  const av =
-                    m.r === 'u'
-                      ? 'background:var(--warm-soft);color:var(--warm)'
-                      : 'background:var(--info-soft);color:var(--info)'
+                  const av = { background: m.r === 'u' ? 'var(--warm-soft)' : 'var(--info-soft)', color: m.r === 'u' ? 'var(--warm)' : 'var(--info)' }
                   const ico = m.r === 'u' ? 'U' : 'A'
                   return (
                     <div key={i} className={`admin-cht-msg ${cls}`}>

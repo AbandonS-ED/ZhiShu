@@ -39,14 +39,19 @@ CREATE INDEX IF NOT EXISTS idx_students_is_active ON students(is_active);
 
 CREATE TABLE IF NOT EXISTS student_profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    student_id UUID NOT NULL,
-    dimensions JSONB NOT NULL DEFAULT '{}',
-    version INTEGER DEFAULT 1,
-    is_current BOOLEAN DEFAULT TRUE,
-    completeness_score FLOAT DEFAULT 0.0,
+    student_id UUID NOT NULL UNIQUE,
+    dimensions JSONB NOT NULL DEFAULT '{"comprehension":{"score":0,"confidence":0},"memory":{"score":0,"confidence":0},"application":{"score":0,"confidence":0},"imagination":{"score":0,"confidence":0},"focus":{"score":0,"confidence":0}}',
+    background JSONB NOT NULL DEFAULT '{}',
+    assessment_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    assess_session_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
+
+-- Drop old profile tables (removed in refactor)
+DROP TABLE IF EXISTS profile_guided_answers CASCADE;
+DROP TABLE IF EXISTS profile_guided_sessions CASCADE;
+DROP TABLE IF EXISTS subject_profiles CASCADE;
 
 CREATE TABLE IF NOT EXISTS document_chunks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

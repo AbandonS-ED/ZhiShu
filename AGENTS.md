@@ -2,7 +2,7 @@
 
 中国软件杯 A3 赛题：多智能体个性化学习资源生成系统。
 
-**首次进入先读**：`README.md`（项目概览）→ `CLAUDE.md`（架构 + 已修复 + 踩坑）→ `开发进度.md`（实时进度 + 演示路径）。更细的模块设计在 `docs/设计文档/`。
+**首次进入先读**：`README.md` → `AGENTS.md`（当前文档）→ `开发进度.md`。模块设计见 `docs/设计文档/`。
 
 ## 硬约束
 
@@ -26,12 +26,12 @@ ZhiShu/
 │   ├── app/
 │   │   ├── main.py               9 router 注册 + lifespan
 │   │   ├── api/                  9 router（auth/profile/resource/path/tutor/chat/mindmap/dashboard/evaluation）
-│   │   ├── agents/               master_agent.py (StateGraph 13 节点) + 7 子 Agent + state + communicator
-│   │   ├── models/               9 个 SQLAlchemy Model
+│   │   ├── agents/               master_agent.py (StateGraph 10 节点) + 6 子 Agent + initial_assessment + state + communicator
+│   │   ├── models/               10 个 SQLAlchemy Model
 │   │   ├── services/             12 个 Service（LLM 客户端 / 防幻觉 / RAG / 安全）
 │   │   └── core/                 config / database / security (bcrypt+JWT) / dependencies (门禁) / celery_config (未启用)
 │   ├── scripts/
-│   │   ├── init_db.sql           建库 + 9 张表 + 12 索引 + admin 种子
+│   │   ├── init_db.sql           建库 + 9 张表 + 11 索引 + admin 种子（含 DROP 旧表）
 │   │   └── init_admin.py         ⭐ 自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号
 │   ├── tests/                    smoke_test.py + 7 pytest (119) + 6 debug
 │   ├── pytest.ini                asyncio_mode=auto, testpaths=tests
@@ -41,7 +41,7 @@ ZhiShu/
 └── docker-compose.yml             postgres+pgvector / redis / minio（全部未启用）
 ```
 
-**前端 `package.json` 装了但未使用**（不要新增依赖）：`@radix-ui/*`（6 个）、`class-variance-authority`、`clsx`、`tailwind-merge`、`lucide-react`、`reactflow`、`mermaid`、`recharts`、`react-markdown`、`react-syntax-highlighter`、`rehype-highlight`、`zustand`、`swr`。模板 1:1 复刻用纯自定义 CSS，不引 UI 库。
+**前端 `package.json` 装了但未使用**（不要新增依赖）：`@radix-ui/*`（6 个）、`class-variance-authority`、`clsx`、`tailwind-merge`、`reactflow`、`mermaid`、`recharts`、`react-markdown`、`react-syntax-highlighter`、`rehype-highlight`、`zustand`、`swr`。已使用：`lucide-react`（图标）、`chart.js` + `react-chartjs-2`（雷达图）。用纯自定义 CSS，不引 UI 库。
 
 ## 命令（按顺序）
 
@@ -53,11 +53,11 @@ psql -U postgres -f backend/scripts/init_db.sql
 cd backend && venv\Scripts\python scripts\init_admin.py
 # → 创建/更新 admin / admin123 / role=admin
 
-# 3. 后端（必须 8001，不要 8000：Windows 端口僵尸 socket 坑）
+# 3. 后端（建议 8000）
 cd backend
 python -m venv venv && venv\Scripts\activate
 pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8001   # Swagger: http://localhost:8001/docs
+uvicorn app.main:app --host 0.0.0.0 --port 8000   # Swagger: http://localhost:8000/docs
 
 # 4. 前端
 cd frontend && npm install
@@ -82,7 +82,6 @@ cd frontend && npm run build                         # 17 路由编译
 ## 踩过的坑（不修会卡住）
 
 - **`.next` 缓存损坏**：`npm run build` 后切 `npm run dev` 报 `Cannot find module` → 杀 node → `Remove-Item frontend/.next -Recurse` → 重启。
-- **Windows 8000 端口僵尸 socket**：进程死后端口还被内核占着，`taskkill` / `Get-NetTCPConnection` 都看不到。**直接用 8001**，同步改 `frontend/src/lib/api.ts:5` 的 `BASE_URL`。
 - **PowerShell `$2b$` 变量插值**：在 PowerShell 命令行直接传 `'$2b$12$...'` 会被 shell 解析为变量，破坏 bcrypt 哈希。**用 `init_admin.py` 绕开**。
 - **PowerShell 终端 GBK**：LLM 输出含 emoji 会让 `print` 报 `UnicodeEncodeError`。`smoke_test.py` 已用 `io.TextIOWrapper(..., errors="replace")` 兜底。
 - **CRLF/LF 警告**：Windows 正常现象，不要修。
@@ -96,12 +95,13 @@ cd frontend && npm run build                         # 17 路由编译
 
 ## 架构要点
 
-- **9 router / 27 唯一 API / 8 Agent / 9 Model / 12 Service / 119 pytest**
+- **9 router / 27 唯一 API / 7 Agent / 10 Model / 12 Service / 119 pytest**
 - **请求路由**（`chat.py:493-540`）：`_quick_route()` 关键词匹配 → 匹配到走对应 handler，没匹配到走 StateGraph（Master Agent）。**短消息（<15字）默认走 tutor 真流式**。
-- **StateGraph 编排**（`agents/master_agent.py`）：13 节点 LangGraph（intent_recognition → task_planning → conditional_route → 7 子 Agent → result_aggregation → response_generation）。**tutor/chat 走原路径真逐 token 流式**（`chat.py:97-205`），其他意图走 StateGraph（`chat.py:212-287`）。
+- **StateGraph 编排**（`agents/master_agent.py`）：10 节点 LangGraph（intent_recognition → task_planning → 6 子 Agent → result_aggregation → response_generation）。**tutor/chat 走原路径真逐 token 流式**（`chat.py:97-205`），其他意图走 StateGraph（`chat.py:212-287`）。profile 不走 StateGraph，由独立 API 端点驱动（`api/profile.py` 的 `/assess/start` → `InitialAssessmentAgent` 多轮对话）。
 - **多轮对话上下文**：`_handle_tutor_chat_stream` 和 `tutor_agent.answer()` 都传 `history`（最近 10 条）给 LLM。assistant 消息在 DB 里是 JSON（`{"type":"tutor","data":{...}}`），需要解析出 `answer` 字段（`chat.py:131-141`）。
+- **画像评估 session**：`InitialAssessmentAgent` 用**内存字典**存多轮对话状态（`assess_sessions`），每个 session 包含 5 维得分/置信度、当前维度、对话历史。服务重启后评估需重新开始。
 - **`<think>` 标签过滤**：`chat.py:45-72` 的 `_strip_think` 状态机是流式期间**必须**的，否则会吞前端渲染。
-- **防幻觉**（`services/anti_hallucination.py`）：6 个 Agent 都接 `validate()`（Document/Exercise 走完整三层，Profile/Path/MindMap/Tutor 走 `skip_llm=True` 快速模式）。
+- **防幻觉**（`services/anti_hallucination.py`）：6 个 Agent 都接 `validate()`（Document/Exercise 走完整三层，Path/MindMap/Tutor 走 `skip_llm=True` 快速模式）。InitialAssessmentAgent 不走防幻觉管道（对话式输出不包含资源内容）。
 - **RAG 管道**：`document_parser` → `text_chunker` → `embedding_service` → `vector_store.search`（pgvector + JSONB fallback）→ `reranker`。`tutor.py` 的 `/ask` 和 `chat/stream` 的 tutor 分支都走完整流程。
 - **SSE 流式**：4 个真流式端点（chat/stream、resource/generate/stream、resource/exercises/generate/stream、path/generate/stream）+ 1 个伪流式。所有 stream 方法**必须手动加 `Authorization` 头**。
 - **登录注册**（`core/security.py`）：`bcrypt` 密码哈希 + JWT（HS256，7 天过期，密钥从 `JWT_SECRET` 环境变量读取）。全 24 个业务端点加 `Depends(get_current_user)` 门禁（`core/dependencies.py`）。前端 `api.ts` 的 `request()` 自动带 token，401 自动跳登录页。**`/auth/login` 和 `/auth/register` 不触发 401 自动跳转**（`api.ts:27`）。

@@ -15,7 +15,7 @@ async def main():
         # First test what the LLM returns for the mindmap prompt (sync chat)
         # We can't easily call the agent directly, so let's just inspect the endpoint result
         r = await c.post(
-            "http://localhost:8001/api/v1/mindmap/generate",
+            "http://localhost:8000/api/v1/mindmap/generate",
             json={"student_id": "00000000-0000-0000-0000-000000000001", "knowledge_point": "A* 算法"},
         )
         data = r.json()

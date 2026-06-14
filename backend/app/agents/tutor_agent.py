@@ -124,10 +124,7 @@ class TutorAgent:
             parts.append("")
 
         if student_profile:
-            mastery = student_profile.get("knowledge_mastery", {})
-            parts.append(f"## 学生知识掌握度")
-            parts.append(json.dumps(mastery, ensure_ascii=False, indent=2))
-            parts.append("")
+            pass
 
         parts.append(f"## 学生提问\n{question}")
         if output_format == "json":

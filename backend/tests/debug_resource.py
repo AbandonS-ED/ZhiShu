@@ -21,7 +21,7 @@ async def main():
         events = []
         async with c.stream(
             "POST",
-            "http://localhost:8001/api/v1/resource/generate/stream",
+            "http://localhost:8000/api/v1/resource/generate/stream",
             json=PAYLOAD,
             headers={"Accept": "text/event-stream"},
         ) as r:

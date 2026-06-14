@@ -62,7 +62,7 @@ export default function DuihuaPage() {
 
   // 加载画像（右侧知识点）
   useEffect(() => {
-    profileApi.get(studentId).then(setProfile).catch(() => {})
+    profileApi.getMe().then(setProfile).catch(() => {})
   }, [studentId])
 
   // 切换会话时加载历史消息
@@ -219,16 +219,10 @@ export default function DuihuaPage() {
     }
   }
 
-  // 从画像提取知识点列表
-  const knowledgePoints = profile?.dimensions?.knowledge_mastery
-    ? Object.entries(profile.dimensions.knowledge_mastery)
-        .filter(([, v]) => (v as number) > 0)
-        .sort((a, b) => (b[1] as number) - (a[1] as number))
-        .slice(0, 8)
-        .map(([k]) => k)
-    : []
+  // 从画像提取知识点列表（暂不可用，待学科画像实现后启用）
+  const knowledgePoints: string[] = []
 
-  const weakTopics = profile?.dimensions?.weak_topics || []
+  const weakTopics: string[] = []
 
   return (
     <div className="chat-page" style={{ padding: '16px 20px', height: 'calc(100vh - var(--header-h))' }}>

@@ -17,9 +17,31 @@ async def init_db():
     except Exception:
         print("WARNING: pgvector 扩展未安装，向量检索功能不可用")
 
-    # 建表
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # 建表（数据库不可用时优雅降级）
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except OSError as e:
+        print(f"WARNING: 数据库连接失败 ({e})，使用内存模式运行（部分功能不可用）")
+    except Exception as e:
+        print(f"WARNING: 建表失败 {e}，使用内存模式运行")
+
+    # 迁移：为旧表添加新列（表已存在时 create_all 不会修改现有表）
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("""
+                ALTER TABLE student_profiles
+                    ADD COLUMN IF NOT EXISTS background JSONB NOT NULL DEFAULT '{}',
+                    ADD COLUMN IF NOT EXISTS assessment_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    ADD COLUMN IF NOT EXISTS assess_session_id UUID,
+                    DROP COLUMN IF EXISTS completeness_score
+            """))
+            await conn.execute(text("DROP TABLE IF EXISTS profile_guided_answers CASCADE"))
+            await conn.execute(text("DROP TABLE IF EXISTS profile_guided_sessions CASCADE"))
+            await conn.execute(text("DROP TABLE IF EXISTS subject_profiles CASCADE"))
+            print("INFO: 数据库迁移完成")
+    except Exception:
+        pass  # 表可能不存在，忽略
 
 async def get_db():
     async with async_session() as session:

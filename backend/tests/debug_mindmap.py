@@ -17,7 +17,7 @@ PAYLOAD = {
 
 async def main():
     async with httpx.AsyncClient(timeout=60.0) as c:
-        r = await c.post("http://localhost:8001/api/v1/mindmap/generate", json=PAYLOAD)
+        r = await c.post("http://localhost:8000/api/v1/mindmap/generate", json=PAYLOAD)
         print(f"status: {r.status_code}")
         print(f"body: {r.text}")
 

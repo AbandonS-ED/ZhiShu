@@ -6,9 +6,12 @@ from app.models.learning_path import LearningPath
 from app.models.exercise import Exercise
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
+from app.models.learning_record import LearningRecord
+from app.models.learning_activity_log import LearningActivityLog
 
 __all__ = [
     "Student", "StudentProfile", "DocumentChunk",
     "Resource", "LearningPath", "Exercise",
-    "ChatSession", "ChatMessage",
+    "ChatSession", "ChatMessage", "LearningRecord",
+    "LearningActivityLog",
 ]

@@ -18,7 +18,7 @@ if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
-BASE = "http://localhost:8001/api/v1"
+BASE = "http://localhost:8000/api/v1"
 STUDENT_ID = "00000000-0000-0000-0000-000000000001"
 TIMEOUT = 120.0
 
@@ -81,7 +81,7 @@ async def collect_sse_events(client: httpx.AsyncClient, path: str, payload: dict
 
 async def step1_health(client: httpx.AsyncClient) -> None:
     header("Step 0: Health Check")
-    r = await client.get("http://localhost:8001/health", timeout=5)
+    r = await client.get("http://localhost:8000/health", timeout=5)
     if r.status_code == 200 and r.json().get("status") == "healthy":
         ok(f"/health 200, body={r.text[:60]}")
     else:
@@ -109,7 +109,7 @@ async def step2_profile_build(client: httpx.AsyncClient) -> dict | None:
     data = r.json()
     dims = data.get("dimensions", {})
     km = dims.get("knowledge_mastery", {})
-    info(f"version={data.get('version')}, completeness={data.get('completeness_score')}%")
+    info(f"completeness={data.get('completeness_score')}%")
     info(f"dimensions keys: {list(dims.keys())}")
     info(f"knowledge_mastery: {km}")
     ok(f"200 in {dur:.1f}s, {len(dims)} dimensions")

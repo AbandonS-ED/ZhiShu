@@ -1,196 +1,107 @@
-"""Profile API — 学生画像构建与查询"""
-
-import uuid
+"""Profile API — 5-dimension personal ability profile."""
+import json
+import logging
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, field_validator
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import valid_student_id, get_current_user
+from app.core.dependencies import get_current_user
 from app.models.student import Student
 from app.models.student_profile import StudentProfile
-from app.agents.profile_agent import profile_agent
+from app.agents.initial_assessment_agent import initial_assessment_agent
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-class BuildProfileRequest(BaseModel):
-    student_id: str
-    messages: list[dict]  # [{"role": "user", "content": "..."}, ...]
-
-    @field_validator("student_id")
-    @classmethod
-    def _validate_uuid(cls, v: str) -> str:
-        try:
-            uuid.UUID(v)
-            return v
-        except (ValueError, AttributeError, TypeError):
-            raise ValueError(f"无效的 UUID: {v}")
+class AssessStreamRequest(BaseModel):
+    session_id: str = ""
+    answer: str = ""
 
 
-class ProfileResponse(BaseModel):
-    student_id: str
-    dimensions: dict
-    version: int
-    completeness_score: float
-
-
-@router.post("/build")
-async def build_profile(req: BuildProfileRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
-    """根据对话内容构建/更新学生画像"""
-    if str(user.id) != req.student_id:
-        raise HTTPException(status_code=403, detail="只能操作自己的画像")
-    # 1. 查找或创建学生
-    student_uuid = uuid.UUID(req.student_id)  # BuildProfileRequest 已用 field_validator 校验
-    result = await db.execute(
-        select(Student).where(Student.id == student_uuid)
-    )
-    student = result.scalar_one_or_none()
-
-    if not student:
-        # 自动创建学生记录
-        student = Student(id=student_uuid, name="未命名")
-        db.add(student)
-        await db.flush()
-
-    # 2. 获取当前画像（如有）
-    result = await db.execute(
-        select(StudentProfile)
-        .where(StudentProfile.student_id == student.id)
-        .where(StudentProfile.is_current == True)
-        .order_by(StudentProfile.version.desc())
-        .limit(1)
-    )
-    current_profile = result.scalar_one_or_none()
-    current_dimensions = current_profile.dimensions if current_profile else None
-    new_version = (current_profile.version + 1) if current_profile else 1
-
-    # 3. 调用 Profile Agent 分析对话
-    dimensions = await profile_agent.analyze(
-        messages=req.messages,
-        current_profile=current_dimensions,
-    )
-
-    # 4. 计算完整度分数
-    completeness = _calc_completeness(dimensions)
-
-    # 5. 旧画像标记为非当前
-    if current_profile:
-        current_profile.is_current = False
-
-    # 6. 保存新画像
-    new_profile = StudentProfile(
-        student_id=student.id,
-        dimensions=dimensions,
-        version=new_version,
-        is_current=True,
-        completeness_score=completeness,
-    )
-    db.add(new_profile)
-    await db.commit()
-
-    return {
-        "student_id": str(student.id),
-        "dimensions": dimensions,
-        "version": new_version,
-        "completeness_score": completeness,
-    }
-
-
-_EMPTY_DIMENSIONS = {
-    "knowledge_mastery": {},
-    "learning_style": {"visual": 50, "textual": 50, "auditory": 50, "kinesthetic": 50},
-    "cognitive_level": {"memory": 50, "understand": 50, "apply": 50, "analyze": 50},
-    "interest": {},
-    "weak_topics": [],
-    "learning_pace": {"daily_hours": 0, "preferred_time": "", "focus_duration": 0},
-}
-
-
-@router.get("/{student_id}")
-async def get_profile(
-    student_id: uuid.UUID = Depends(valid_student_id),
+@router.post("/assess/stream")
+async def assess_stream(
+    req: AssessStreamRequest,
+    current_user: Student = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    user: Student = Depends(get_current_user),
 ):
-    """获取学生当前画像，不存在时返回空画像"""
-    if user.id != student_id:
-        raise HTTPException(status_code=403, detail="只能查看自己的画像")
-    result = await db.execute(
-        select(Student).where(Student.id == student_id)
-    )
-    student = result.scalar_one_or_none()
-    if not student:
-        student = Student(id=uuid.UUID(student_id), name="未命名")
-        db.add(student)
-        await db.commit()
+    if not req.session_id:
+        session = await initial_assessment_agent.start_assessment(str(current_user.id))
+        session_id = session["session_id"]
+        is_initial = True
+    else:
+        session = initial_assessment_agent.get_session(req.session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        session_id = req.session_id
+        initial_assessment_agent.add_user_message(session_id, req.answer)
+        is_initial = False
 
+    async def event_generator():
+        async for event in initial_assessment_agent.stream_llm_response(session_id, is_initial):
+            yield event
+
+            if '"type": "result"' in event and '"done": true' in event:
+                try:
+                    data = json.loads(event[6:].strip())
+                    profile_result = await db.execute(
+                        select(StudentProfile).where(StudentProfile.student_id == current_user.id)
+                    )
+                    profile = profile_result.scalar_one_or_none()
+                    dims = data.get("dimensions", {})
+                    if profile:
+                        profile.dimensions = dims
+                        profile.assessment_status = "completed"
+                    else:
+                        profile = StudentProfile(
+                            student_id=current_user.id,
+                            dimensions=dims,
+                            assessment_status="completed",
+                        )
+                        db.add(profile)
+                    await db.commit()
+                except Exception as e:
+                    logger.error(f"Failed to save profile: {e}")
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.get("/me")
+async def get_my_profile(
+    current_user: Student = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(
-        select(StudentProfile)
-        .where(StudentProfile.student_id == student.id)
-        .where(StudentProfile.is_current == True)
+        select(StudentProfile).where(StudentProfile.student_id == current_user.id)
     )
     profile = result.scalar_one_or_none()
 
-    if profile:
+    if not profile:
         return {
-            "student_id": str(student.id),
-            "dimensions": profile.dimensions,
-            "version": profile.version,
-            "completeness_score": profile.completeness_score,
+            "dimensions": {
+                "comprehension": 0,
+                "memory": 0,
+                "application": 0,
+                "imagination": 0,
+                "focus": 0,
+            },
+            "background": {},
+            "assessment_status": "pending",
         }
 
+    dims = profile.dimensions or {}
+    scores = {}
+    for k, v in dims.items():
+        if isinstance(v, dict) and "score" in v:
+            scores[k] = v["score"]
+        elif isinstance(v, (int, float)):
+            scores[k] = v
+
     return {
-        "student_id": str(student.id),
-        "dimensions": _EMPTY_DIMENSIONS,
-        "version": 0,
-        "completeness_score": 0.0,
+        "dimensions": scores,
+        "background": profile.background or {},
+        "assessment_status": profile.assessment_status or "pending",
     }
-
-
-def _calc_completeness(dimensions: dict) -> float:
-    """计算画像完整度 (0-100)"""
-    score = 0.0
-    total = 0
-
-    # 知识掌握度
-    km = dimensions.get("knowledge_mastery", {})
-    if km:
-        non_zero = sum(1 for v in km.values() if v > 0)
-        score += (non_zero / len(km)) * 30 if km else 0
-    total += 30
-
-    # 学习风格
-    ls = dimensions.get("learning_style", {})
-    if ls:
-        non_zero = sum(1 for v in ls.values() if v != 50)
-        score += (non_zero / len(ls)) * 20 if ls else 0
-    total += 20
-
-    # 认知水平
-    cl = dimensions.get("cognitive_level", {})
-    if cl:
-        non_zero = sum(1 for v in cl.values() if v != 50)
-        score += (non_zero / len(cl)) * 20 if cl else 0
-    total += 20
-
-    # 兴趣
-    interest = dimensions.get("interest", {})
-    if interest:
-        score += min(len(interest) / 5, 1) * 10
-    total += 10
-
-    # 薄弱点
-    wt = dimensions.get("weak_topics", [])
-    if wt:
-        score += min(len(wt) / 3, 1) * 10
-    total += 10
-
-    # 学习节奏
-    lp = dimensions.get("learning_pace", {})
-    if lp and lp.get("daily_hours", 0) > 0:
-        score += 10
-    total += 10
-
-    return round(score / total * 100, 1)

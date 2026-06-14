@@ -1,25 +1,21 @@
-// 学习者画像六维数据
+// 学习者画像 — 5维个人底层能力
+export interface AbilityScore {
+  score: number
+  confidence: number
+}
+
 export interface ProfileDimensions {
-  knowledge_mastery: Record<string, number>  // 知识掌握度
-  learning_style: {
-    visual: number
-    textual: number
-    auditory: number
-    kinesthetic: number
-  }
-  cognitive_level: {
-    memory: number
-    understand: number
-    apply: number
-    analyze: number
-  }
-  interest: Record<string, number>  // 兴趣偏好
-  weak_topics: string[]  // 薄弱环节
-  learning_pace: {
-    daily_hours: number
-    preferred_time: string
-    focus_duration: number
-  }
+  comprehension: AbilityScore
+  memory: AbilityScore
+  application: AbilityScore
+  imagination: AbilityScore
+  focus: AbilityScore
+}
+
+export interface StudentProfile {
+  dimensions: Record<string, number>  // {comprehension: 72, memory: 55, ...}
+  background: Record<string, unknown>
+  assessment_status: 'pending' | 'in_progress' | 'completed'
 }
 
 // 学生信息

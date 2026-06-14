@@ -111,13 +111,8 @@ class AgentCommunicator:
         self.bus = bus
 
     async def request_profile(self, student_id: str) -> dict:
-        """请求学生画像"""
-        return await self.bus.request(
-            sender=self.agent_name,
-            receiver="profile_agent",
-            action="get_profile",
-            payload={"student_id": student_id},
-        )
+        """请求学生画像（旧画像系统已移除，返回空）"""
+        return {"student_id": student_id, "profile": {}}
 
     async def request_rag(self, query: str, course_id: str) -> dict:
         """请求 RAG 检索"""

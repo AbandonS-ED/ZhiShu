@@ -110,20 +110,7 @@ class ExerciseAgent:
         parts = [f"请为「{knowledge_point}」生成 {count} 道练习题。"]
 
         if student_profile:
-            mastery = student_profile.get("knowledge_mastery", {})
-            weak = student_profile.get("weak_topics", [])
-            score = mastery.get(knowledge_point, 50)
-
-            parts.append(f"\n学生画像：")
-            parts.append(f"- 知识掌握度: {score}/100")
-            if knowledge_point in weak:
-                parts.append("- 该知识点是学生的薄弱点，请重点练习")
-            if score < 30:
-                parts.append("- 难度偏基础，侧重概念理解")
-            elif score < 60:
-                parts.append("- 难度适中，概念+应用并重")
-            else:
-                parts.append("- 难度可偏高，侧重综合应用")
+            pass
 
         type_map = {
             "all": "混合题型 (选择+判断+简答+编程)",

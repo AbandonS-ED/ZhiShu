@@ -151,14 +151,9 @@ class TestAgentCommunicator:
 
     @pytest.mark.asyncio
     async def test_request_profile(self, bus):
-        async def responder(msg):
-            await bus.respond(msg.correlation_id, {"dimensions": {}})
-
-        # request_profile sends to "profile_agent", bus publishes to "agent.profile_agent"
-        bus.subscribe("agent.profile_agent", responder)
         comm = AgentCommunicator("document_agent", bus)
         result = await comm.request_profile("student-123")
-        assert "dimensions" in result
+        assert result == {"student_id": "student-123", "profile": {}}
 
     @pytest.mark.asyncio
     async def test_broadcast_event(self, bus):

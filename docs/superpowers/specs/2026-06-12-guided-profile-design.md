@@ -449,8 +449,101 @@ def merge_weak_topics(profiles):
 
 - 学习行为自动更新画像
 - 对话中实时提取信息更新画像
--学科画像中途保存/继续
+- 学科画像中途保存/继续
 - 上一步/跳过功能
+
+---
+
+## 12. 学习活动信息接收入口
+
+### 12.1 设计原则
+
+GuidedProfileAgent **不主动获取**学生学习数据，只提供**被动的信息接收入口**。
+其他模块（练习、对话等）在产生关键学习数据时，调用入口将数据推送给 GuidedProfileAgent。
+
+### 12.2 入口函数
+
+```python
+async def receive_learning_activity(
+    student_id: str,
+    subject: str,
+    activity_type: str,   # "exercise_result" | "chat_summary" | "resource_view"
+    payload: dict,       # 具体的活动数据
+) -> dict:
+    """接收学习活动信息，智能更新学科画像和主画像
+
+    Args:
+        student_id: 学生 UUID
+        subject: 学科名称（如"人工智能导论"）
+        activity_type: 活动类型
+        payload: 活动数据负载
+
+    Returns:
+        更新后的学科画像 + 主画像版本号
+    """
+```
+
+### 12.3 支持的活动类型
+
+| activity_type | payload 示例 | 处理逻辑 |
+|---|---|---|
+| `exercise_result` | `{"knowledge_point": "反向传播", "is_correct": false}` | 答错 → 加入 weak_topics；答对 → 提升 knowledge_mastery |
+| `chat_summary` | `{"topics": ["梯度下降", "优化器"], "depth": "intermediate"}` | 从对话提取知识点，更新 knowledge_mastery |
+| `resource_view` | `{"knowledge_points": ["过拟合", "正则化"]}` | 标记为已学习，设置初始掌握度 |
+
+### 12.4 数据库更新
+
+```sql
+-- 新增一张学习活动记录表（用于审计和画像追溯）
+CREATE TABLE learning_activity_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL REFERENCES students(id),
+    subject VARCHAR(100),
+    activity_type VARCHAR(30) NOT NULL,
+    payload JSONB NOT NULL,
+    triggered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+### 12.5 API 入口
+
+```
+POST /api/v1/profile/guided/activity
+
+Request:
+{
+  "student_id": "uuid",
+  "subject": "人工智能导论",
+  "activity_type": "exercise_result",
+  "payload": {
+    "knowledge_point": "反向传播",
+    "is_correct": false
+  }
+}
+
+Response:
+{
+  "received": true,
+  "subject_profile_version": 2,
+  "master_profile_version": 3,
+  "updated_dimensions": ["weak_topics", "knowledge_mastery"]
+}
+```
+
+### 12.6 画像更新逻辑
+
+```
+收到活动数据
+  → 根据 subject 找到或创建学科画像
+  → 根据 activity_type 执行对应更新策略
+  → 标记学科画像版本 +1
+  → 重新计算主画像
+  → 返回更新结果
+```
+
+---
+
+**设计完成，待用户确认后进入实现阶段。**
 
 ---
 

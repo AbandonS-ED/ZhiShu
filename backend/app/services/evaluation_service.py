@@ -177,8 +177,6 @@ class EvaluationService:
         profile_result = await db.execute(
             select(StudentProfile)
             .where(StudentProfile.student_id == uuid.UUID(student_id))
-            .where(StudentProfile.is_current == True)
-            .order_by(StudentProfile.version.desc())
             .limit(1)
         )
         profile = profile_result.scalar_one_or_none()

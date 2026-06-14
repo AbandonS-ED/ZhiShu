@@ -112,20 +112,7 @@ class MindMapAgent:
         parts = [f"请为「{knowledge_point}」生成一个思维导图。"]
 
         if student_profile:
-            mastery = student_profile.get("knowledge_mastery", {})
-            weak = student_profile.get("weak_topics", [])
-            score = mastery.get(knowledge_point, 50)
-
-            parts.append(f"\n学生画像：")
-            parts.append(f"- 知识掌握度: {score}/100")
-            if knowledge_point in weak:
-                parts.append("- 该知识点是学生的薄弱点，请多展开子节点")
-            if score < 30:
-                parts.append("- 基础较弱，分支从最基本概念开始")
-            elif score < 60:
-                parts.append("- 有一定基础，可以包含一些进阶内容")
-            else:
-                parts.append("- 掌握较好，可以包含高级应用和扩展知识")
+            pass
 
         parts.append("\n请返回 JSON 格式。只返回 JSON。")
 

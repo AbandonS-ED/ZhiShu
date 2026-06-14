@@ -2,7 +2,6 @@
 
 import pytest
 from app.agents.mindmap_agent import MindMapAgent
-from app.agents.profile_agent import ProfileAgent
 from app.agents.path_agent import PathAgent
 from app.agents.tutor_agent import TutorAgent
 from app.agents.exercise_agent import ExerciseAgent
@@ -57,39 +56,6 @@ class TestMindMapAgent:
         assert self.agent._is_fallback_result({"mermaid_code": self.agent.FALLBACK_MERMAID}) is True
 
 
-class TestProfileAgent:
-    def setup_method(self):
-        self.agent = ProfileAgent()
-
-    def test_build_user_prompt_basic(self):
-        messages = [{"role": "user", "content": "我是一名大学生"}]
-        prompt = self.agent._build_user_prompt(messages, None)
-        assert "大学生" in prompt
-        assert "6 维" in prompt
-
-    def test_build_user_prompt_with_current(self):
-        messages = [{"role": "user", "content": "我擅长数学"}]
-        current = {"knowledge_mastery": {"数学": 80}}
-        prompt = self.agent._build_user_prompt(messages, current)
-        assert "current_profile" not in prompt  # uses "当前已有的画像数据"
-        assert "80" in prompt
-
-    def test_default_profile(self):
-        profile = self.agent._default_profile()
-        assert "knowledge_mastery" in profile
-        assert "learning_style" in profile
-        assert "cognitive_level" in profile
-        assert "interest" in profile
-        assert "weak_topics" in profile
-        assert "learning_pace" in profile
-        assert len(profile["knowledge_mastery"]) == 6
-
-    def test_parse_profile_invalid_content(self):
-        from app.services.json_parser import parse_json_response
-        result = self.agent._parse_profile("不是 JSON")
-        assert result["weak_topics"] == []
-
-
 class TestPathAgent:
     def setup_method(self):
         self.agent = PathAgent()
@@ -101,13 +67,11 @@ class TestPathAgent:
 
     def test_build_prompt_with_profile(self):
         profile = {
-            "knowledge_mastery": {"机器学习": 50},
-            "weak_topics": ["深度学习"],
-            "learning_pace": {"daily_hours": 2, "focus_duration": 45},
+            "comprehension": {"score": 60, "confidence": 0.8},
+            "memory": {"score": 50, "confidence": 0.7},
         }
         prompt = self.agent._build_prompt(["机器学习", "深度学习"], profile, 30)
-        assert "薄弱点" in prompt
-        assert "2 小时" in prompt
+        assert "机器学习" in prompt
 
     def test_parse_response_invalid(self):
         result = self.agent._parse_response("不是 JSON")

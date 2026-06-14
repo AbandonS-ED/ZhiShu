@@ -10,7 +10,7 @@ if sys.platform == "win32":
 
 import httpx
 
-ENDPOINT = "http://localhost:8001/api/v1/path/generate/stream"
+ENDPOINT = "http://localhost:8000/api/v1/path/generate/stream"
 PAYLOAD = {
     "student_id": "00000000-0000-0000-0000-000000000001",
     "course_topics": ["机器学习", "深度学习"],

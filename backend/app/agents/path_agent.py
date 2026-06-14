@@ -113,16 +113,7 @@ class PathAgent:
         parts.append(f"\n知识点列表：{', '.join(course_topics)}")
 
         if student_profile:
-            mastery = student_profile.get("knowledge_mastery", {})
-            weak = student_profile.get("weak_topics", [])
-            pace = student_profile.get("learning_pace", {})
-
-            parts.append(f"\n学生画像：")
-            parts.append(f"- 知识掌握度: {json.dumps(mastery, ensure_ascii=False)}")
-            if weak:
-                parts.append(f"- 薄弱点: {', '.join(weak)}")
-            parts.append(f"- 每日可用时间: {pace.get('daily_hours', 2)} 小时")
-            parts.append(f"- 专注时长: {pace.get('focus_duration', 45)} 分钟")
+            pass
 
         parts.append(f"\n总天数: {total_days}")
         parts.append("\n请返回 JSON 格式。只返回 JSON。")

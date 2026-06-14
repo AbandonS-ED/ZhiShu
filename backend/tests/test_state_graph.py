@@ -55,7 +55,7 @@ class TestMasterAgentGraph:
         expected_nodes = {
             "__start__", "__end__",
             "intent_recognition", "task_planning",
-            "run_profile_agent", "run_document_agent",
+            "run_document_agent",
             "run_mindmap_agent", "run_exercise_agent",
             "run_path_agent", "run_tutor_agent", "run_audio_agent",
             "result_aggregation", "response_generation",
@@ -166,13 +166,6 @@ class TestSubAgentAdapters:
         from app.agents.tutor_agent import tutor_agent
         import inspect
         sig = inspect.signature(tutor_agent.execute)
-        params = list(sig.parameters.keys())
-        assert "state" in params
-
-    def test_profile_agent_execute_signature(self):
-        from app.agents.profile_agent import profile_agent
-        import inspect
-        sig = inspect.signature(profile_agent.execute)
         params = list(sig.parameters.keys())
         assert "state" in params
 

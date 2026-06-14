@@ -19,7 +19,6 @@ from app.services import minimax_client as mc_module
 from app.services.json_parser import parse_json_response
 
 # 子 Agent 导入
-from app.agents.profile_agent import profile_agent
 from app.agents.document_agent import document_agent
 from app.agents.exercise_agent import exercise_agent
 from app.agents.path_agent import path_agent
@@ -128,9 +127,7 @@ def _extract_intent_params(msg: str) -> dict:
 # ====================================================================
 
 TASK_TEMPLATES: dict[str, list[dict[str, Any]]] = {
-    "profile": [
-        {"agent": "profile_agent", "action": "analyze", "priority": "high", "status": "pending"}
-    ],
+    "profile": [],
     "document": [
         {"agent": "document_agent", "action": "generate", "priority": "high", "status": "pending"}
     ],
@@ -160,7 +157,6 @@ TASK_TEMPLATES: dict[str, list[dict[str, Any]]] = {
         {"agent": "exercise_agent", "action": "generate", "priority": "high", "status": "pending"},
     ],
     "full_course": [
-        {"agent": "profile_agent", "action": "analyze", "priority": "high", "status": "pending"},
         {"agent": "document_agent", "action": "generate", "priority": "high", "status": "pending"},
         {"agent": "mindmap_agent", "action": "generate", "priority": "medium", "status": "pending"},
         {"agent": "exercise_agent", "action": "generate", "priority": "medium", "status": "pending"},
@@ -173,7 +169,6 @@ TASK_TEMPLATES: dict[str, list[dict[str, Any]]] = {
 
 # 路由映射：agent名 → StateGraph 节点名
 ROUTE_MAP = {
-    "profile_agent": "run_profile_agent",
     "document_agent": "run_document_agent",
     "mindmap_agent": "run_mindmap_agent",
     "exercise_agent": "run_exercise_agent",
@@ -204,7 +199,6 @@ class MasterAgent:
         # 注册节点
         graph.add_node("intent_recognition", self._intent_recognition)
         graph.add_node("task_planning", self._task_planning)
-        graph.add_node("run_profile_agent", self._run_profile_agent)
         graph.add_node("run_document_agent", self._run_document_agent)
         graph.add_node("run_mindmap_agent", self._run_mindmap_agent)
         graph.add_node("run_exercise_agent", self._run_exercise_agent)
@@ -225,7 +219,6 @@ class MasterAgent:
             "task_planning",
             self._route_to_agents,
             {
-                "run_profile_agent": "run_profile_agent",
                 "run_document_agent": "run_document_agent",
                 "run_mindmap_agent": "run_mindmap_agent",
                 "run_exercise_agent": "run_exercise_agent",
@@ -238,7 +231,7 @@ class MasterAgent:
 
         # 每个 Agent 完成后 → 检查是否有剩余任务
         agent_nodes = [
-            "run_profile_agent", "run_document_agent", "run_mindmap_agent",
+            "run_document_agent", "run_mindmap_agent",
             "run_exercise_agent", "run_path_agent", "run_tutor_agent",
             "run_audio_agent",
         ]
@@ -376,17 +369,6 @@ class MasterAgent:
     # ------------------------------------------------------------------
     # Agent 执行节点
     # ------------------------------------------------------------------
-
-    async def _run_profile_agent(self, state: AgentState) -> dict:
-        """执行 Profile Agent"""
-        try:
-            result = await profile_agent.analyze(
-                messages=state.get("messages", []),
-                current_profile=state.get("student_profile"),
-            )
-            return self._complete_task(state, "profile_result", result, "画像分析完成")
-        except Exception as e:
-            return self._fail_task(state, f"画像分析失败: {e}")
 
     async def _run_document_agent(self, state: AgentState) -> dict:
         """执行 Document Agent"""
@@ -649,13 +631,7 @@ class MasterAgent:
         """兼容旧接口：执行 Agent"""
         request_type = state.get("request_type", "chat")
         try:
-            if request_type == "profile":
-                result = await profile_agent.analyze(
-                    messages=state.get("messages", []),
-                    current_profile=state.get("student_profile"),
-                )
-                state["result"] = {"type": "profile", "data": result}
-            elif request_type == "document":
+            if request_type == "document":
                 kp = state.get("knowledge_point", "通用知识")
                 result = await document_agent.generate(
                     knowledge_point=kp, student_profile=state.get("student_profile"),

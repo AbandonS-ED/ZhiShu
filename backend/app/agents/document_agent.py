@@ -91,20 +91,7 @@ class DocumentAgent:
         parts = [f"请为「{knowledge_point}」生成学习材料。"]
 
         if student_profile:
-            mastery = student_profile.get("knowledge_mastery", {})
-            style = student_profile.get("learning_style", {})
-            score = mastery.get(knowledge_point, 50)
-
-            parts.append(f"\n学生画像：")
-            parts.append(f"- 知识掌握度: {score}/100")
-            parts.append(f"- 学习风格: {json.dumps(style, ensure_ascii=False)}")
-
-            if score < 30:
-                parts.append("- 该生基础较弱，请从基础概念讲起，多用类比和生活例子")
-            elif score < 60:
-                parts.append("- 该生有一定基础，可以适当深入")
-            else:
-                parts.append("- 该生掌握较好，可以深入讲解高级概念和应用场景")
+            pass
 
         type_map = {
             "all": "知识讲解 + 代码示例 + 音频脚本",

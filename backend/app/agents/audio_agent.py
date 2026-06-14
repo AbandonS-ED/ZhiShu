@@ -73,18 +73,7 @@ class AudioAgent:
         parts = [f"请为「{knowledge_point}」生成一个音频讲解脚本。"]
 
         if student_profile:
-            mastery = student_profile.get("knowledge_mastery", {})
-            score = mastery.get(knowledge_point, 50)
-
-            parts.append(f"\n学生画像：")
-            parts.append(f"- 知识掌握度: {score}/100")
-
-            if score < 30:
-                parts.append("- 该生基础较弱，请从基础概念讲起，多用类比和生活例子")
-            elif score < 60:
-                parts.append("- 该生有一定基础，可以适当深入")
-            else:
-                parts.append("- 该生掌握较好，可以讲深入一些，包含高级应用")
+            pass
 
         parts.append("\n请返回 JSON 格式。只返回 JSON。")
 
