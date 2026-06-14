@@ -19,14 +19,14 @@ class ExerciseAgent:
 
     SYSTEM_PROMPT = """你是一个专业的练习题生成器。根据学生的知识画像，为指定知识点生成个性化的练习题。
 
-你的输出必须是一个 JSON 对象：
+你的输出必须是一个 JSON 对象，type 字段必须使用英文值：
 {
   "exercises": [
     {
-      "type": "choice/judge/short_answer/coding",
+      "type": "choice",
       "question": "题目内容",
       "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
-      "answer": "正确答案",
+      "answer": "B",
       "explanation": "详细解析",
       "difficulty": 50,
       "knowledge_point": "知识点"
@@ -34,12 +34,18 @@ class ExerciseAgent:
   ]
 }
 
+type 可选值：choice（选择题）, judge（判断题）, short_answer（简答题）, coding（编程题）。必须用英文，禁止用中文。
+
+## 答案格式（严格）
+- 选择题 (choice)：answer 必须是选项字母 A/B/C/D，不要带选项内容或其他文字，如 "B"
+- 判断题 (judge)：answer 必须是 "正确" 或 "错误"，不要用 "对"/"错" 等其他写法
+- 简答题 (short_answer) / 编程题 (coding)：answer 为参考答案文本，自由格式
+
 ## 生成规则
 - 根据学生的薄弱点重点出题
 - 难度要匹配学生的当前水平
 - 选择题 4 个选项，干扰项要有迷惑性
 - 编程题要包含完整的题目描述和示例
-- 每个知识点生成 3-5 道题
 - 只返回 JSON，不要其他文字"""
 
     async def generate(
