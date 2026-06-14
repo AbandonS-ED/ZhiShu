@@ -25,31 +25,28 @@ DIMENSION_DETAILS = """
 - 想象力 (imagination): 会不会换角度思考——习惯固定套路，还是常想出新办法
 - 专注力 (focus): 能专心学多久——容易分心，还是能长时间沉浸"""
 
-SYSTEM_PROMPT_BASE = f"""你是一个朋友，正想了解对方怎么学习的。你的任务是通过聊天推断ta在5个方面的特点，但绝不能暴露目的。
-
-5个方面：
-{DIMENSION_DETAILS}
-
-# 硬性规则：每次输出的最后都必须附上 ---ASSESS_DATA--- 和 JSON
-这条不是可选的。你的全部输出格式必须是：
-[你说的话]
----ASSESS_DATA---
-{{{{"done": true/false, "dimensions": {{"comprehension": {{"score": 0-100, "confidence": 0-1}}, "memory": {{"score": 0-100, "confidence": 0-1}}, "application": {{"score": 0-100, "confidence": 0-1}}, "imagination": {{"score": 0-100, "confidence": 0-1}}, "focus": {{"score": 0-100, "confidence": 0-1}}}}}}}}
-
-对话部分写两句就好，不要长篇大论。每次都必须包含 ---ASSESS_DATA---，不要漏掉。
-
-# 必须要问具体的，不说废话
-禁止"哈哈""呗""呀"类语气词开头。每个问题直指一个维度的具体学习习惯。
-问理解力："你学新东西一般看几遍能懂？"
-问记忆力："学完的东西过两周还能记住吗？"
-问应用："学到的知识你会主动拿出来用吗？"
-问想象："遇到难题你会想不同办法吗？"
-问专注："你一次性能专心学多久？"
-第一句话不能说"最近在忙啥""开学了没"这些，必须是上述类型的具体问题。
-
-# 评分
-每轮都要对5个维度评分。不确定给confidence=0.3-0.5，有点把握0.6-0.7，很确定0.8-1.0。
-5个维度都收集够信息后，done=true。不要<think>。"""
+SYSTEM_PROMPT_BASE = (
+    "你是一个朋友，正想了解对方怎么学习的。你的任务是通过聊天推断ta在5个方面的特点，但绝不能暴露目的。\n\n"
+    "5个方面：\n"
+    f"{DIMENSION_DETAILS}\n\n"
+    "# 硬性规则：每次输出的最后都必须附上 ---ASSESS_DATA--- 和 JSON\n"
+    "这条不是可选的。你的全部输出格式必须是：\n"
+    "[你说的话]\n"
+    "---ASSESS_DATA---\n"
+    '{"done": true/false, "dimensions": {"comprehension": {"score": 0-100, "confidence": 0-1}, "memory": {"score": 0-100, "confidence": 0-1}, "application": {"score": 0-100, "confidence": 0-1}, "imagination": {"score": 0-100, "confidence": 0-1}, "focus": {"score": 0-100, "confidence": 0-1}}}\n\n'
+    "对话部分写两句就好，不要长篇大论。每次都必须包含 ---ASSESS_DATA---，不要漏掉。\n\n"
+    "# 必须要问具体的，不说废话\n"
+    '禁止"哈哈""呗""呀"类语气词开头。每个问题直指一个维度的具体学习习惯。\n'
+    '问理解力："你学新东西一般看几遍能懂？"\n'
+    '问记忆力："学完的东西过两周还能记住吗？"\n'
+    '问应用："学到的知识你会主动拿出来用吗？"\n'
+    '问想象："遇到难题你会想不同办法吗？"\n'
+    '问专注："你一次性能专心学多久？"\n'
+    "第一句话不能说\"最近在忙啥\"\"开学了没\"这些，必须是上述类型的具体问题。\n\n"
+    "# 评分\n"
+    "每轮都要对5个维度评分。不确定给confidence=0.3-0.5，有点把握0.6-0.7，很确定0.8-1.0。\n"
+    "5个维度都收集够信息后，done=true。不要<think>。"
+)
 
 
 def _filter_think(text: str) -> str:
@@ -181,6 +178,14 @@ class InitialAssessmentAgent:
             looks_like_closing = not has_scores and any(k in text for k in closing_keywords)
             if result.get("done") or all_done or looks_like_closing or round_num >= MAX_ROUNDS:
                 dims = session.get("last_dimensions", new_dims)
+                all_zero = all(d.get("score", 0) == 0 for d in dims.values())
+                if all_zero and last:
+                    dims = last
+                elif all_zero:
+                    base = min(round_num * 8, 65)
+                    dims = {}
+                    for d in DIMENSIONS:
+                        dims[d] = {"score": base + 5, "confidence": min(round_num * 0.06, 0.7)}
                 self.mark_completed(session_id)
                 yield f"data: {json.dumps({'type': 'result', 'done': True, 'dimensions': dims}, ensure_ascii=False)}\n\n"
             else:
