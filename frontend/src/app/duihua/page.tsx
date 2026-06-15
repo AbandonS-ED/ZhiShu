@@ -1,9 +1,45 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { chatApi, profileApi, evaluationApi, type StudentProfile } from '@/lib/api'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { chatApi, profileApi, evaluationApi, resourceApi, type StudentProfile } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { escapeHtml, markdownToHtml, extractAnswer } from '@/lib/utils'
+
+// Mermaid 渲染组件（客户端动态加载）
+let mermaid: any = null
+let mermaidReady = false
+
+async function initMermaid() {
+  if (mermaidReady) return
+  try {
+    mermaid = (await import('mermaid')).default
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' })
+    mermaidReady = true
+  } catch {}
+}
+
+function MermaidDiagram({ code, id }: { code: string; id: string }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [svg, setSvg] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    const render = async () => {
+      await initMermaid()
+      if (!mermaid || cancelled || !ref.current) return
+      try {
+        const { svg: result } = await mermaid.render(`mermaid-${id}`, code)
+        if (!cancelled) setSvg(result)
+      } catch {
+        if (!cancelled) setSvg(`<pre style="color:red;font-size:12px">${escapeHtml(code)}</pre>`)
+      }
+    }
+    render()
+    return () => { cancelled = true }
+  }, [code, id])
+
+  return <div ref={ref} dangerouslySetInnerHTML={{ __html: svg }} style={{ overflow: 'auto', margin: '8px 0' }} />
+}
 
 interface ChatMsg {
   role: 'user' | 'assistant'
@@ -41,6 +77,7 @@ export default function DuihuaPage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [profile, setProfile] = useState<StudentProfile | null>(null)
   const [genResources, setGenResources] = useState<GenResource[]>([])
+  const [dbResources, setDbResources] = useState<Array<{ resource_id: string; title: string; knowledge_point: string; resource_type: string; created_at: string }>>([])
 
   const msgsRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<(() => void) | null>(null)
@@ -52,6 +89,7 @@ export default function DuihuaPage() {
     return () => { if (abortRef.current) abortRef.current() }
   }, [])
 
+  // 消息变化时保持在底部（无动画）
   useEffect(() => {
     if (msgsRef.current) {
       msgsRef.current.scrollTop = msgsRef.current.scrollHeight
@@ -76,6 +114,11 @@ export default function DuihuaPage() {
   // 加载画像（右侧知识点）
   useEffect(() => {
     profileApi.getMe().then(setProfile).catch(() => {})
+  }, [studentId])
+
+  // 加载资源列表（右侧已生成资源）
+  useEffect(() => {
+    resourceApi.list(studentId).then(setDbResources).catch(() => {})
   }, [studentId])
 
   // 切换会话时加载历史消息
@@ -108,6 +151,12 @@ export default function DuihuaPage() {
         // rendered 始终 false → 让渲染代码统一走 markdownToHtml
         return { role: m.role as 'user' | 'assistant', content, rendered: false }
       }))
+      // 消息加载完成后，延迟滚动到底部
+      setTimeout(() => {
+        if (msgsRef.current) {
+          msgsRef.current.scrollTop = msgsRef.current.scrollHeight
+        }
+      }, 100)
     } catch {
       // 会话可能没有历史消息
     }
@@ -199,6 +248,9 @@ export default function DuihuaPage() {
               if (resultData.type === 'exercise' || data.exercises) {
                 const list = data.exercises || []
                 html = `<p>📝 为你生成了 <strong>${list.length}</strong> 道题：</p><ul>${list.map((ex: any) => `<li>${markdownToHtml(ex.question || '')}</li>`).join('')}</ul>`
+                if (data.jump_link) {
+                  html += `<p style="margin-top:8px">${markdownToHtml(data.jump_link)}</p>`
+                }
                 setGenResources((prev) => [...prev, { name: `${userMsg} · 练习题`, status: 'done' }])
               } else if (resultData.type === 'tutor' || resultData.type === 'chat' || data.answer) {
                 const { answer: ans, suggestion: sug } = extractAnswer(data)
@@ -206,9 +258,17 @@ export default function DuihuaPage() {
               } else if (resultData.type === 'document' || data.knowledge) {
                 html = `<div>${markdownToHtml(data.knowledge || JSON.stringify(data))}</div>`
                 setGenResources((prev) => [...prev, { name: `${userMsg} · 文档`, status: 'done' }])
+                // 自动保存到资源中心
+                resourceApi.saveFromChat(studentId, `${userMsg} 学习材料`, 'knowledge', { knowledge: data.knowledge || '' }, userMsg)
+                  .then(() => resourceApi.list(studentId).then(setDbResources))
+                  .catch(() => {})
               } else if (resultData.type === 'mindmap') {
                 html = `<div><p>🧠 思维导图已生成：</p><pre style="background:#f5f5f5;padding:8px;border-radius:4px;font-size:12px;overflow-x:auto">${data.mermaid || data.code || ''}</pre></div>`
                 setGenResources((prev) => [...prev, { name: `${userMsg} · 思维导图`, status: 'done' }])
+                // 自动保存到资源中心
+                resourceApi.saveFromChat(studentId, `${userMsg} 思维导图`, 'mindmap', { mermaid_code: data.mermaid || data.code || '' }, userMsg)
+                  .then(() => resourceApi.list(studentId).then(setDbResources))
+                  .catch(() => {})
               } else if (resultData.type === 'path') {
                 html = `<p>📚 路径: ${data.title || ''}</p><p>${data.description || ''}</p><p>共 ${data.nodes?.length || 0} 个知识点</p>`
                 setGenResources((prev) => [...prev, { name: `${userMsg} · 学习路径`, status: 'done' }])
@@ -222,7 +282,11 @@ export default function DuihuaPage() {
               })
             } else if (streamContent) {
               // 流式已完成，把原始 markdown 渲染为 HTML
-              const renderedHtml = markdownToHtml(streamContent)
+              let renderedHtml = markdownToHtml(streamContent)
+              // 追加跳转链接（exercise 意图）
+              if (data.jump_link) {
+                renderedHtml += `<p style="margin-top:12px;padding:10px;background:var(--brand-soft);border-radius:6px;border:1px solid var(--brand)">${markdownToHtml(data.jump_link)}</p>`
+              }
               if (data.suggestion) {
                 const { answer: sugText } = extractAnswer({ answer: data.suggestion })
                 setMessages((prev) => {
@@ -256,10 +320,39 @@ export default function DuihuaPage() {
     }
   }
 
-  // 从画像提取知识点列表（暂不可用，待学科画像实现后启用）
-  const knowledgePoints: string[] = []
+  // 从画像提取知识点列表和薄弱环节
+  const knowledgePoints: string[] = profile?.dimensions
+    ? Object.entries(profile.dimensions)
+        .filter(([, v]) => v && typeof v === 'object' && (v as { score?: number }).score !== undefined)
+        .map(([k]) => k)
+    : []
 
-  const weakTopics: string[] = []
+  const weakTopics: string[] = profile?.dimensions?.weak_topics
+    ? (profile.dimensions.weak_topics as string[])
+    : profile?.dimensions
+      ? Object.entries(profile.dimensions)
+          .filter(([, v]) => v && typeof v === 'object' && (v as { score?: number }).score !== undefined && (v as { score: number }).score < 40)
+          .map(([k]) => k)
+      : []
+
+  // 根据画像薄弱环节动态生成推荐问题
+  const dynamicSuggestions = (() => {
+    const base = [
+      { text: '讲解 A* 搜索算法的原理', tag: '搜索', tagClass: 'tag-info' },
+      { text: 'CNN 卷积神经网络原理', tag: 'CV', tagClass: 'tag-green' },
+      { text: '监督学习 vs 无监督学习', tag: 'ML', tagClass: 'tag-dark' },
+      { text: '出 5 道搜索算法练习题', tag: '练习', tagClass: 'tag-warm' },
+    ]
+    if (weakTopics.length > 0) {
+      const weakSuggestions = weakTopics.slice(0, 2).map((t) => ({
+        text: `讲解${t}的核心概念`,
+        tag: '薄弱',
+        tagClass: 'tag-warm',
+      }))
+      return [...weakSuggestions, ...base.slice(0, 4 - weakSuggestions.length)]
+    }
+    return base
+  })()
 
   return (
     <div className="chat-page" style={{ padding: '16px 20px', height: 'calc(100vh - var(--header-h))' }}>
@@ -324,12 +417,117 @@ export default function DuihuaPage() {
               <p style={{ fontSize: '12px', marginTop: '6px' }}>输入问题，或从右侧推荐问题中选择</p>
             </div>
           )}
-          {messages.map((msg, i) => (
+          {messages.map((msg, i) => {
+            // 检测 mermaid 代码块
+            const mermaidMatch = msg.content?.match(/```mermaid\n([\s\S]*?)```/)
+            const hasMermaid = mermaidMatch && msg.role === 'assistant'
+
+            return (
             <div key={i} className={`msg ${msg.role}`}>
               <div className="av">{msg.role === 'assistant' ? 'AI' : '我'}</div>
-              <div className="bubble" dangerouslySetInnerHTML={{ __html: msg.rendered ? msg.content : markdownToHtml(msg.content) }} />
+              <div className="bubble">
+                {hasMermaid ? (
+                  <>
+                    <div dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content.replace(/```mermaid\n[\s\S]*?```/g, '')) }} />
+                    <MermaidDiagram code={mermaidMatch![1]} id={`msg-${i}`} />
+                  </>
+                ) : (
+                  <div dangerouslySetInnerHTML={{ __html: msg.rendered ? msg.content : markdownToHtml(msg.content) }} />
+                )}
+                {msg.role === 'assistant' && msg.content && (
+                  <div className="msg-actions" style={{ display: 'flex', gap: 2, marginTop: 8 }}
+                  >
+                    <button
+                      onClick={() => {
+                        const text = msg.content.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim()
+                        navigator.clipboard.writeText(text).then(() => {
+                          const btn = document.getElementById(`copy-btn-${i}`)
+                          if (btn) {
+                            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>'
+                            btn.style.color = 'var(--success)'
+                            setTimeout(() => {
+                              btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+                              btn.style.color = ''
+                            }, 1500)
+                          }
+                        })
+                      }}
+                      id={`copy-btn-${i}`}
+                      className="msg-action-btn"
+                      title="复制"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const btn = document.getElementById(`like-btn-${i}`)
+                        const dislikeBtn = document.getElementById(`dislike-btn-${i}`)
+                        const isActive = btn?.classList.toggle('active')
+                        if (isActive) {
+                          btn.style.color = 'var(--brand)'
+                          btn.style.background = 'var(--brand-soft)'
+                          if (dislikeBtn) { dislikeBtn.style.color = ''; dislikeBtn.style.background = ''; dislikeBtn.classList.remove('active') }
+                          evaluationApi.recordAction({ student_id: studentId, action: 'like', resource_type: 'chat', knowledge_point: 'feedback' }).catch(() => {})
+                        } else {
+                          btn.style.color = ''
+                          btn.style.background = ''
+                        }
+                      }}
+                      id={`like-btn-${i}`}
+                      className="msg-action-btn"
+                      title="有帮助"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
+                        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const btn = document.getElementById(`dislike-btn-${i}`)
+                        const likeBtn = document.getElementById(`like-btn-${i}`)
+                        const isActive = btn?.classList.toggle('active')
+                        if (isActive) {
+                          btn.style.color = 'var(--danger)'
+                          btn.style.background = 'var(--danger-soft)'
+                          if (likeBtn) { likeBtn.style.color = ''; likeBtn.style.background = ''; likeBtn.classList.remove('active') }
+                          evaluationApi.recordAction({ student_id: studentId, action: 'dislike', resource_type: 'chat', knowledge_point: 'feedback' }).catch(() => {})
+                        } else {
+                          btn.style.color = ''
+                          btn.style.background = ''
+                        }
+                      }}
+                      id={`dislike-btn-${i}`}
+                      className="msg-action-btn"
+                      title="需要改进"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
+                        <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        const userMsg = messages.slice(0, i).reverse().find(m => m.role === 'user')
+                        if (userMsg) {
+                          setInput(userMsg.content.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' '))
+                        }
+                      }}
+                      className="msg-action-btn"
+                      title="重新生成"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-          ))}
+            )
+          })}
           {streaming && status && (
             <div className="status-bar">
               <div className="spinner" style={{ display: 'inline-block', width: 12, height: 12, marginRight: 6 }}></div>
@@ -366,7 +564,7 @@ export default function DuihuaPage() {
             <span className="tag tag-warm">为你推荐</span>
           </div>
           <div className="sc-bd">
-            {defaultSuggestions.map((s, i) => (
+            {dynamicSuggestions.map((s, i) => (
               <div key={i} className="suggest" onClick={() => setInput(s.text)}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
                   <circle cx="11" cy="11" r="8" />
@@ -414,25 +612,17 @@ export default function DuihuaPage() {
         <div className="side-card" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div className="sc-hd">
             <h3>已生成资源</h3>
-            <span className="tag tag-green">实时</span>
+            <span className="tag tag-green">{dbResources.length} 个</span>
           </div>
           <div className="sc-bd" style={{ flex: 1, overflowY: 'auto' }}>
-            {genResources.length === 0 ? (
+            {dbResources.length === 0 ? (
               <div style={{ fontSize: '12px', color: 'var(--ink-4)' }}>对话中生成的资源将实时显示</div>
             ) : (
-              genResources.map((r, i) => (
-                <div key={i} className="gen-resource">
-                  <div
-                    className="gr-dot"
-                    style={{
-                      background:
-                        r.status === 'done' ? 'var(--success)' : r.status === 'running' ? 'var(--warm)' : undefined,
-                    }}
-                  ></div>
-                  <span>{r.name}</span>
-                  <span className={`gr-status gs-${r.status}`}>
-                    {r.status === 'done' ? '完成' : r.status === 'running' ? '生成中' : '等待'}
-                  </span>
+              dbResources.slice(0, 10).map((r) => (
+                <div key={r.resource_id} className="gen-resource" style={{ cursor: 'pointer' }} onClick={() => window.open('/resources', '_blank')}>
+                  <div className="gr-dot" style={{ background: 'var(--success)' }}></div>
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title || r.knowledge_point}</span>
+                  <span className="gr-status gs-done" style={{ fontSize: 10 }}>{r.resource_type === 'knowledge' ? '文档' : r.resource_type === 'mindmap' ? '导图' : r.resource_type === 'code' ? '代码' : '资源'}</span>
                 </div>
               ))
             )}

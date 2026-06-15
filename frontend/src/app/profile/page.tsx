@@ -22,6 +22,8 @@ const DIMS: { key: string; label: string; icon: typeof Brain; color: string; des
   { key: 'application', label: '应用转化', icon: Wrench, color: '#10B981', desc: '将知识灵活运用到实际问题中的能力' },
   { key: 'imagination', label: '想象力', icon: Sparkles, color: '#F59E0B', desc: '跳出固定思路、探索创新方案的能力' },
   { key: 'focus', label: '专注力', icon: Target, color: '#EF4444', desc: '持续集中注意力、深度投入的能力' },
+  { key: 'knowledge_base', label: '知识基础', icon: BookOpen, color: '#8B5CF6', desc: '先修知识掌握程度、当前学习水平' },
+  { key: 'learning_goal', label: '学习目标', icon: Target, color: '#EC4899', desc: '学习目的——考研/工作/竞赛/兴趣爱好' },
 ]
 
 const DIM_CN: Record<string, string> = {
@@ -30,6 +32,8 @@ const DIM_CN: Record<string, string> = {
   application: '应用转化',
   imagination: '想象力',
   focus: '专注力',
+  knowledge_base: '知识基础',
+  learning_goal: '学习目标',
 }
 
 function dimColor(key: string): string { return DIMS.find(d => d.key === key)?.color || '#78716C' }
@@ -302,7 +306,7 @@ function RadarChart({ scores, size = 340 }: { scores: Record<string, number>; si
   const data = {
     labels,
     datasets: [{
-      data: allZero ? [10, 10, 10, 10, 10] : dataValues,
+      data: allZero ? [10, 10, 10, 10, 10, 10, 10] : dataValues,
       backgroundColor: 'rgba(99,102,241,0.10)',
       borderColor: 'rgba(99,102,241,0.75)',
       borderWidth: 2,
@@ -419,6 +423,180 @@ function AnalysisReport({ scores, confidence }: { scores: Record<string, number>
             以下维度评估置信度较低，建议重新评估：{lowConfDims.map(d => dimLabel(d.key)).join('、')}
           </p>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ═══ LEARNING RECOMMENDATIONS ═══
+
+function LearningRecommendations({ scores, confidence, background }: {
+  scores: Record<string, number>; confidence: Record<string, number>; background: Record<string, unknown>
+}) {
+  // 根据7个维度生成个性化学习建议
+  const recommendations = []
+
+  // 理解力建议
+  if (scores.comprehension < 50) {
+    recommendations.push({
+      dimension: '理解力',
+      color: '#6366F1',
+      icon: Brain,
+      title: '提升理解力',
+      items: [
+        '预习新内容时先看目录和标题，建立整体框架',
+        '遇到难懂的概念，尝试用自己的话复述',
+        '多看不同来源的讲解（视频、文章、图解）',
+      ]
+    })
+  } else if (scores.comprehension >= 70) {
+    recommendations.push({
+      dimension: '理解力',
+      color: '#6366F1',
+      icon: Brain,
+      title: '保持理解力优势',
+      items: [
+        '尝试学习更高级的内容，挑战自己',
+        '帮助同学讲解，教是最好的学',
+        '探索跨学科知识，拓展理解边界',
+      ]
+    })
+  }
+
+  // 记忆力建议
+  if (scores.memory < 50) {
+    recommendations.push({
+      dimension: '记忆力',
+      color: '#06B6D4',
+      icon: BookOpen,
+      title: '提升记忆力',
+      items: [
+        '使用间隔重复法复习（当天→3天→7天→15天）',
+        '学习后立即做笔记或思维导图',
+        '睡前回顾当天学习内容',
+      ]
+    })
+  }
+
+  // 应用转化建议
+  if (scores.application < 50) {
+    recommendations.push({
+      dimension: '应用转化',
+      color: '#10B981',
+      icon: Wrench,
+      title: '提升应用能力',
+      items: [
+        '每学一个知识点，立刻找一个实际例子',
+        '参与项目实践，做中学',
+        '尝试用新知识解决旧问题',
+      ]
+    })
+  }
+
+  // 专注力建议
+  if (scores.focus < 50) {
+    recommendations.push({
+      dimension: '专注力',
+      color: '#EF4444',
+      icon: Target,
+      title: '提升专注力',
+      items: [
+        '使用番茄工作法：25分钟专注 + 5分钟休息',
+        '学习时手机静音或放到另一个房间',
+        '选择固定的学习环境，减少干扰',
+      ]
+    })
+  }
+
+  // 知识基础建议
+  if (scores.knowledge_base < 50) {
+    recommendations.push({
+      dimension: '知识基础',
+      color: '#8B5CF6',
+      icon: BookOpen,
+      title: '补充基础知识',
+      items: [
+        '回顾先修课程的核心概念',
+        '找到知识薄弱点，针对性补习',
+        '建立知识之间的联系，形成体系',
+      ]
+    })
+  }
+
+  // 学习目标建议
+  if (scores.learning_goal < 50) {
+    recommendations.push({
+      dimension: '学习目标',
+      color: '#EC4899',
+      icon: Target,
+      title: '明确学习目标',
+      items: [
+        '思考学习这门课程的长期价值',
+        '设定具体、可衡量的学习目标',
+        '将大目标拆解为每周小目标',
+      ]
+    })
+  }
+
+  // 如果没有需要提升的维度
+  if (recommendations.length === 0) {
+    recommendations.push({
+      dimension: '综合',
+      color: '#10B981',
+      icon: TrendingUp,
+      title: '保持优秀状态',
+      items: [
+        '你的各项能力都很均衡，继续保持',
+        '可以尝试更高级的内容挑战自己',
+        '帮助他人学习，巩固自己的知识',
+      ]
+    })
+  }
+
+  return (
+    <div style={{
+      background: '#fff', borderRadius: 16, border: '1px solid #E7E5E4',
+      padding: '24px', marginBottom: 20,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+        <TrendingUp size={18} color="#10B981" />
+        <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1C1917', margin: 0 }}>
+          个性化学习建议
+        </h3>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+        {recommendations.map((rec, idx) => {
+          const Icon = rec.icon
+          return (
+            <div key={idx} style={{
+              padding: 16, borderRadius: 12,
+              border: `1px solid ${rec.color}20`,
+              background: `${rec.color}08`,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 8,
+                  background: `${rec.color}20`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Icon size={14} color={rec.color} />
+                </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: rec.color }}>
+                  {rec.title}
+                </div>
+              </div>
+              <ul style={{
+                margin: 0, paddingLeft: 16, fontSize: 12, color: '#57534E',
+                lineHeight: 1.8,
+              }}>
+                {rec.items.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -589,7 +767,15 @@ function AssessmentModal({
                 setTimeout(() => onComplete(finalScores), 800)
               }
             } else if (event.type === 'error') {
-              setMessages(prev => [...prev, { role: 'assistant', content: '出错了：' + (event.message || '请重试') }])
+              // 处理会话不存在的情况
+              const errorMsg = event.message || '请重试'
+              if (errorMsg.includes('Session not found') || errorMsg.includes('会话不存在')) {
+                setMessages(prev => [...prev, { role: 'assistant', content: '评估会话已过期，请点击"重新评估"开始新的评估。' }])
+                // 清除本地存储的 session_id
+                localStorage.removeItem('assessment_session_id')
+              } else {
+                setMessages(prev => [...prev, { role: 'assistant', content: '出错了：' + errorMsg }])
+              }
             } else if (event.type === 'done') {
               break
             }
@@ -645,7 +831,7 @@ function AssessmentModal({
             <div style={{ fontSize: 16, fontWeight: 600, color: '#1C1917' }}>个人能力评估</div>
             <div style={{ fontSize: 12, color: '#A8A29E', marginTop: 2 }}>
               {started && round > 0
-                ? `第 ${round}/${maxRounds} 轮 · 已了解 ${assessedDims.length}/5 个维度`
+                ? `第 ${round}/${maxRounds} 轮 · 已了解 ${assessedDims.length}/7 个维度`
                 : 'AI 对话式评估 · 约 5-10 分钟'
               }
             </div>
@@ -718,7 +904,7 @@ function AssessmentModal({
                   ))}
                 </div>
                 <div style={{ fontSize: 11, color: '#A8A29E' }}>
-                  {assessedDims.length}/5 维度已收集
+                  {assessedDims.length}/7 维度已收集
                 </div>
               </div>
             )}
@@ -797,11 +983,12 @@ function AssessmentModal({
 
 export default function ProfilePage() {
   const [scores, setScores] = useState<Record<string, number>>({
-    comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0,
+    comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0, knowledge_base: 0, learning_goal: 0,
   })
   const [confidence, setConfidence] = useState<Record<string, number>>({
-    comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0,
+    comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0, knowledge_base: 0, learning_goal: 0,
   })
+  const [background, setBackground] = useState<Record<string, string>>({})
   const [status, setStatus] = useState<string>('pending')
   const [loading, setLoading] = useState(true)
   const [showAssess, setShowAssess] = useState(false)
@@ -832,6 +1019,9 @@ export default function ProfilePage() {
       }
       if (data.confidence) {
         setConfidence(prev => ({ ...prev, ...data.confidence }))
+      }
+      if (data.background) {
+        setBackground(data.background as Record<string, string>)
       }
       setStatus(data.assessment_status || 'pending')
     } catch (e) {
@@ -874,8 +1064,8 @@ export default function ProfilePage() {
     setResetting(true)
     try {
       await profileApi.reset()
-      setScores({ comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0 })
-      setConfidence({ comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0 })
+      setScores({ comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0, knowledge_base: 0, learning_goal: 0 })
+      setConfidence({ comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0, knowledge_base: 0, learning_goal: 0 })
       setStatus('pending')
       setAssessmentStatus(null)
       setShowAssess(true)
@@ -916,7 +1106,7 @@ export default function ProfilePage() {
         <AssessmentModal
           onComplete={handleComplete}
           onClose={handleClose}
-          resumeSessionId={canResume ? undefined : undefined}
+          resumeSessionId={canResume ? assessmentStatus?.session_id ?? undefined : undefined}
           existingDims={canResume ? assessmentStatus?.dimensions : undefined}
         />
       )}
@@ -1096,6 +1286,46 @@ export default function ProfilePage() {
         {/* ══ ANALYSIS REPORT ══ */}
         {hasScores && (
           <AnalysisReport scores={scores} confidence={confidence} />
+        )}
+
+        {/* ══ BACKGROUND INFO ══ */}
+        {hasScores && background && Object.keys(background).length > 0 && (
+          <div style={{
+            background: '#fff', borderRadius: 16, border: '1px solid #E7E5E4',
+            padding: '24px', marginBottom: 20,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <Info size={18} color="#6366F1" />
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1C1917', margin: 0 }}>
+                学习背景
+              </h3>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              {background.major && (
+                <div style={{ padding: 12, background: '#F5F5F4', borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, color: '#A8A29E', marginBottom: 4 }}>专业</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: '#1C1917' }}>{String(background.major)}</div>
+                </div>
+              )}
+              {background.grade && (
+                <div style={{ padding: 12, background: '#F5F5F4', borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, color: '#A8A29E', marginBottom: 4 }}>年级</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: '#1C1917' }}>{String(background.grade)}</div>
+                </div>
+              )}
+              {background.goal && (
+                <div style={{ padding: 12, background: '#F5F5F4', borderRadius: 10 }}>
+                  <div style={{ fontSize: 11, color: '#A8A29E', marginBottom: 4 }}>学习目标</div>
+                  <div style={{ fontSize: 14, fontWeight: 500, color: '#1C1917' }}>{String(background.goal)}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══ PERSONALIZED LEARNING RECOMMENDATIONS ══ */}
+        {hasScores && (
+          <LearningRecommendations scores={scores} confidence={confidence} background={background} />
         )}
 
         {/* ══ KEYFRAMES (added via style tag for modal animation) ══ */}

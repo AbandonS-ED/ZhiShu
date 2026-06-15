@@ -7,6 +7,9 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.services.minimax_client import init_minimax_client
 from app.services.spark_client import spark_client
+import logging
+
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,7 +27,7 @@ async def lifespan(app: FastAPI):
     try:
         await init_db()
     except Exception as e:
-        print(f"WARNING: 数据库初始化失败 {e}，使用内存模式运行")
+        logger.warning("数据库初始化失败 %s，使用内存模式运行", e)
     yield
     
     # 关闭客户端

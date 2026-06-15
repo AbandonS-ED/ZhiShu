@@ -116,7 +116,26 @@ type 可选值：choice（选择题）, judge（判断题）, short_answer（简
         parts = [f"请为「{knowledge_point}」生成 {count} 道练习题。"]
 
         if student_profile:
-            pass
+            # 根据学生画像调整题目难度
+            dims = student_profile.get("dimensions", {})
+
+            # 知识基础影响难度
+            knowledge_base = dims.get("knowledge_base", {})
+            kb_score = knowledge_base.get("score", 50)
+            if kb_score < 50:
+                parts.append("\n学生基础较弱，请生成基础题，难度偏低，注重概念理解。")
+            elif kb_score >= 70:
+                parts.append("\n学生基础较好，可以生成一些有挑战性的题目。")
+
+            # 应用转化能力影响题型
+            application = dims.get("application", {})
+            if application.get("score", 50) >= 70:
+                parts.append("\n学生应用能力强，可以多出一些实践应用题。")
+
+            # 理解力影响题目表述
+            comprehension = dims.get("comprehension", {})
+            if comprehension.get("score", 50) < 50:
+                parts.append("\n学生理解力一般，题目表述要清晰直白，避免歧义。")
 
         type_map = {
             "all": "混合题型 (选择+判断+简答+编程)",

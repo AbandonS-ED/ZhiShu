@@ -125,10 +125,10 @@ class TestMasterAgentGraph:
         assert "mindmap_agent" in agent_names
         assert "exercise_agent" in agent_names
 
-    def test_full_course_has_five_tasks(self):
+    def test_full_course_has_four_tasks(self):
         from app.agents.master_agent import TASK_TEMPLATES
         tasks = TASK_TEMPLATES["full_course"]
-        assert len(tasks) == 5
+        assert len(tasks) == 4
 
 
 class TestSubAgentAdapters:

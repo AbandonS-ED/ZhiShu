@@ -2,6 +2,9 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy import text
 from app.core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -15,16 +18,16 @@ async def init_db():
         async with engine.begin() as conn:
             await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     except Exception:
-        print("WARNING: pgvector 扩展未安装，向量检索功能不可用")
+        logger.warning("pgvector 扩展未安装，向量检索功能不可用")
 
     # 建表（数据库不可用时优雅降级）
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
     except OSError as e:
-        print(f"WARNING: 数据库连接失败 ({e})，使用内存模式运行（部分功能不可用）")
+        logger.warning("数据库连接失败 (%s)，使用内存模式运行（部分功能不可用）", e)
     except Exception as e:
-        print(f"WARNING: 建表失败 {e}，使用内存模式运行")
+        logger.warning("建表失败 %s，使用内存模式运行", e)
 
     # 迁移：为旧表添加新列（表已存在时 create_all 不会修改现有表）
     try:
@@ -39,7 +42,7 @@ async def init_db():
             await conn.execute(text("DROP TABLE IF EXISTS profile_guided_answers CASCADE"))
             await conn.execute(text("DROP TABLE IF EXISTS profile_guided_sessions CASCADE"))
             await conn.execute(text("DROP TABLE IF EXISTS subject_profiles CASCADE"))
-            print("INFO: 数据库迁移完成")
+            logger.info("数据库迁移完成")
     except Exception:
         pass  # 表可能不存在，忽略
 

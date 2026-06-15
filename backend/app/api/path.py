@@ -2,6 +2,7 @@
 
 import json
 import uuid
+import logging
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
@@ -17,6 +18,7 @@ from app.agents.path_agent import path_agent
 from app.services import minimax_client as mc_module
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class PathGenerateRequest(BaseModel):
@@ -138,7 +140,7 @@ async def generate_path_stream(req: PathGenerateRequest, db: AsyncSession = Depe
                 import traceback
                 yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
                 yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
-                print(f"[path/stream] 异常: {traceback.format_exc()}")
+                logger.exception("[path/stream] 异常")
 
     return StreamingResponse(
         event_generator(),

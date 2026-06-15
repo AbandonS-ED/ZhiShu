@@ -3,166 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { resourceApi, evaluationApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
-
-// ═══ DATA ═══
-const resources: Resource[] = [
-  {
-    id: 1, type: 'explanation', title: 'A* 搜索算法详解',
-    kp: '搜索算法', desc: '从 Dijkstra 到 A* 的演进，启发函数的设计原则，可采纳性与一致性证明，附带完整 Python 实现与复杂度分析。',
-    diff: '中级', verified: true, time: '2 小时前', fav: true,
-    content: `<h4>算法概述</h4><p>A*（A-Star）算法是一种在图中寻找从起始节点到目标节点最短路径的启发式搜索算法。它结合了 Dijkstra 算法的最优性保证和贪心最佳优先搜索的效率。</p><h4>核心公式</h4><p>A* 使用评估函数 <code>f(n) = g(n) + h(n)</code> 来决定节点的探索优先级：</p><ul><li><strong>g(n)</strong>：从起点到节点 n 的实际代价</li><li><strong>h(n)</strong>：从节点 n 到目标的启发式估计</li><li><strong>f(n)</strong>：节点 n 的综合评估值</li></ul><h4>与 Dijkstra 的关系</h4><p>Dijkstra 算法可以看作 A* 的特例，即 <code>h(n) = 0</code> 时的 A*。此时算法退化为均匀扩展的盲目搜索。通过引入启发函数，A* 能够优先探索更可能通向目标的路径，大幅减少搜索节点数。</p><h4>可采纳性条件</h4><p>当启发函数 h(n) 满足<strong>可采纳性</strong>（admissibility），即对所有节点 n，h(n) 不超过从 n 到目标的实际最短距离时，A* 保证找到最优解。</p><div class="md-cite">引用 — <em>[1]</em> 人工智能导论 · 教材 第3章 P.87-92 <em>[2]</em> Russell & Norvig, AIMA, Chapter 3 <em>[3]</em> 课件 第3讲 启发式搜索</div>`,
-  },
-  {
-    id: 2, type: 'mindmap', title: 'Transformer 架构全景图',
-    kp: 'NLP · 深度学习', desc: '完整的 Transformer 知识图谱，涵盖编码器/解码器结构、自注意力机制、多头注意力、位置编码等核心概念。',
-    diff: '中级', verified: true, time: '3 小时前', fav: false,
-    mindmap: `Transformer
-├── 输入处理
-│   ├── Token Embedding
-│   ├── Positional Encoding (正弦/余弦)
-│   └── Input Embedding + PE
-├── 编码器 (Encoder) ×N
-│   ├── Multi-Head Self-Attention
-│   │   ├── Q = X·Wq
-│   │   ├── K = X·Wk
-│   │   ├── V = X·Wv
-│   │   └── Attention = softmax(QK^T/√dk)·V
-│   ├── Add & Layer Norm
-│   ├── Feed-Forward Network
-│   │   ├── Linear(512 → 2048)
-│   │   ├── ReLU
-│   │   └── Linear(2048 → 512)
-│   └── Add & Layer Norm
-├── 解码器 (Decoder) ×N
-│   ├── Masked Multi-Head Attention
-│   ├── Cross-Attention (Encoder-Decoder)
-│   ├── FFN + Layer Norm
-│   └── Linear + Softmax → 输出概率
-└── 后续发展
-    ├── BERT (Encoder-only)
-    ├── GPT (Decoder-only)
-    └── T5 (Encoder-Decoder)`,
-  },
-  {
-    id: 3, type: 'exercise', title: '机器学习基础练习题',
-    kp: '机器学习', desc: '涵盖监督学习、无监督学习、模型评估、特征工程等核心概念的综合练习，适合期中复习使用。',
-    diff: '初级', verified: true, time: '昨天', fav: true,
-    count: 8, exTypes: ['选择', '判断', '简答'],
-    exercises: [
-      { q: '以下哪种算法属于无监督学习？', opts: ['线性回归', 'K-Means 聚类', '支持向量机', '决策树'], ans: 1, expl: 'K-Means 是典型的无监督聚类算法，不需要标签数据。线性回归、SVM、决策树都需要标注数据进行训练。' },
-      { q: '过拟合（Overfitting）的典型表现是什么？', opts: ['训练集和测试集表现都差', '训练集表现好但测试集表现差', '测试集表现好但训练集表现差', '训练集和测试集表现都好'], ans: 1, expl: '过拟合指模型过度学习了训练数据的噪声和细节，导致在新数据（测试集）上泛化能力下降。' },
-      { q: '简述梯度下降法的基本原理及其常见变体。', opts: [], ans: -1, expl: '梯度下降法通过沿损失函数梯度的反方向迭代更新参数来最小化损失。常见变体包括：批量梯度下降（BGD）、随机梯度下降（SGD）、小批量梯度下降（Mini-batch GD），以及带动量的 SGD、Adam、RMSProp 等自适应学习率方法。' },
-    ],
-  },
-  {
-    id: 4, type: 'code', title: 'CNN 图像分类实战代码',
-    kp: '深度学习 · CV', desc: '使用 PyTorch 实现完整的 CNN 图像分类流程，包含数据加载、模型定义、训练循环、评估与可视化。',
-    diff: '中级', verified: true, time: '昨天', fav: false,
-    code: `import torch
-import torch.nn as nn
-import torchvision
-from torchvision import transforms
-
-# 数据预处理
-transform = transforms.Compose([
-    transforms.Resize((32, 32)),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5,), (0.5,))
-])
-
-# 定义 CNN 模型
-class SimpleCNN(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(3, 32, 3, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, 3, padding=1)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(64 * 8 * 8, 256)
-        self.fc2 = nn.Linear(256, 10)
-
-    def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 64 * 8 * 8)
-        x = F.relu(self.fc1(x))
-        return self.fc2(x)`,
-  },
-  {
-    id: 5, type: 'audio', title: '强化学习概念速听',
-    kp: '强化学习', desc: '15 分钟音频讲解强化学习核心概念：马尔可夫决策过程、策略梯度、Q-Learning、Deep Q-Network。',
-    diff: '初级', verified: false, time: '2 天前', fav: false,
-    duration: '15:42',
-  },
-  {
-    id: 6, type: 'explanation', title: '反向传播算法数学推导',
-    kp: '深度学习', desc: '从链式法则出发，逐步推导前馈神经网络的反向传播过程，包含矩阵形式和逐元素形式两种推导路径。',
-    diff: '高级', verified: true, time: '2 天前', fav: false,
-    content: `<h4>链式法则回顾</h4><p>反向传播的数学基础是微积分的<strong>链式法则</strong>。对于复合函数 <code>f(g(x))</code>，其导数为 <code>f'(g(x)) · g'(x)</code>。</p><h4>前向传播</h4><p>对于第 l 层：<code>z^l = W^l · a^{l-1} + b^l</code>，<code>a^l = σ(z^l)</code>。逐层计算直到输出层得到预测值。</p><h4>反向传播</h4><p>定义损失函数对最后一层的误差 δ^L = ∂C/∂z^L，然后逐层反向传播：δ^l = ((W^{l+1})^T · δ^{l+1}) ⊙ σ'(z^l)。最终得到 ∂C/∂W^l = δ^l · (a^{l-1})^T。</p><div class="md-cite">引用 — <em>[1]</em> 教材 第7章 深度学习 P.215-228 <em>[2]</em> 课件 第7讲 反向传播</div>`,
-  },
-  {
-    id: 7, type: 'mindmap', title: '知识表示方法总览',
-    kp: '知识工程', desc: '系统梳理知识表示的各类方法：谓词逻辑、语义网络、框架、产生式规则、本体论等。',
-    diff: '初级', verified: true, time: '3 天前', fav: true,
-    mindmap: `知识表示
-├── 逻辑表示
-│   ├── 命题逻辑
-│   ├── 一阶谓词逻辑
-│   └── 描述逻辑
-├── 结构化表示
-│   ├── 语义网络
-│   │   ├── 节点 = 概念/实例
-│   │   └── 边 = 关系
-│   ├── 框架 (Frame)
-│   │   ├── 槽 (Slot)
-│   │   └── 侧面 (Facet)
-│   └── 脚本 (Script)
-├── 规则表示
-│   ├── 产生式规则
-│   └── IF-THEN 结构
-└── 现代方法
-    ├── 知识图谱
-    ├── 向量表示 (Embedding)
-    └── 本体论 (Ontology)`,
-  },
-  {
-    id: 8, type: 'exercise', title: '搜索算法专项练习',
-    kp: '搜索算法', desc: '针对 BFS、DFS、A*、贪心搜索等搜索算法的专项练习，包含手动模拟搜索过程的题目。',
-    diff: '中级', verified: true, time: '3 天前', fav: false,
-    count: 5, exTypes: ['选择', '手动模拟'],
-    exercises: [
-      { q: 'A* 算法中，当启发函数 h(n)=0 时，算法等价于：', opts: ['贪心最佳优先搜索', 'Dijkstra 算法', 'BFS', 'DFS'], ans: 1, expl: 'h(n)=0 时 f(n)=g(n)，算法退化为按实际代价排序的 Dijkstra 算法。' },
-    ],
-  },
-  {
-    id: 9, type: 'code', title: '决策树分类 Python 实现',
-    kp: '机器学习', desc: '从零实现 ID3 决策树算法，包含信息增益计算、递归建树、预测与可视化。使用 sklearn 进行对比验证。',
-    diff: '中级', verified: true, time: '4 天前', fav: false,
-    code: `import numpy as np
-from collections import Counter
-
-def entropy(y):
-    """计算信息熵"""
-    counts = np.bincount(y)
-    probs = counts / len(y)
-    return -np.sum(p * np.log2(p) for p in probs if p > 0)
-
-def information_gain(X, y, feature_idx):
-    """计算信息增益"""
-    parent_entropy = entropy(y)
-    values = np.unique(X[:, feature_idx])
-    child_entropy = 0
-    for val in values:
-        mask = X[:, feature_idx] == val
-        child_entropy += (mask.sum()/len(y)) * entropy(y[mask])
-    return parent_entropy - child_entropy`,
-  },
-  {
-    id: 10, type: 'explanation', title: 'RNN 与 LSTM 原理对比',
-    kp: '深度学习', desc: '深入分析 RNN 的梯度消失问题，以及 LSTM 如何通过门控机制解决这一问题，包含 GRU 的对比分析。',
-    diff: '中级', verified: true, time: '4 天前', fav: false,
-    content: `<h4>RNN 基础</h4><p>循环神经网络通过隐状态 h_t = σ(W_hh · h_{t-1} + W_xh · x_t) 实现序列信息的传递。然而标准 RNN 存在严重的<strong>梯度消失</strong>问题。</p><h4>LSTM 解决方案</h4><p>LSTM 引入三个门控机制：<strong>遗忘门</strong>（决定丢弃什么信息）、<strong>输入门</strong>（决定存储什么新信息）、<strong>输出门</strong>（决定输出什么信息），以及一个<strong>细胞状态</strong>（长期记忆通道）。</p><div class="md-cite">引用 — <em>[1]</em> 教材 第7章 P.198-214 <em>[2]</em> Hochreiter & Schmidhuber (1997)</div>`,
-  },
-]
+import { showToast } from '@/lib/utils'
 
 // ═══ TYPES ═══
 type ResourceType = 'explanation' | 'mindmap' | 'exercise' | 'code' | 'audio'
@@ -176,9 +17,8 @@ interface Exercise {
 }
 
 interface Resource {
-  id: number
+  id: string
   type: ResourceType
-  isApi?: boolean
   title: string
   kp: string
   desc: string
@@ -193,6 +33,7 @@ interface Resource {
   count?: number
   exTypes?: string[]
   exercises?: Exercise[]
+  rawData?: Record<string, unknown>
 }
 
 // ═══ ICONS ═══
@@ -207,9 +48,126 @@ const typeLabels: Record<ResourceType, string> = {
   explanation: '知识点讲解', mindmap: '思维导图', exercise: '练习题', code: '代码示例', audio: '音频',
 }
 
-// ═══ HELPER ═══
+// ═══ HELPERS ═══
 function esc(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function inferTypeFromContent(content: Record<string, unknown> | null, resourceType: string): ResourceType {
+  if (!content) return 'explanation'
+
+  // 根据后端 resource_type 字段判断
+  if (resourceType === 'mindmap' || content.mermaid_code || content.mermaid) return 'mindmap'
+  if (resourceType === 'exercise' || content.exercises) return 'exercise'
+  if (resourceType === 'code' || content.code) return 'code'
+  if (resourceType === 'audio' || content.audio_script) return 'audio'
+
+  // 根据内容字段推断
+  if (content.knowledge && !content.code) return 'explanation'
+  if (content.code) return 'code'
+
+  return 'explanation'
+}
+
+function extractContentFromApi(resource: {
+  resource_id: string
+  title: string
+  resource_type: string
+  knowledge_point: string
+  content: Record<string, unknown>
+  difficulty: number
+  is_favorited: boolean
+  created_at: string
+}): Resource {
+  const content = resource.content || {}
+  const type = inferTypeFromContent(content, resource.resource_type)
+
+  // 提取描述
+  let desc = ''
+  if (content.knowledge) {
+    desc = String(content.knowledge).slice(0, 150) + (String(content.knowledge).length > 150 ? '...' : '')
+  } else if (content.mermaid_code || content.mermaid) {
+    desc = `思维导图：${resource.knowledge_point}`
+  } else if (content.exercises) {
+    const exs = content.exercises as Exercise[]
+    desc = `${exs.length} 道练习题`
+  } else if (content.code) {
+    desc = String(content.code).slice(0, 100) + '...'
+  } else if (content.audio_script) {
+    desc = String(content.audio_script).slice(0, 100) + '...'
+  } else {
+    desc = resource.title
+  }
+
+  // 构建 Resource 对象
+  const result: Resource = {
+    id: resource.resource_id,
+    type,
+    title: resource.title || resource.knowledge_point,
+    kp: resource.knowledge_point,
+    desc,
+    diff: getDifficultyLabel(resource.difficulty),
+    verified: true,
+    time: resource.created_at ? new Date(resource.created_at).toLocaleDateString('zh-CN') : '刚刚',
+    fav: resource.is_favorited,
+    rawData: content,
+  }
+
+  // 根据类型填充特定字段
+  if (type === 'explanation') {
+    // 将 knowledge 转为 HTML（简单处理）
+    const knowledge = String(content.knowledge || '')
+    result.content = knowledge.replace(/\n/g, '<br>')
+  } else if (type === 'mindmap') {
+    result.mindmap = String(content.mermaid_code || content.mermaid || '')
+  } else if (type === 'exercise') {
+    const exercises = content.exercises as Array<Record<string, unknown>> || []
+    result.exercises = exercises.map((ex) => ({
+      q: String(ex.question || ''),
+      opts: (ex.options as string[]) || [],
+      ans: getAnswerIndex(ex),
+      expl: String(ex.explanation || ''),
+    }))
+    result.count = exercises.length
+    result.exTypes = [...new Set(exercises.map((ex) => getExerciseTypeLabel(String(ex.type || ''))))]
+  } else if (type === 'code') {
+    result.code = String(content.code || '')
+  } else if (type === 'audio') {
+    result.content = String(content.audio_script || '')
+    result.duration = content.duration_minutes ? `${content.duration_minutes} 分钟` : '未知时长'
+  }
+
+  return result
+}
+
+function getDifficultyLabel(difficulty: number): string {
+  if (difficulty < 40) return '初级'
+  if (difficulty < 70) return '中级'
+  return '高级'
+}
+
+function getExerciseTypeLabel(type: string): string {
+  const map: Record<string, string> = {
+    choice: '选择',
+    judge: '判断',
+    short_answer: '简答',
+    coding: '编程',
+  }
+  return map[type] || type
+}
+
+function getAnswerIndex(ex: Record<string, unknown>): number {
+  const answer = String(ex.answer || '')
+  // 如果是 A/B/C/D 格式
+  if (/^[A-D]$/.test(answer)) {
+    return answer.charCodeAt(0) - 65
+  }
+  // 如果是数字
+  const idx = parseInt(answer)
+  if (!isNaN(idx) && idx >= 0 && idx <= 3) {
+    return idx
+  }
+  return -1
 }
 
 // ═══ MAIN PAGE ═══
@@ -217,89 +175,138 @@ export default function ResourcesPage() {
   const [filter, setFilter] = useState<FilterType>('all')
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [search, setSearch] = useState('')
-  const [favorites, setFavorites] = useState<Set<number>>(new Set(resources.filter((r) => r.fav).map((r) => r.id)))
   const [selectedRes, setSelectedRes] = useState<Resource | null>(null)
   const [revealedAns, setRevealedAns] = useState<Set<string>>(new Set())
   const [audioBars, setAudioBars] = useState<number[]>([])
   const [detailAudioBars, setDetailAudioBars] = useState<number[]>([])
+  const [generating, setGenerating] = useState(false)
+  const [genResult, setGenResult] = useState<string>('')
+  const [genInput, setGenInput] = useState('')
+  const [apiResources, setApiResources] = useState<Resource[]>([])
+  const [loading, setLoading] = useState(true)
+
   useEffect(() => {
     setAudioBars(Array.from({ length: 24 }, () => Math.random() * 16 + 4))
     setDetailAudioBars(Array.from({ length: 40 }, () => Math.random() * 20 + 4))
   }, [])
-  const [generating, setGenerating] = useState(false)
-  const [genResult, setGenResult] = useState<string>('')
-  const [genInput, setGenInput] = useState('')
-  const [apiResources, setApiResources] = useState<Array<{ resource_id: string; title: string; knowledge_point: string; created_at: string }>>([])
+
+  // 加载资源列表
+  const loadResources = useCallback(async () => {
+    try {
+      setLoading(true)
+      const data = await resourceApi.list(getStudentId())
+      const resources = data.map(extractContentFromApi)
+      setApiResources(resources)
+    } catch {
+      // 静默失败
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    resourceApi.list(getStudentId()).then(setApiResources).catch(() => {})
-  }, [])
+    loadResources()
+  }, [loadResources])
 
-  const generate = () => {
+  // 生成资源（支持单个或批量）
+  const generate = async () => {
     if (!genInput.trim() || generating) return
     setGenerating(true)
-    setGenResult('正在生成中...')
+    setGenResult('正在分析知识点...')
 
-    let streamContent = ''
-    resourceApi.generateStream(
-      getStudentId(),
-      genInput.trim(),
-      (e) => {
-        if (e.type === 'progress' && e.message) {
-          setGenResult(e.message)
+    // 检查是否是批量生成（用逗号分隔）
+    const knowledgePoints = genInput.split(/[,，、]/).map(s => s.trim()).filter(s => s.length > 0)
+
+    if (knowledgePoints.length > 1) {
+      // 批量生成
+      try {
+        setGenResult(`正在批量生成 ${knowledgePoints.length} 个知识点的资源...`)
+        const result = await resourceApi.batchGenerate(getStudentId(), knowledgePoints)
+
+        const successCount = result.success
+        const failCount = result.total - successCount
+
+        let resultMsg = `✅ 批量生成完成\n\n`
+        resultMsg += `成功：${successCount} 个\n`
+        if (failCount > 0) {
+          resultMsg += `失败：${failCount} 个\n`
         }
-        if (e.type === 'token' && e.content) {
-          streamContent += e.content
-          setGenResult(streamContent.slice(0, 500) + (streamContent.length > 500 ? '...' : ''))
-        }
-        if (e.type === 'result' && e.data) {
-          const data = e.data
-          const content = data.content || {}
-          const knowledge = content.knowledge || ''
-          setGenResult(`✅ 已生成「${data.knowledge_point || genInput.trim()}」资源\n\n${knowledge.slice(0, 500)}${knowledge.length > 500 ? '...' : ''}`)
-          setApiResources((prev) => [{ resource_id: data.resource_id, title: data.knowledge_point || genInput.trim(), knowledge_point: data.knowledge_point || genInput.trim(), created_at: new Date().toISOString() }, ...prev])
-          evaluationApi.recordAction({
-            student_id: getStudentId(),
-            action: 'generate',
-            resource_type: 'resource',
-            resource_id: data.resource_id,
-            knowledge_point: data.knowledge_point || genInput.trim(),
-          }).catch(() => {})
-        }
-        if (e.type === 'error') {
-          setGenResult(`❌ ${e.message || '调用失败'}`)
-        }
-        if (e.type === 'done' || e.type === 'error') {
-          setGenerating(false)
-        }
+        resultMsg += `\n知识点：${knowledgePoints.join('、')}`
+
+        setGenResult(resultMsg)
+        loadResources()
+      } catch (err) {
+        setGenResult(`❌ 批量生成失败: ${err instanceof Error ? err.message : '未知错误'}`)
+      } finally {
+        setGenerating(false)
       }
-    )
+    } else {
+      // 单个生成（流式）
+      let streamContent = ''
+      resourceApi.generateStream(
+        getStudentId(),
+        genInput.trim(),
+        (e) => {
+          if (e.type === 'progress' && e.message) {
+            setGenResult(e.message)
+          }
+          if (e.type === 'token' && e.content) {
+            streamContent += e.content
+            setGenResult(streamContent.slice(0, 500) + (streamContent.length > 500 ? '...' : ''))
+          }
+          if (e.type === 'result' && e.data) {
+            const data = e.data as Record<string, unknown>
+            const content = data.content as Record<string, unknown> || {}
+            const knowledge = String(content.knowledge || '')
+            setGenResult(`✅ 已生成「${data.knowledge_point || genInput.trim()}」资源\n\n${knowledge.slice(0, 500)}${knowledge.length > 500 ? '...' : ''}`)
+            // 刷新资源列表
+            loadResources()
+            evaluationApi.recordAction({
+              student_id: getStudentId(),
+              action: 'generate',
+              resource_type: 'resource',
+              resource_id: String(data.resource_id || ''),
+              knowledge_point: String(data.knowledge_point || genInput.trim()),
+            }).catch(() => {})
+          }
+          if (e.type === 'error') {
+            setGenResult(`❌ ${e.message || '调用失败'}`)
+          }
+          if (e.type === 'done' || e.type === 'error') {
+            setGenerating(false)
+          }
+        }
+      )
+    }
   }
 
-  const toggleFav = useCallback((id: number) => {
-    setFavorites((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }, [])
+  // 切换收藏
+  const toggleFav = useCallback(async (id: string) => {
+    // 乐观更新
+    setApiResources((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, fav: !r.fav } : r))
+    )
+    if (selectedRes && selectedRes.id === id) {
+      setSelectedRes((prev) => (prev ? { ...prev, fav: !prev.fav } : null))
+    }
 
-  const apiResourceCards: Resource[] = apiResources.map((r, i) => ({
-    id: 1000 + i,
-    type: 'explanation' as ResourceType,
-    isApi: true,
-    title: r.title || r.knowledge_point,
-    kp: r.knowledge_point,
-    desc: r.title || r.knowledge_point,
-    diff: '中级',
-    verified: true,
-    time: r.created_at ? new Date(r.created_at).toLocaleDateString('zh-CN') : '刚刚',
-    fav: false,
-  }))
+    try {
+      await resourceApi.favorite(id)
+    } catch {
+      // 失败时回滚
+      setApiResources((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, fav: !r.fav } : r))
+      )
+      if (selectedRes && selectedRes.id === id) {
+        setSelectedRes((prev) => (prev ? { ...prev, fav: !prev.fav } : null))
+      }
+      showToast('收藏失败，请重试')
+    }
+  }, [selectedRes])
 
-  const filtered: Resource[] = [...resources, ...apiResourceCards].filter((r) => {
-    if (filter === 'favorites') return favorites.has(r.id)
+  // 筛选资源
+  const filtered: Resource[] = apiResources.filter((r) => {
+    if (filter === 'favorites') return r.fav
     if (filter !== 'all') return r.type === (filter as ResourceType)
     return true
   }).filter((r) => {
@@ -308,6 +315,7 @@ export default function ResourcesPage() {
     return r.title.toLowerCase().includes(q) || r.kp.toLowerCase().includes(q) || r.desc.toLowerCase().includes(q)
   })
 
+  const favoritesCount = apiResources.filter((r) => r.fav).length
   const getDiffClass = (diff: string) => diff === '初级' ? 'easy' : diff === '中级' ? 'med' : 'hard'
 
   return (
@@ -367,7 +375,7 @@ export default function ResourcesPage() {
           value={genInput}
           onChange={e => setGenInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && generate()}
-          placeholder="输入知识点（如：线性回归、Transformer）"
+          placeholder="输入知识点，多个用逗号分隔（如：线性回归、神经网络、决策树）"
           disabled={generating}
           style={{ flex: 1, padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--surface)' }}
         />
@@ -385,12 +393,16 @@ export default function ResourcesPage() {
       <div className="stats-bar">
         共 <span className="sb-count">{filtered.length}</span> 项资源
         <span className="sb-sep">·</span>
-        已收藏 <span className="sb-count">{favorites.size}</span> 项
+        已收藏 <span className="sb-count">{favoritesCount}</span> 项
       </div>
 
       {/* Grid */}
       <div className={`res-grid${view === 'list' ? ' list-view' : ''}`}>
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 0', color: 'var(--ink-3)' }}>
+            <div style={{ fontSize: '14px', fontWeight: 500 }}>加载中...</div>
+          </div>
+        ) : filtered.length === 0 ? (
           <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 0', color: 'var(--ink-3)' }}>
             <div style={{ fontSize: '36px', marginBottom: '12px' }}>📭</div>
             <div style={{ fontSize: '14px', fontWeight: 500 }}>没有找到匹配的资源</div>
@@ -399,7 +411,7 @@ export default function ResourcesPage() {
         ) : (
           filtered.map((r, i) => {
             const ti = typeIcons[r.type as keyof typeof typeIcons]
-            const isFav = favorites.has(r.id)
+            const isFav = r.fav
             const dc = getDiffClass(r.diff)
 
             return (
@@ -484,7 +496,7 @@ export default function ResourcesPage() {
                 </div>
               </div>
               <button
-                className={`rc-fav${favorites.has(selectedRes.id) ? ' liked' : ''}`}
+                className={`rc-fav${selectedRes.fav ? ' liked' : ''}`}
                 style={{ position: 'static', boxShadow: 'none' }}
                 onClick={() => toggleFav(selectedRes.id)}
               >
@@ -500,12 +512,15 @@ export default function ResourcesPage() {
               </button>
             </div>
             <div className="modal-bd">
+              {/* 知识点讲解 */}
               {selectedRes.type === 'explanation' && selectedRes.content && (
                 <div className="md-content" dangerouslySetInnerHTML={{ __html: selectedRes.content }} />
               )}
+              {/* 思维导图 */}
               {selectedRes.type === 'mindmap' && selectedRes.mindmap && (
                 <div className="md-mindmap">{esc(selectedRes.mindmap)}</div>
               )}
+              {/* 练习题 */}
               {selectedRes.type === 'exercise' && selectedRes.exercises && (
                 selectedRes.exercises.map((ex, i) => (
                   <div key={i} className="md-exercise">
@@ -532,9 +547,11 @@ export default function ResourcesPage() {
                   </div>
                 ))
               )}
+              {/* 代码示例 */}
               {selectedRes.type === 'code' && selectedRes.code && (
                 <div className="md-content"><div className="md-codeblk">{esc(selectedRes.code)}</div></div>
               )}
+              {/* 音频 */}
               {selectedRes.type === 'audio' && (
                 <div style={{ padding: '20px 0', textAlign: 'center' }}>
                   <div style={{ fontSize: '13px', color: 'var(--ink-2)', marginBottom: '16px' }}>{selectedRes.desc}</div>
@@ -549,27 +566,24 @@ export default function ResourcesPage() {
                   </div>
                 </div>
               )}
-              {!selectedRes.content && !selectedRes.mindmap && !selectedRes.code && !selectedRes.exercises && selectedRes.type !== 'audio' && selectedRes.isApi && (
-                <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--ink-3)' }}>
-                  <div style={{ fontSize: '32px', marginBottom: '12px' }}>📄</div>
-                  <div style={{ fontWeight: 500, marginBottom: 6 }}>AI 生成的资源</div>
-                  <div style={{ fontSize: 13 }}>在 AI 生成面板输入知识点即可重新生成</div>
-                </div>
-              )}
             </div>
             <div className="modal-ft">
               <span style={{ fontSize: '11.5px', color: 'var(--ink-4)' }}>
                 {selectedRes.time}{selectedRes.verified ? ' · 已验证 AI 生成内容' : ''}
               </span>
               <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
-                <button className="btn" onClick={() => alert('已复制到剪贴板')}>
+                <button className="btn" onClick={() => {
+                  // 复制内容到剪贴板
+                  const content = selectedRes.content || selectedRes.mindmap || selectedRes.code || ''
+                  navigator.clipboard.writeText(content).then(() => showToast('已复制到剪贴板'))
+                }}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
                     <rect x="9" y="9" width="13" height="13" rx="2" />
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                   </svg>
                   复制
                 </button>
-                <button className="btn btn-solid" onClick={() => alert('跳转到智能对话页，基于该资源继续学习')}>继续学习</button>
+                <button className="btn btn-solid" onClick={() => showToast('跳转到智能对话页，基于该资源继续学习')}>继续学习</button>
               </div>
             </div>
           </div>

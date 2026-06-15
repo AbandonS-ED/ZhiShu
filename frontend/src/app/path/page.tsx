@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { pathApi, evaluationApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
+import { showToast } from '@/lib/utils'
 
 // ═══ TYPES ═══
 interface Node {
@@ -377,7 +378,7 @@ export default function PathPage() {
                       { icon: '📝', label: '练习题' },
                       { icon: '💻', label: '代码示例' },
                     ].map((r) => (
-                      <button key={r.label} className="dp-res-btn" onClick={() => alert(`查看 ${selectedData.name} 的${r.label}`)}>
+                      <button key={r.label} className="dp-res-btn" onClick={() => showToast(`查看 ${selectedData.name} 的${r.label}`)}>
                         {r.icon} {r.label}
                       </button>
                     ))}
@@ -385,13 +386,13 @@ export default function PathPage() {
                 </div>
               </div>
               <div className="dp-actions">
-                <button className="btn btn-solid" onClick={() => alert(`跳转到智能对话页，开始学习: ${selectedData.name}`)}>
+                <button className="btn btn-solid" onClick={() => showToast(`跳转到智能对话页，开始学习: ${selectedData.name}`)}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
                   开始学习
                 </button>
-                <button className="btn" onClick={() => alert('已标记为稍后学习')}>
+                <button className="btn" onClick={() => showToast('已标记为稍后学习')}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
                     <circle cx="12" cy="12" r="10" />
                     <polyline points="12 6 12 12 16 14" />

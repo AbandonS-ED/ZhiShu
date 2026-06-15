@@ -5,7 +5,7 @@ import { exerciseApi, evaluationApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { markdownToHtml } from '@/lib/utils'
 
-const BASE_URL = 'http://localhost:8000/api/v1'
+const BASE_URL = 'http://localhost:8001/api/v1'
 const HIDDEN_KEY = 'zhishu_hidden_exercises'
 
 interface Exercise {

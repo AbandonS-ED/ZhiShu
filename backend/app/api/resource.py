@@ -4,6 +4,7 @@ import json
 import re
 import uuid
 import difflib
+import logging
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
@@ -146,9 +147,11 @@ async def _cap_exercises(db: AsyncSession, student_id: uuid.UUID, knowledge_poin
         .where(Exercise.knowledge_point == knowledge_point)
         .where(Exercise.id.notin_(keep_ids))
     )
+    await db.commit()
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 def _strip_think(text: str) -> str:
     """去掉 <think>...</think> 标签及其内容（支持嵌套和未闭合标签）
@@ -242,13 +245,20 @@ async def generate_resource(req: ResourceGenRequest, db: AsyncSession = Depends(
         resource_type=req.resource_type,
     )
 
+    # 根据请求的 resource_type 确定实际存储类型
+    resource_type = "knowledge"  # 默认
+    if req.resource_type == "code":
+        resource_type = "code"
+    elif req.resource_type == "audio":
+        resource_type = "audio"
+
     # 保存到数据库
     resource = Resource(
         id=uuid.uuid4(),
         student_id=uuid.UUID(req.student_id),
         course_id=uuid.UUID(req.course_id) if req.course_id else None,
         title=f"{req.knowledge_point} 学习材料",
-        resource_type="knowledge",
+        resource_type=resource_type,
         content=content,
         knowledge_point=req.knowledge_point,
     )
@@ -314,12 +324,19 @@ async def generate_resource_stream(req: ResourceGenRequest, db: AsyncSession = D
 
                 yield f"data: {json.dumps({'type': 'progress', 'progress': 0.8, 'message': '正在保存...'}, ensure_ascii=False)}\n\n"
 
+                # 根据请求的 resource_type 确定实际存储类型
+                resource_type = "knowledge"  # 默认
+                if req.resource_type == "code":
+                    resource_type = "code"
+                elif req.resource_type == "audio":
+                    resource_type = "audio"
+
                 resource = Resource(
                     id=uuid.uuid4(),
                     student_id=uuid.UUID(req.student_id),
                     course_id=uuid.UUID(req.course_id) if req.course_id else None,
                     title=f"{req.knowledge_point} 学习材料",
-                    resource_type="knowledge",
+                    resource_type=resource_type,
                     content=result,
                     knowledge_point=req.knowledge_point,
                 )
@@ -333,7 +350,7 @@ async def generate_resource_stream(req: ResourceGenRequest, db: AsyncSession = D
                 import traceback
                 yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
                 yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
-                print(f"[resource/stream] 异常: {traceback.format_exc()}")
+                logger.exception("[resource/stream] 异常")
 
     return StreamingResponse(
         event_generator(),
@@ -352,13 +369,12 @@ async def list_resources(
     db: AsyncSession = Depends(get_db),
     user: Student = Depends(get_current_user),
 ):
-    """获取学生的所有资源"""
-    if user.id != student_id:
-        raise HTTPException(status_code=403, detail="只能查看自己的数据")
+    """获取资源列表（包含用户资源和系统预置资源）"""
+    # 查询用户的资源 + 系统预置资源
     result = await db.execute(
         select(Resource)
-        .where(Resource.student_id == student_id)
-        .order_by(Resource.created_at.desc())
+        .where((Resource.student_id == student_id) | (Resource.is_preset == True))
+        .order_by(Resource.is_preset.desc(), Resource.created_at.desc())
     )
     resources = result.scalars().all()
     return [
@@ -367,6 +383,9 @@ async def list_resources(
             "title": r.title,
             "resource_type": r.resource_type,
             "knowledge_point": r.knowledge_point,
+            "content": r.content,
+            "difficulty": r.difficulty,
+            "is_favorited": r.is_favorited or False,
             "created_at": r.created_at.isoformat() if r.created_at else None,
         }
         for r in resources
@@ -572,7 +591,7 @@ async def generate_exercises_stream(req: ExerciseGenRequest, db: AsyncSession = 
                 import traceback
                 yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
                 yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
-                print(f"[exercises/stream] 异常: {traceback.format_exc()}")
+                logger.exception("[exercises/stream] 异常")
 
     return StreamingResponse(
         event_generator(),
@@ -699,3 +718,145 @@ async def list_exercises(
         }
         for e in exercises
     ]
+
+
+@router.post("/{resource_id}/favorite")
+async def toggle_favorite(
+    resource_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    """切换资源收藏状态"""
+    result = await db.execute(
+        select(Resource).where(Resource.id == resource_id)
+    )
+    resource = result.scalar_one_or_none()
+    if not resource:
+        raise HTTPException(status_code=404, detail="资源不存在")
+    if resource.student_id != user.id:
+        raise HTTPException(status_code=403, detail="只能操作自己的资源")
+
+    resource.is_favorited = not (resource.is_favorited or False)
+    await db.commit()
+
+    return {
+        "resource_id": str(resource.id),
+        "is_favorited": resource.is_favorited,
+    }
+
+
+class BatchGenRequest(BaseModel):
+    student_id: str
+    knowledge_points: list[str]  # 多个知识点
+    resource_type: str = "all"
+
+    @field_validator("student_id")
+    @classmethod
+    def _validate_uuid(cls, v: str) -> str:
+        try:
+            uuid.UUID(v)
+            return v
+        except (ValueError, AttributeError, TypeError):
+            raise ValueError(f"无效的 UUID: {v}")
+
+
+@router.post("/batch-generate")
+async def batch_generate_resources(req: BatchGenRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
+    """批量生成多个知识点的资源"""
+    if str(user.id) != req.student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
+
+    # 获取学生画像
+    profile_result = await db.execute(
+        select(StudentProfile)
+        .where(StudentProfile.student_id == uuid.UUID(req.student_id))
+        .limit(1)
+    )
+    profile = profile_result.scalar_one_or_none()
+    student_profile = profile.dimensions if profile else None
+
+    results = []
+    for kp in req.knowledge_points[:10]:  # 最多10个知识点
+        try:
+            content = await document_agent.generate(
+                knowledge_point=kp,
+                student_profile=student_profile,
+                resource_type=req.resource_type,
+            )
+
+            # 根据请求的 resource_type 确定实际存储类型
+            resource_type = "knowledge"
+            if req.resource_type == "code":
+                resource_type = "code"
+            elif req.resource_type == "audio":
+                resource_type = "audio"
+
+            resource = Resource(
+                id=uuid.uuid4(),
+                student_id=uuid.UUID(req.student_id),
+                title=f"{kp} 学习材料",
+                resource_type=resource_type,
+                content=content,
+                knowledge_point=kp,
+            )
+            db.add(resource)
+            results.append({
+                "resource_id": str(resource.id),
+                "knowledge_point": kp,
+                "status": "success",
+            })
+        except Exception as e:
+            results.append({
+                "knowledge_point": kp,
+                "status": "error",
+                "message": str(e),
+            })
+
+    await db.commit()
+
+    return {
+        "total": len(req.knowledge_points),
+        "success": sum(1 for r in results if r["status"] == "success"),
+        "results": results,
+    }
+
+
+class SaveFromChatRequest(BaseModel):
+    student_id: str
+    title: str
+    resource_type: str  # knowledge/mindmap/exercise/code/audio
+    content: dict
+    knowledge_point: str
+
+    @field_validator("student_id")
+    @classmethod
+    def _validate_uuid(cls, v: str) -> str:
+        try:
+            uuid.UUID(v)
+            return v
+        except (ValueError, AttributeError, TypeError):
+            raise ValueError(f"无效的 UUID: {v}")
+
+
+@router.post("/save-from-chat")
+async def save_from_chat(req: SaveFromChatRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
+    """从对话页保存资源到资源中心"""
+    if str(user.id) != req.student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
+
+    resource = Resource(
+        id=uuid.uuid4(),
+        student_id=uuid.UUID(req.student_id),
+        title=req.title,
+        resource_type=req.resource_type,
+        content=req.content,
+        knowledge_point=req.knowledge_point,
+    )
+    db.add(resource)
+    await db.commit()
+
+    return {
+        "resource_id": str(resource.id),
+        "title": req.title,
+        "message": "资源已保存到资源中心",
+    }

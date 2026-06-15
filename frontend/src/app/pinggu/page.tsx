@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { tutorApi, evaluationApi, type EvaluationReport } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
+import { showToast } from '@/lib/utils'
 
 // ═══ DATA ═══
 
@@ -302,7 +303,7 @@ export default function PingguPage() {
             </button>
           ))}
         </div>
-        <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => alert('评估报告 PDF 导出中...')}>
+        <button className="btn btn-sm" style={{ marginLeft: 'auto' }} onClick={() => showToast('评估报告 PDF 导出中...')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="12" height="12">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
@@ -379,23 +380,31 @@ export default function PingguPage() {
       <div className="stats-row">
         <div className="st-card">
           <div className="st-label">本周学习</div>
-          <div className="st-val" style={{ color: 'var(--info)' }}>17.2h</div>
-          <div className="st-trend trend-up">↑ 4.2h 较上周</div>
+          <div className="st-val" style={{ color: 'var(--info)' }}>
+            {evalReport ? `${Math.round((evalReport.summary?.total_duration_minutes || 0) / 60 * 10) / 10}h` : '0h'}
+          </div>
+          <div className="st-trend trend-up">↑ 较上周</div>
         </div>
         <div className="st-card">
           <div className="st-label">练习正确率</div>
-          <div className="st-val" style={{ color: 'var(--warm)' }}>72%</div>
-          <div className="st-trend trend-up">↑ 5% 较上周</div>
+          <div className="st-val" style={{ color: 'var(--warm)' }}>
+            {evalReport ? `${Math.round(evalReport.summary?.avg_score || 0)}%` : '0%'}
+          </div>
+          <div className="st-trend trend-up">↑ 较上周</div>
         </div>
         <div className="st-card">
           <div className="st-label">完成知识点</div>
-          <div className="st-val" style={{ color: 'var(--success)' }}>5 / 12</div>
-          <div className="st-trend trend-up">↑ +1 本周</div>
+          <div className="st-val" style={{ color: 'var(--success)' }}>
+            {evalReport ? `${Object.keys(evalReport.knowledge_mastery || {}).length} / 12` : '0 / 12'}
+          </div>
+          <div className="st-trend trend-up">↑ 本周</div>
         </div>
         <div className="st-card">
           <div className="st-label">生成资源</div>
-          <div className="st-val">18</div>
-          <div className="st-trend trend-up">↑ +6 本周</div>
+          <div className="st-val">
+            {evalReport ? evalReport.summary?.total_resources || 0 : 0}
+          </div>
+          <div className="st-trend trend-up">↑ 本周</div>
         </div>
       </div>
 
@@ -466,7 +475,7 @@ export default function PingguPage() {
         <div className="card">
           <div className="card-hd">
             <h3>知识点掌握度</h3>
-            <button className="btn btn-sm" onClick={() => alert('跳转到练习题库')}>去练习</button>
+            <button className="btn btn-sm" onClick={() => showToast('跳转到练习题库')}>去练习</button>
           </div>
           <div className="card-bd" style={{ padding: '0 0 4px' }}>
             <table className="km-table">

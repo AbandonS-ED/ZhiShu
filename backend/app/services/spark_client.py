@@ -12,7 +12,7 @@ from typing import AsyncGenerator
 class SparkClient:
     """讯飞星火 V4 客户端"""
 
-    def __init__(self, api_key: str, base_url: str = "https://open.bigmodel.cn/api/paas/v4"):
+    def __init__(self, api_key: str, base_url: str = "https://spark-api-open.xf-yun.com/v1"):
         self.api_key = api_key
         self.base_url = base_url.rstrip("/")
         self._client: httpx.AsyncClient | None = None

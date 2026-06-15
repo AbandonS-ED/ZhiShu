@@ -1,6 +1,9 @@
 // 智枢 API 客户端
-// 后端 baseURL: http://localhost:8000
-const BASE_URL = 'http://localhost:8000/api/v1'
+// 后端 baseURL: http://localhost:8001
+const BASE_URL = 'http://localhost:8001/api/v1'
+
+import type { Resource, ResourceContent, Exercise } from '@/types'
+export type { Resource, ResourceContent, Exercise }
 
 // 通用 fetch 封装（自动带 token）
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -41,6 +44,14 @@ export interface StudentProfile {
   assessment_status?: string
 }
 
+export interface AssessmentStatus {
+  status: string
+  can_resume: boolean
+  session_id?: string | null
+  assessed_dimensions: string[]
+  dimensions: Record<string, { score: number; confidence: number }>
+}
+
 export const profileApi = {
   assessStream: (data: { session_id?: string; answer?: string }) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
@@ -57,9 +68,34 @@ export const profileApi = {
   getMe: () =>
     request<{
       dimensions: Record<string, number>
+      confidence: Record<string, number>
       background: Record<string, unknown>
       assessment_status: string
     }>('/profile/me'),
+
+  reset: () =>
+    request<{ status: string; message: string }>('/profile/reset', {
+      method: 'POST',
+    }),
+
+  getAssessmentStatus: () =>
+    request<AssessmentStatus>('/profile/assessment-status'),
+
+  updateBackground: (background: Record<string, unknown>) =>
+    request<{ status: string; message: string }>('/profile/background', {
+      method: 'PUT',
+      body: JSON.stringify({ background }),
+    }),
+
+  updateBehavior: (data: {
+    exercise_correct_rate?: number
+    resource_access_count?: number
+    study_duration?: number
+  }) =>
+    request<{ status: string; message: string; updated: boolean }>('/profile/update-behavior', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 }
 
 // ===== Chat (SSE 流式) =====
@@ -83,6 +119,7 @@ export const chatApi = {
     opts?: { session_id?: string; course_topics?: string[] }
   ): () => void {
     const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 120_000)
     const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
     fetch(`${BASE_URL}/chat/stream`, {
       method: 'POST',
@@ -116,7 +153,8 @@ export const chatApi = {
       .catch((err) => {
         if (err.name !== 'AbortError') onEvent({ type: 'error', message: err.message })
       })
-    return () => controller.abort()
+      .finally(() => clearTimeout(timeout))
+    return () => { clearTimeout(timeout); controller.abort() }
   },
 
   getSessions: (student_id: string) =>
@@ -134,21 +172,6 @@ export const chatApi = {
 }
 
 // ===== Resource =====
-export interface ResourceContent {
-  knowledge?: string
-  code?: string
-  audio_script?: string
-  [k: string]: any
-}
-
-export interface Resource {
-  resource_id: string
-  knowledge_point: string
-  content: ResourceContent
-  title?: string
-  resource_type?: string
-  created_at?: string
-}
 
 export const resourceApi = {
   // SSE 流式生成学习资源
@@ -159,6 +182,7 @@ export const resourceApi = {
     resource_type = 'all'
   ): () => void {
     const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 120_000)
     const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
     fetch(`${BASE_URL}/resource/generate/stream`, {
       method: 'POST',
@@ -190,7 +214,8 @@ export const resourceApi = {
       .catch((err) => {
         if (err.name !== 'AbortError') onEvent({ type: 'error', message: err.message })
       })
-    return () => controller.abort()
+      .finally(() => clearTimeout(timeout))
+    return () => { clearTimeout(timeout); controller.abort() }
   },
   generate: (student_id: string, knowledge_point: string, resource_type = 'all') =>
     request<Resource>('/resource/generate', {
@@ -198,22 +223,38 @@ export const resourceApi = {
       body: JSON.stringify({ student_id, knowledge_point, resource_type }),
     }),
   list: (student_id: string) =>
-    request<Array<{ resource_id: string; title: string; knowledge_point: string; created_at: string }>>(
-      `/resource/list?student_id=${student_id}`
+    request<Array<{
+      resource_id: string;
+      title: string;
+      resource_type: string;
+      knowledge_point: string;
+      content: Record<string, unknown>;
+      difficulty: number;
+      is_favorited: boolean;
+      created_at: string;
+    }>>(`/resource/list?student_id=${student_id}`),
+  favorite: (resource_id: string) =>
+    request<{ resource_id: string; is_favorited: boolean }>(
+      `/resource/${resource_id}/favorite`,
+      { method: 'POST' }
     ),
+  batchGenerate: (student_id: string, knowledge_points: string[], resource_type = 'all') =>
+    request<{
+      total: number;
+      success: number;
+      results: Array<{ resource_id?: string; knowledge_point: string; status: string; message?: string }>;
+    }>('/resource/batch-generate', {
+      method: 'POST',
+      body: JSON.stringify({ student_id, knowledge_points, resource_type }),
+    }),
+  saveFromChat: (student_id: string, title: string, resource_type: string, content: Record<string, unknown>, knowledge_point: string) =>
+    request<{ resource_id: string; title: string; message: string }>('/resource/save-from-chat', {
+      method: 'POST',
+      body: JSON.stringify({ student_id, title, resource_type, content, knowledge_point }),
+    }),
 }
 
 // ===== Exercise =====
-export interface Exercise {
-  exercise_id: string
-  type: 'choice' | 'judge' | 'short_answer' | 'coding'
-  question: string
-  options?: string[]
-  answer?: string
-  explanation?: string
-  difficulty: number
-  knowledge_point?: string
-}
 
 export const exerciseApi = {
   // SSE 流式生成练习题
@@ -225,6 +266,7 @@ export const exerciseApi = {
     exercise_type = 'all'
   ): () => void {
     const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 120_000)
     const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
     fetch(`${BASE_URL}/resource/exercises/generate/stream`, {
       method: 'POST',
@@ -256,7 +298,8 @@ export const exerciseApi = {
       .catch((err) => {
         if (err.name !== 'AbortError') onEvent({ type: 'error', message: err.message })
       })
-    return () => controller.abort()
+      .finally(() => clearTimeout(timeout))
+    return () => { clearTimeout(timeout); controller.abort() }
   },
   generate: (
     student_id: string,
@@ -311,6 +354,7 @@ export const pathApi = {
     total_days = 30
   ): () => void {
     const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 120_000)
     const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
     fetch(`${BASE_URL}/path/generate/stream`, {
       method: 'POST',
@@ -342,7 +386,8 @@ export const pathApi = {
       .catch((err) => {
         if (err.name !== 'AbortError') onEvent({ type: 'error', message: err.message })
       })
-    return () => controller.abort()
+      .finally(() => clearTimeout(timeout))
+    return () => { clearTimeout(timeout); controller.abort() }
   },
   generate: (student_id: string, course_topics: string[], total_days = 30) =>
     request<LearningPathData>('/path/generate', {

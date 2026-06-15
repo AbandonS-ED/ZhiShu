@@ -74,18 +74,21 @@ export interface LearningPath {
   status: 'active' | 'completed' | 'paused'
 }
 
-// 学习资源
+// 学习资源 — 与后端返回格式一致
 export interface Resource {
-  id: string
-  type: 'explanation' | 'mindmap' | 'exercise' | 'code' | 'audio' | 'path' | 'qa'
-  title: string
-  content: string
-  kp_id: string
-  difficulty?: string
-  metadata: Record<string, any>
-  source_refs: SourceRef[]
-  is_verified: boolean
-  created_at: string
+  resource_id: string
+  knowledge_point: string
+  content: ResourceContent
+  title?: string
+  resource_type?: string
+  created_at?: string
+}
+
+export interface ResourceContent {
+  knowledge?: string
+  code?: string
+  audio_script?: string
+  [k: string]: any
 }
 
 // 来源引用
@@ -96,16 +99,17 @@ export interface SourceRef {
   quote: string
 }
 
-// 练习题
+// 练习题 — 与后端返回格式一致
 export interface Exercise {
-  id: string
-  type: 'choice' | 'fill' | 'code' | 'short_answer'
-  difficulty: 'easy' | 'medium' | 'hard'
+  exercise_id: string
+  type: 'choice' | 'judge' | 'short_answer' | 'coding'
   question: string
-  options?: { key: string; text: string; is_correct: boolean }[]
-  answer: string
-  explanation: string
-  sample_code?: string
+  options?: string[]
+  answer?: string
+  explanation?: string
+  difficulty: number
+  knowledge_point?: string
+  source?: string
 }
 
 // 对话消息

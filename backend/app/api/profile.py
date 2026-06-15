@@ -1,4 +1,4 @@
-"""Profile API — 5-dimension personal ability profile."""
+"""Profile API — 7-dimension personal ability profile."""
 import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,6 +16,34 @@ from app.agents.initial_assessment_agent import initial_assessment_agent
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# 维度更新规则：根据学习行为自动调整维度分数
+UPDATE_RULES = {
+    # 练习正确率影响应用转化
+    "exercise_correct_rate": {
+        "dimension": "application",
+        "high_threshold": 0.8,  # 正确率 > 80% 提升
+        "low_threshold": 0.5,   # 正确率 < 50% 降低
+        "high_boost": 3,        # 提升分数
+        "low_reduce": -2,       # 降低分数
+    },
+    # 资源访问频率影响专注力
+    "resource_access_count": {
+        "dimension": "focus",
+        "high_threshold": 5,    # 访问 > 5 次提升
+        "low_threshold": 1,     # 访问 < 1 次降低
+        "high_boost": 2,
+        "low_reduce": -1,
+    },
+    # 学习时长影响记忆力
+    "study_duration": {
+        "dimension": "memory",
+        "high_threshold": 60,   # 学习 > 60 分钟提升
+        "low_threshold": 10,    # 学习 < 10 分钟降低
+        "high_boost": 2,
+        "low_reduce": -1,
+    },
+}
 
 
 class AssessStreamRequest(BaseModel):
@@ -46,6 +74,8 @@ async def assess_stream(
         is_initial = False
 
     async def event_generator():
+        from app.core.database import async_session as db_async_session
+
         async for event in initial_assessment_agent.stream_llm_response(session_id, is_initial):
             yield event
 
@@ -56,42 +86,46 @@ async def assess_stream(
                     dims = data.get("dimensions", {})
                     is_done = data.get("done", False)
 
-                    # 获取或创建 profile
-                    profile_result = await db.execute(
-                        select(StudentProfile).where(StudentProfile.student_id == current_user.id)
-                    )
-                    profile = profile_result.scalar_one_or_none()
-
                     # 检查是否有有效的维度数据
                     has_valid_dims = any(
                         d.get("score", 0) > 0 for d in dims.values()
                     ) if dims else False
 
                     if has_valid_dims:
-                        if profile:
-                            # 更新现有 profile（合并维度，保留高置信度的分数）
-                            old_dims = profile.dimensions or {}
-                            merged_dims = {}
-                            for dim_key in ["comprehension", "memory", "application", "imagination", "focus"]:
-                                old_dim = old_dims.get(dim_key, {})
-                                new_dim = dims.get(dim_key, {})
-                                old_conf = old_dim.get("confidence", 0)
-                                new_conf = new_dim.get("confidence", 0)
-                                # 保留置信度更高的数据
-                                if new_conf >= old_conf:
-                                    merged_dims[dim_key] = new_dim
-                                else:
-                                    merged_dims[dim_key] = old_dim
-                            profile.dimensions = merged_dims
-                            profile.assessment_status = "completed" if is_done else "in_progress"
-                        else:
-                            profile = StudentProfile(
-                                student_id=current_user.id,
-                                dimensions=dims,
-                                assessment_status="completed" if is_done else "in_progress",
+                        # 在 generator 内部创建新的数据库会话
+                        async with db_async_session() as db:
+                            # 获取或创建 profile
+                            profile_result = await db.execute(
+                                select(StudentProfile).where(StudentProfile.student_id == current_user.id)
                             )
-                            db.add(profile)
-                        await db.commit()
+                            profile = profile_result.scalar_one_or_none()
+
+                            if profile:
+                                # 更新现有 profile（合并维度，保留高置信度的分数）
+                                old_dims = profile.dimensions or {}
+                                merged_dims = {}
+                                # 合并所有7个维度
+                                all_dims = set(list(old_dims.keys()) + list(dims.keys()))
+                                for dim_key in all_dims:
+                                    old_dim = old_dims.get(dim_key, {})
+                                    new_dim = dims.get(dim_key, {})
+                                    old_conf = old_dim.get("confidence", 0)
+                                    new_conf = new_dim.get("confidence", 0)
+                                    # 保留置信度更高的数据
+                                    if new_conf >= old_conf:
+                                        merged_dims[dim_key] = new_dim
+                                    else:
+                                        merged_dims[dim_key] = old_dim
+                                profile.dimensions = merged_dims
+                                profile.assessment_status = "completed" if is_done else "in_progress"
+                            else:
+                                profile = StudentProfile(
+                                    student_id=current_user.id,
+                                    dimensions=dims,
+                                    assessment_status="completed" if is_done else "in_progress",
+                                )
+                                db.add(profile)
+                            await db.commit()
 
                 except Exception as e:
                     logger.error(f"Failed to save profile: {e}")
@@ -117,7 +151,10 @@ async def get_my_profile(
                 "application": 0,
                 "imagination": 0,
                 "focus": 0,
+                "knowledge_base": 0,
+                "learning_goal": 0,
             },
+            "confidence": {},
             "background": {},
             "assessment_status": "pending",
         }
@@ -158,6 +195,8 @@ async def reset_profile(
             "application": {"score": 0, "confidence": 0},
             "imagination": {"score": 0, "confidence": 0},
             "focus": {"score": 0, "confidence": 0},
+            "knowledge_base": {"score": 0, "confidence": 0},
+            "learning_goal": {"score": 0, "confidence": 0},
         }
         profile.assessment_status = "pending"
         await db.commit()
@@ -170,6 +209,8 @@ async def reset_profile(
                 "application": {"score": 0, "confidence": 0},
                 "imagination": {"score": 0, "confidence": 0},
                 "focus": {"score": 0, "confidence": 0},
+                "knowledge_base": {"score": 0, "confidence": 0},
+                "learning_goal": {"score": 0, "confidence": 0},
             },
             assessment_status="pending",
         )
@@ -191,21 +232,31 @@ async def get_assessment_status(
     profile = result.scalar_one_or_none()
 
     if not profile:
-        return {"status": "pending", "can_resume": False}
+        return {"status": "pending", "can_resume": False, "session_id": None}
 
     status = profile.assessment_status or "pending"
     dims = profile.dimensions or {}
 
     # 计算已评估的维度和置信度
     assessed_dims = []
-    for dim_key in ["comprehension", "memory", "application", "imagination", "focus"]:
+    for dim_key in ["comprehension", "memory", "application", "imagination", "focus", "knowledge_base", "learning_goal"]:
         dim = dims.get(dim_key, {})
         if dim.get("score", 0) > 0:
             assessed_dims.append(dim_key)
 
+    # 尝试从内存中获取会话 ID（如果会话存在）
+    session_id = None
+    if status == "in_progress":
+        # 查找该用户的活跃会话
+        for sid, sess in initial_assessment_agent._sessions.items():
+            if sess.get("student_id") == str(current_user.id) and sess.get("status") == "in_progress":
+                session_id = sid
+                break
+
     return {
         "status": status,
-        "can_resume": status == "in_progress",
+        "can_resume": status == "in_progress" and session_id is not None,
+        "session_id": session_id,
         "assessed_dimensions": assessed_dims,
         "dimensions": {
             k: v for k, v in dims.items()
@@ -237,6 +288,8 @@ async def update_background(
                 "application": {"score": 0, "confidence": 0},
                 "imagination": {"score": 0, "confidence": 0},
                 "focus": {"score": 0, "confidence": 0},
+                "knowledge_base": {"score": 0, "confidence": 0},
+                "learning_goal": {"score": 0, "confidence": 0},
             },
             background=req.background,
             assessment_status="pending",
@@ -245,3 +298,85 @@ async def update_background(
 
     await db.commit()
     return {"status": "ok", "message": "背景信息已更新"}
+
+
+class UpdateBehaviorRequest(BaseModel):
+    """学习行为数据"""
+    exercise_correct_rate: float | None = None  # 练习正确率 (0-1)
+    resource_access_count: int | None = None     # 资源访问次数
+    study_duration: float | None = None          # 学习时长（分钟）
+
+
+@router.post("/update-behavior")
+async def update_profile_by_behavior(
+    req: UpdateBehaviorRequest,
+    current_user: Student = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """根据学习行为自动更新画像（随学随新）"""
+    result = await db.execute(
+        select(StudentProfile).where(StudentProfile.student_id == current_user.id)
+    )
+    profile = result.scalar_one_or_none()
+
+    if not profile:
+        return {"status": "ok", "message": "无画像数据，跳过更新"}
+
+    dims = profile.dimensions or {}
+    updated = False
+
+    # 根据行为数据更新维度
+    if req.exercise_correct_rate is not None:
+        rule = UPDATE_RULES["exercise_correct_rate"]
+        dim = dims.get(rule["dimension"], {"score": 50, "confidence": 0.5})
+        old_score = dim.get("score", 50)
+        if req.exercise_correct_rate >= rule["high_threshold"]:
+            new_score = min(100, old_score + rule["high_boost"])
+            dim["score"] = new_score
+            dim["confidence"] = min(1.0, dim.get("confidence", 0.5) + 0.05)
+            updated = True
+        elif req.exercise_correct_rate <= rule["low_threshold"]:
+            new_score = max(0, old_score + rule["low_reduce"])
+            dim["score"] = new_score
+            dim["confidence"] = min(1.0, dim.get("confidence", 0.5) + 0.05)
+            updated = True
+        dims[rule["dimension"]] = dim
+
+    if req.resource_access_count is not None:
+        rule = UPDATE_RULES["resource_access_count"]
+        dim = dims.get(rule["dimension"], {"score": 50, "confidence": 0.5})
+        old_score = dim.get("score", 50)
+        if req.resource_access_count >= rule["high_threshold"]:
+            new_score = min(100, old_score + rule["high_boost"])
+            dim["score"] = new_score
+            dim["confidence"] = min(1.0, dim.get("confidence", 0.5) + 0.05)
+            updated = True
+        elif req.resource_access_count <= rule["low_threshold"]:
+            new_score = max(0, old_score + rule["low_reduce"])
+            dim["score"] = new_score
+            dim["confidence"] = min(1.0, dim.get("confidence", 0.5) + 0.05)
+            updated = True
+        dims[rule["dimension"]] = dim
+
+    if req.study_duration is not None:
+        rule = UPDATE_RULES["study_duration"]
+        dim = dims.get(rule["dimension"], {"score": 50, "confidence": 0.5})
+        old_score = dim.get("score", 50)
+        if req.study_duration >= rule["high_threshold"]:
+            new_score = min(100, old_score + rule["high_boost"])
+            dim["score"] = new_score
+            dim["confidence"] = min(1.0, dim.get("confidence", 0.5) + 0.05)
+            updated = True
+        elif req.study_duration <= rule["low_threshold"]:
+            new_score = max(0, old_score + rule["low_reduce"])
+            dim["score"] = new_score
+            dim["confidence"] = min(1.0, dim.get("confidence", 0.5) + 0.05)
+            updated = True
+        dims[rule["dimension"]] = dim
+
+    if updated:
+        profile.dimensions = dims
+        await db.commit()
+        logger.info(f"[profile] Updated profile for user {current_user.id} based on behavior")
+
+    return {"status": "ok", "message": "画像已更新", "updated": updated}

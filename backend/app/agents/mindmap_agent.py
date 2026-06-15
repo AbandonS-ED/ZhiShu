@@ -112,7 +112,21 @@ class MindMapAgent:
         parts = [f"请为「{knowledge_point}」生成一个思维导图。"]
 
         if student_profile:
-            pass
+            # 根据学生画像调整思维导图深度
+            dims = student_profile.get("dimensions", {})
+
+            # 知识基础影响深度
+            knowledge_base = dims.get("knowledge_base", {})
+            kb_score = knowledge_base.get("score", 50)
+            if kb_score < 50:
+                parts.append("\n学生基础较弱，请生成简洁的思维导图，只包含核心概念，层级不超过3层。")
+            elif kb_score >= 70:
+                parts.append("\n学生基础较好，可以生成详细的思维导图，包含更多细节和扩展。")
+
+            # 理解力影响分支复杂度
+            comprehension = dims.get("comprehension", {})
+            if comprehension.get("score", 50) < 50:
+                parts.append("\n学生理解力一般，思维导图的分支要简洁清晰，避免过于复杂的层级。")
 
         parts.append("\n请返回 JSON 格式。只返回 JSON。")
 

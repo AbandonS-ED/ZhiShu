@@ -7,6 +7,9 @@ MiniMax 使用 OpenAI 兼容 API: /v1/chat/completions
 from typing import AsyncGenerator
 import httpx
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class MiniMaxClient:
@@ -116,11 +119,11 @@ class MiniMaxClient:
                     delta = choice.get("delta", {})
                     token = delta.get("content") or delta.get("reasoning_content") or ""
                     if not token:
-                        print(f"[chat_stream] 空 token, delta keys={list(delta.keys())}")
+                        logger.debug("[chat_stream] 空 token, delta keys=%s", list(delta.keys()))
                     if token:
                         yield token
                 except (json.JSONDecodeError, IndexError, KeyError) as e:
-                    print(f"[chat_stream] 解析跳过: {e}, raw={data_str[:200]}")
+                    logger.debug("[chat_stream] 解析跳过: %s", e)
                     continue
 
 

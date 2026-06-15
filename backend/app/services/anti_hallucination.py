@@ -32,31 +32,23 @@ class PatternDetector:
     """
 
     SUSPICIOUS_PATTERNS = [
-        # 虚假年份引用
-        (r"据\s*20[2-3]\d\s*年.*研究", "可能引用了未来年份的研究"),
-        (r"根据?\s*20[2-3]\d\s*年.*发表", "可能引用了未来年份的论文"),
-        (r"在\s*20[2-3]\d\s*年.*提出", "可能虚构了年份引用"),
+        # 虚假年份引用（仅匹配明显未来年份，2030+）
+        (r"据\s*20[3-9]\d\s*年.*研究", "可能引用了未来年份的研究"),
+        (r"根据?\s*20[3-9]\d\s*年.*发表", "可能引用了未来年份的论文"),
+        (r"在\s*20[3-9]\d\s*年.*提出", "可能虚构了年份引用"),
 
         # 虚假期刊/会议（英文+中文）
         (r"(?:Nature|Science|IEEE|ACM|ACL|NeurIPS|ICML)\s*(?:journal|proceedings|conference)", "可能虚构了期刊引用"),
         (r"(?:在|于)\s*(?:Nature|Science|IEEE|ACM)\s*(?:上|发表|刊登)", "可能虚构了期刊引用"),
         (r"(?:发表|刊登)\s*(?:在|于)\s*(?:Nature|Science|IEEE|ACM)", "可能虚构了期刊引用"),
 
-        # 虚假统计数据
-        (r"(?:准确率|成功率|效率)\s*(?:达到了?|达到?|为)\s*(?:9[5-9]|100)\s*%", "可能夸大了统计数据"),
-        (r"(?:提高|提升|增加)\s*(?:了)?\s*(?:50|60|70|80|90)\s*%", "可能夸大了提升幅度"),
-        (r"(?:超过|优于)\s*(?:9[5-9]|100)\s*%", "可能夸大了比较数据"),
-
-        # 虚假人物引用
-        (r"(?:Hinton|LeCun|Bengio|Goodfellow)\s*(?:在|于)\s*20[2-3]\d", "可能虚构了人物引用"),
-        (r"(?:Hinton|LeCun|Bengio|Goodfellow)\s*(?:提出|发表|认为)", "可能虚构了人物引用"),
+        # 虚假统计数据（仅匹配极端值，正常范围交给 SourceValidator）
+        (r"(?:准确率|成功率|效率)\s*(?:达到了?|达到?|为)\s*(?:9[89]|100)\s*%", "可能夸大了统计数据"),
+        (r"(?:超过|优于)\s*(?:9[89]|100)\s*%", "可能夸大了比较数据"),
 
         # 绝对化表述
-        (r"(?:永远|绝对|一定|所有|每个|任何)\s*(?:都是|都能|都会|可以)", "存在绝对化表述，可能是幻觉"),
+        (r"(?:永远|绝对|一定)\s*(?:都是|都能|都会|可以)", "存在绝对化表述，可能是幻觉"),
         (r"(?:100%\s*(?:正确|准确|有效))", "存在绝对化表述，可能是幻觉"),
-
-        # 无来源的数字统计
-        (r"(?:研究表明|实验显示|数据表明)\s*(?:.*\d+\s*%)", "可能虚构了统计数据"),
     ]
 
     def detect(self, content: str) -> ValidationResult:
@@ -94,13 +86,15 @@ class SourceValidator:
         if has_citations and not context_chunks:
             issues.append("内容包含引用格式但没有提供参考来源")
 
-        # 检查引用的完整性
+        # 检查引用的完整性（用索引匹配：[1] 对应第 1 个 context_chunk）
         if context_chunks:
-            source_ids = {c.get("id") or c.get("doc_id") for c in context_chunks}
-            refs = re.findall(r"\[(\d+|[a-zA-Z]+\s*\d{4})\]", content)
+            max_index = len(context_chunks)
+            # 提取数字索引引用
+            refs = re.findall(r"\[(\d+)\]", content)
             for ref in refs:
-                if ref not in source_ids and len(source_ids) > 0:
-                    issues.append(f"引用 [{ref}] 在提供的来源中找不到对应文档")
+                idx = int(ref)
+                if idx < 1 or idx > max_index:
+                    issues.append(f"引用 [{ref}] 超出来源范围（共 {max_index} 个来源）")
 
         return ValidationResult(
             passed=len(issues) == 0,

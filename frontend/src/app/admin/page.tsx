@@ -31,7 +31,7 @@ export default function AdminDashboardPage() {
     setMounted(true)
     const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_admin_token') : null
     if (token) {
-      fetch('http://localhost:8000/api/v1/admin/stats', {
+      fetch('http://localhost:8001/api/v1/admin/stats', {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((r) => (r.ok ? r.json() : null))

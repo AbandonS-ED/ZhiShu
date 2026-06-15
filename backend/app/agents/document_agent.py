@@ -91,7 +91,26 @@ class DocumentAgent:
         parts = [f"请为「{knowledge_point}」生成学习材料。"]
 
         if student_profile:
-            pass
+            # 根据学生画像调整内容难度和风格
+            dims = student_profile.get("dimensions", {})
+
+            # 知识基础影响内容深度
+            knowledge_base = dims.get("knowledge_base", {})
+            if knowledge_base.get("score", 50) < 50:
+                parts.append("\n学生基础较弱，请从基础概念开始讲解，多用生活化的例子。")
+            elif knowledge_base.get("score", 50) >= 70:
+                parts.append("\n学生基础较好，可以讲得深入一些，包含进阶内容。")
+
+            # 理解力影响讲解方式
+            comprehension = dims.get("comprehension", {})
+            if comprehension.get("score", 50) < 50:
+                parts.append("\n学生理解力一般，请多用类比和图解，把复杂概念简单化。")
+
+            # 学习目标影响内容侧重点
+            learning_goal = dims.get("learning_goal", {})
+            goal_score = learning_goal.get("score", 50)
+            if goal_score < 50:
+                parts.append("\n学生学习目标不明确，请在内容开头说明学习这个知识的价值和应用场景。")
 
         type_map = {
             "all": "知识讲解 + 代码示例 + 音频脚本",

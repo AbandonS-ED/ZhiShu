@@ -124,7 +124,28 @@ class TutorAgent:
             parts.append("")
 
         if student_profile:
-            pass
+            # 根据学生画像调整辅导风格
+            dims = student_profile.get("dimensions", {})
+
+            # 理解力影响解释方式
+            comprehension = dims.get("comprehension", {})
+            comp_score = comprehension.get("score", 50)
+            if comp_score < 50:
+                parts.append("## 辅导要求\n学生理解力一般，请用简单易懂的语言解释，多用类比和例子，避免专业术语堆砌。")
+            elif comp_score >= 70:
+                parts.append("## 辅导要求\n学生理解力较好，可以深入讲解原理，适当使用专业术语。")
+
+            # 知识基础影响回答深度
+            knowledge_base = dims.get("knowledge_base", {})
+            kb_score = knowledge_base.get("score", 50)
+            if kb_score < 50:
+                parts.append("学生基础较弱，请从基础概念开始解释，确保学生能跟上。")
+
+            # 记忆力影响复习建议
+            memory = dims.get("memory", {})
+            mem_score = memory.get("score", 50)
+            if mem_score < 50:
+                parts.append("学生记忆力一般，回答末尾请添加复习建议。")
 
         parts.append(f"## 学生提问\n{question}")
         if output_format == "json":

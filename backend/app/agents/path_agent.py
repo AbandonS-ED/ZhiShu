@@ -113,7 +113,36 @@ class PathAgent:
         parts.append(f"\n知识点列表：{', '.join(course_topics)}")
 
         if student_profile:
-            pass
+            # 根据学生画像调整学习路径
+            dims = student_profile.get("dimensions", {})
+
+            # 专注力影响每日学习时长
+            focus = dims.get("focus", {})
+            focus_score = focus.get("score", 50)
+            if focus_score < 50:
+                parts.append("\n学生专注力一般，每天安排2-3个知识点，每个知识点学习时间不宜过长。")
+            elif focus_score >= 70:
+                parts.append("\n学生专注力较好，每天可以安排4-5个知识点，适当增加深度。")
+
+            # 知识基础影响学习起点
+            knowledge_base = dims.get("knowledge_base", {})
+            kb_score = knowledge_base.get("score", 50)
+            if kb_score < 50:
+                parts.append("\n学生基础较弱，请从基础内容开始，循序渐进。")
+            elif kb_score >= 70:
+                parts.append("\n学生基础较好，可以跳过基础内容，直接进入进阶主题。")
+
+            # 记忆力影响复习安排
+            memory = dims.get("memory", {})
+            mem_score = memory.get("score", 50)
+            if mem_score < 50:
+                parts.append("\n学生记忆力一般，请在路径中安排更多的复习环节。")
+
+            # 学习目标影响路径方向
+            learning_goal = dims.get("learning_goal", {})
+            goal_score = learning_goal.get("score", 50)
+            if goal_score < 50:
+                parts.append("\n学生学习目标不明确，请在路径开头说明学习价值和应用场景。")
 
         parts.append(f"\n总天数: {total_days}")
         parts.append("\n请返回 JSON 格式。只返回 JSON。")

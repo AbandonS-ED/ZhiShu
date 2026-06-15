@@ -3,6 +3,7 @@
 import json
 import re
 import uuid
+import logging
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
@@ -22,6 +23,7 @@ from app.services.json_parser import parse_json_response
 from app.core.dependencies import valid_student_id, valid_session_id
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # 流式专用 system prompt — 让 LLM 先输出人类可读文本，末尾跟 JSON
 STREAM_EXERCISE_SYSTEM = """你是一个练习题生成器。请按以下两部分输出：
@@ -116,7 +118,7 @@ async def _handle_tutor_chat_stream(
                 chunks = await vector_store.search(rag_db, query_embedding, top_k=5)
             context_chunks = chunks
         except Exception as e:
-            print(f"[chat/stream] RAG 检索失败: {e}")
+            logger.error("[chat/stream] RAG 检索失败: %s", e)
 
         user_prompt = tutor_agent._build_prompt(
             last_msg, context_chunks, student_profile, output_format="text"
@@ -141,8 +143,11 @@ async def _handle_tutor_chat_stream(
                 pass
         if role in ("user", "assistant") and content:
             messages.append({"role": role, "content": content})
-    # 当前问题作为最后一条
-    messages.append({"role": "user", "content": user_prompt or last_msg})
+
+    # 检查历史最后一条是否已经是当前用户消息，避免重复
+    current_user_msg = user_prompt or last_msg
+    if not messages or messages[-1].get("content") != current_user_msg:
+        messages.append({"role": "user", "content": current_user_msg})
 
     yield f"data: {json.dumps({'type': 'progress', 'progress': 0.4, 'message': f'已路由到 {intent} Agent，开始生成...'}, ensure_ascii=False)}\n\n"
 
@@ -209,7 +214,302 @@ async def _handle_tutor_chat_stream(
 
 
 # ====================================================================
-# 其他意图：StateGraph 多智能体编排
+# 单 Agent 意图：直接调用 Agent 实现真流式
+# ====================================================================
+
+async def _handle_single_agent_stream(
+    intent: str, last_msg: str, student_profile, session, db, student_id: str
+):
+    """document/mindmap/exercise/path/audio 意图：直接调用 Agent 实现真流式"""
+    from app.agents.document_agent import document_agent
+    from app.agents.mindmap_agent import mindmap_agent
+    from app.agents.exercise_agent import exercise_agent
+    from app.agents.path_agent import path_agent
+    from app.services import minimax_client as mc_module
+    from app.services.anti_hallucination import anti_hallucination
+
+    # 提取知识点
+    import re
+    kp = last_msg.strip()
+    kp = re.sub(r"^(请|帮我|帮忙|给我想?|给我)?(讲解|解释|说明|介绍|生成|出|写|做|画|规划)?(一下|个|份)?\s*", "", kp)
+    kp = re.sub(r"(的原理|的代码|的练习|的思维导图的学习路径|相关内容|相关知识)?\s*$", "", kp)
+    kp = kp.strip()
+    if len(kp) < 2:
+        kp = last_msg[:50]
+
+    yield f"data: {json.dumps({'type': 'progress', 'progress': 0.15, 'message': f'正在分析「{kp}」...'}, ensure_ascii=False)}\n\n"
+
+    if intent == "document":
+        # 文档生成：流式返回
+        yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在生成学习文档...'}, ensure_ascii=False)}\n\n"
+
+        prompt = document_agent._build_prompt(kp, student_profile, "all")
+        stream_text = ""
+        async for token in mc_module.minimax_client.chat_stream(
+            messages=[{"role": "user", "content": prompt}],
+            system=document_agent.SYSTEM_PROMPT,
+            max_tokens=4096,
+            temperature=0.7,
+        ):
+            stream_text += token
+            if token:
+                yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+
+        result = document_agent._parse_response(stream_text)
+
+        # 防幻觉验证
+        yield f"data: {json.dumps({'type': 'progress', 'progress': 0.8, 'message': '正在验证内容...'}, ensure_ascii=False)}\n\n"
+        validation = await anti_hallucination.validate(
+            content=result.get("knowledge", ""),
+            knowledge_point=kp,
+        )
+        result["validation"] = {
+            "passed": validation.passed,
+            "issues": validation.issues,
+            "confidence": validation.confidence,
+        }
+
+        # 保存到资源中心
+        from app.models.resource import Resource
+        resource = Resource(
+            id=uuid.uuid4(),
+            student_id=uuid.UUID(student_id),
+            title=f"{kp} 学习材料",
+            resource_type="knowledge",
+            content=result,
+            knowledge_point=kp,
+        )
+        db.add(resource)
+        await db.commit()
+
+        result_data = {"type": "document", "data": result}
+
+    elif intent == "mindmap":
+        # 思维导图：流式返回
+        yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在生成思维导图...'}, ensure_ascii=False)}\n\n"
+
+        prompt = mindmap_agent._build_prompt(kp, student_profile)
+        stream_text = ""
+        async for token in mc_module.minimax_client.chat_stream(
+            messages=[{"role": "user", "content": prompt}],
+            system=mindmap_agent.SYSTEM_PROMPT,
+            max_tokens=4096,
+            temperature=0.7,
+        ):
+            stream_text += token
+            if token:
+                yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+
+        result = mindmap_agent._parse_response(stream_text)
+
+        # 保存到资源中心
+        resource = Resource(
+            id=uuid.uuid4(),
+            student_id=uuid.UUID(student_id),
+            title=f"{kp} 思维导图",
+            resource_type="mindmap",
+            content=result,
+            knowledge_point=kp,
+        )
+        db.add(resource)
+        await db.commit()
+
+        result_data = {"type": "mindmap", "data": result}
+
+    elif intent == "exercise":
+        # 练习题：dual-format 流式
+        yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在生成练习题...'}, ensure_ascii=False)}\n\n"
+
+        # 解析数量参数
+        count_match = re.search(r"(\d+)\s*道", last_msg)
+        count = int(count_match.group(1)) if count_match else 5
+
+        prompt = exercise_agent._build_prompt(kp, student_profile, "all", count)
+        prompt = prompt.replace("请返回 JSON 格式。只返回 JSON。", "请先输出人类可读的完整题目内容，末尾再输出 JSON 数据。")
+
+        STREAM_EXERCISE_SYSTEM = """你是一个练习题生成器。请按以下两部分输出：
+
+前半部分：markdown 格式的人类可读内容（用户直接阅读）
+📝 为你生成了 N 道关于「知识点」的练习题：
+
+**1.** 【题型】题目内容（含选项、答案、解析、难度）
+
+---JSON_DATA---
+后半部分：与前半部分内容一致的 JSON 数据
+{"exercises": [{"type":"choice","question":"...","options":["A. ...","B. ..."],"answer":"B","explanation":"...","difficulty":50,"knowledge_point":"..."}]}
+
+规则：
+- type 必须是：choice(选择题)、judge(判断题)、short_answer(简答题)、coding(编程题)
+- 选择题 answer 必须是选项字母 A/B/C/D
+- 只输出以上内容，不要额外文字"""
+
+        stream_text = ""
+        sep = "---JSON_DATA---"
+        sep_found = False
+        prev_display_len = 0
+        async for token in mc_module.minimax_client.chat_stream(
+            messages=[{"role": "user", "content": prompt}],
+            system=STREAM_EXERCISE_SYSTEM,
+            max_tokens=4096,
+            temperature=0.7,
+        ):
+            stream_text += token
+            if sep in stream_text:
+                sep_found = True
+            if not sep_found:
+                display = _strip_think(stream_text)
+                new_content = display[prev_display_len:]
+                prev_display_len = len(display)
+                if new_content:
+                    yield f"data: {json.dumps({'type': 'token', 'content': new_content}, ensure_ascii=False)}\n\n"
+
+        # 解析 JSON
+        if sep in stream_text:
+            json_part = stream_text.split(sep, 1)[1].strip()
+            from app.services.json_parser import parse_json_response
+            result = parse_json_response(json_part, {"exercises": []})
+        else:
+            result = exercise_agent._parse_response(stream_text)
+
+        # 保存练习题到 DB（含去重）
+        from app.models.exercise import Exercise
+        from difflib import SequenceMatcher
+        exercises_data = result.get("exercises", [])
+        saved_count = 0
+
+        # 加载已有题目用于去重
+        existing_result = await db.execute(
+            select(Exercise.question)
+            .where(Exercise.student_id == uuid.UUID(student_id))
+            .where(Exercise.knowledge_point == kp)
+        )
+        existing_questions = [row[0] for row in existing_result.all() if row[0]]
+
+        for ex_data in exercises_data:
+            question = ex_data.get("question", "")
+            # 去重
+            is_dup = False
+            for eq in existing_questions:
+                if SequenceMatcher(None, question, eq).ratio() > 0.85:
+                    is_dup = True
+                    break
+            if is_dup:
+                continue
+
+            ex_type = ex_data.get("type", "short_answer")
+            if ex_type not in ("choice", "judge", "short_answer", "coding"):
+                ex_type = "short_answer"
+            answer = ex_data.get("answer", "")
+            if ex_type == "choice":
+                for ch in answer:
+                    if "A" <= ch <= "Z":
+                        answer = ch
+                        break
+            elif ex_type == "judge":
+                if answer.strip().lower() in ("正确", "对", "true", "t", "✔", "√", "是", "yes"):
+                    answer = "正确"
+                elif answer.strip().lower() in ("错误", "错", "false", "f", "✗", "✘", "否", "no"):
+                    answer = "错误"
+            exercise = Exercise(
+                id=uuid.uuid4(),
+                student_id=uuid.UUID(student_id),
+                exercise_type=ex_type,
+                question=question,
+                options=ex_data.get("options"),
+                answer=answer,
+                explanation=ex_data.get("explanation", ""),
+                difficulty=ex_data.get("difficulty", 50),
+                knowledge_point=kp,
+            )
+            db.add(exercise)
+            saved_count += 1
+            existing_questions.append(question)
+        await db.commit()
+
+        # 限容：每个知识点最多 20 道 AI 题
+        from sqlalchemy import delete as sql_delete
+        subq = (
+            select(Exercise.id)
+            .where(Exercise.student_id == uuid.UUID(student_id))
+            .where(Exercise.knowledge_point == kp)
+            .order_by(Exercise.created_at.desc())
+            .offset(20)
+        )
+        await db.execute(sql_delete(Exercise).where(Exercise.id.in_(subq)))
+        await db.commit()
+
+        # 追加跳转链接到 result
+        if saved_count > 0:
+            result["jump_link"] = f"[👉 点击前往题库作答](/tiku?kp={kp})"
+
+        result_data = {"type": "exercise", "data": result}
+
+    elif intent == "path":
+        # 学习路径
+        yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在规划学习路径...'}, ensure_ascii=False)}\n\n"
+
+        topics = [t.strip() for t in kp.split(",") if t.strip()]
+        if not topics:
+            topics = [kp]
+
+        result = await path_agent.generate(
+            course_topics=topics,
+            student_profile=student_profile,
+            total_days=14,
+        )
+
+        # 切片推 token
+        final_response = f"📚 学习路径已生成：{result.get('title', '')}\n\n共 {len(result.get('nodes', []))} 个知识点，{len(result.get('edges', []))} 条依赖关系"
+        for i in range(0, len(final_response), 8):
+            chunk = final_response[i:i + 8]
+            if chunk:
+                yield f"data: {json.dumps({'type': 'token', 'content': chunk}, ensure_ascii=False)}\n\n"
+
+        result_data = {"type": "path", "data": result}
+
+    elif intent == "audio":
+        # 音频脚本
+        yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在生成音频脚本...'}, ensure_ascii=False)}\n\n"
+
+        result = await document_agent.generate(
+            knowledge_point=kp,
+            student_profile=student_profile,
+            resource_type="audio",
+        )
+
+        # 保存到资源中心
+        resource = Resource(
+            id=uuid.uuid4(),
+            student_id=uuid.UUID(student_id),
+            title=f"{kp} 音频脚本",
+            resource_type="audio",
+            content=result,
+            knowledge_point=kp,
+        )
+        db.add(resource)
+        await db.commit()
+
+        result_data = {"type": "audio", "data": result}
+
+    else:
+        result_data = {"type": intent, "data": {"message": f"不支持的意图: {intent}"}}
+
+    # 保存 assistant 消息
+    assistant_msg = ChatMessage(
+        id=uuid.uuid4(),
+        session_id=session.id,
+        role="assistant",
+        content=json.dumps(result_data, ensure_ascii=False),
+    )
+    db.add(assistant_msg)
+    await db.commit()
+
+    yield f"data: {json.dumps({'type': 'result', 'data': result_data}, ensure_ascii=False)}\n\n"
+    yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+
+
+# ====================================================================
+# 其他意图：StateGraph 多智能体编排（保留用于复合意图）
 # ====================================================================
 
 async def _handle_state_graph_stream(
@@ -244,6 +544,17 @@ async def _handle_state_graph_stream(
         # 推进度
         if isinstance(node_output, dict) and node_output.get("progress"):
             yield f"data: {json.dumps({'type': 'progress', 'progress': node_output['progress'], 'message': node_output.get('current_step', '')}, ensure_ascii=False)}\n\n"
+
+        # 推送 Agent 执行进度（让用户知道正在生成内容）
+        if isinstance(node_output, dict):
+            if node_output.get("document_result"):
+                yield f"data: {json.dumps({'type': 'progress', 'progress': 0.6, 'message': '文档生成完成，正在整理内容...'}, ensure_ascii=False)}\n\n"
+            elif node_output.get("mindmap_result"):
+                yield f"data: {json.dumps({'type': 'progress', 'progress': 0.6, 'message': '思维导图生成完成，正在整理内容...'}, ensure_ascii=False)}\n\n"
+            elif node_output.get("exercise_result"):
+                yield f"data: {json.dumps({'type': 'progress', 'progress': 0.6, 'message': '练习题生成完成，正在整理内容...'}, ensure_ascii=False)}\n\n"
+            elif node_output.get("path_result"):
+                yield f"data: {json.dumps({'type': 'progress', 'progress': 0.6, 'message': '学习路径生成完成，正在整理内容...'}, ensure_ascii=False)}\n\n"
 
         # 累积：每个节点的输出合并到 final_state
         if isinstance(node_output, dict):
@@ -327,8 +638,8 @@ async def _handle_state_graph_stream(
         if saved_count > 0:
             final_response += f"\n\n[👉 点击前往题库作答](/tiku?kp={kp})"
 
-    # 切片推 token（让前端实时看到内容）
-    chunk_size = 16
+    # 切片推 token（让前端实时看到内容，更小的切片让显示更平滑）
+    chunk_size = 8
     for i in range(0, len(final_response), chunk_size):
         chunk = final_response[i:i + chunk_size]
         if chunk:
@@ -375,10 +686,26 @@ async def stream_chat(req: ChatRequest, db: AsyncSession = Depends(get_db), user
         session = None
 
     if not session:
+        # 用 LLM 生成简短标题
+        title = req.message[:50]
+        try:
+            title_prompt = f"用10个字以内概括这个请求的核心内容，只输出标题，不要其他文字：{req.message[:100]}"
+            title_response = await mc_module.minimax_client.chat(
+                messages=[{"role": "user", "content": title_prompt}],
+                system="你是一个标题生成器。用简短的中文概括用户请求的核心内容。",
+                max_tokens=30,
+                temperature=0.3,
+            )
+            generated_title = title_response.get("content", "").strip().strip('"').strip("'")
+            if generated_title and len(generated_title) <= 20:
+                title = generated_title
+        except Exception:
+            pass
+
         session = ChatSession(
             id=uuid.uuid4(),
-            student_id=uuid.UUID(req.student_id),  # ChatRequest 已用 field_validator 校验
-            title=req.message[:50],
+            student_id=uuid.UUID(req.student_id),
+            title=title,
         )
         db.add(session)
         await db.commit()
@@ -427,7 +754,16 @@ async def stream_chat(req: ChatRequest, db: AsyncSession = Depends(get_db), user
                     yield evt
                 return
 
-            # 其他所有意图 → 走 StateGraph 多智能体编排
+            # 单 Agent 意图 → 走直接调用（真流式）
+            single_agent_intents = ("document", "mindmap", "exercise", "path", "audio")
+            if intent in single_agent_intents:
+                async for evt in _handle_single_agent_stream(
+                    intent, last_msg, student_profile, session, db, req.student_id
+                ):
+                    yield evt
+                return
+
+            # 复合意图 → 走 StateGraph 多智能体编排
             async for evt in _handle_state_graph_stream(
                 req, history, student_profile, session, db
             ):
@@ -437,9 +773,17 @@ async def stream_chat(req: ChatRequest, db: AsyncSession = Depends(get_db), user
             import traceback
             yield f"data: {json.dumps({'type': 'error', 'message': f'服务器内部错误: {str(e)}'}, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
-            print(f"[chat/stream] 异常: {traceback.format_exc()}")
+            logger.exception("[chat/stream] 异常")
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/sessions/{student_id}")
@@ -582,7 +926,7 @@ def _quick_route(msg: str) -> str | None:
         "mindmap": ["思维导图", "脑图", "知识结构", "导图", "结构图"],
         "exercise": ["练习", "题目", "出题", "测试", "考核", "做题"],
         "path": ["路径", "规划", "计划", "学习安排", "路线"],
-        "document": ["教程", "学习材料"],
+        "document": ["教程", "学习材料", "讲解", "解释", "介绍一下", "说明"],
         "audio": ["音频", "语音讲解"],
     }
     for intent, words in non_tutor_intents.items():
@@ -590,16 +934,16 @@ def _quick_route(msg: str) -> str | None:
             return intent
 
     # tutor 最后检查（避免"讲解...并出题"被误判为 tutor）
-    # 加入更多通用疑问词，让简单问题（"一加一等于几"、"什么是 X"）也走 tutor 真流式
+    # 简单问题（"什么是 X"、"为什么XX"）走 tutor 真流式
     tutor_keywords = [
-        "讲解", "为什么", "怎么", "什么", "解释", "原理", "区别", "对比", "比较",
+        "为什么", "怎么", "什么", "原理", "区别", "对比", "比较",
         "等于", "多少", "几", "？", "?", "怎么算", "如何", "请问", "帮我说", "帮我讲",
         "然后", "接下来", "接着", "继续", "还有", "再说", "另外", "补充",
         "对吗", "是吗", "对吧", "是不是", "对不对",
     ]
     # 短消息（<15字）没匹配到其他意图，默认走 tutor（多轮追问场景）
     if len(msg.strip()) < 15 and not any(
-        w in msg_lower for w in ["画像", "思维导图", "脑图", "练习", "题目", "出题", "路径", "规划", "教程", "学习材料", "音频"]
+        w in msg_lower for w in ["画像", "思维导图", "脑图", "练习", "题目", "出题", "路径", "规划", "教程", "学习材料", "音频", "讲解", "解释"]
     ):
         return "tutor"
     if any(w in msg_lower for w in tutor_keywords):
