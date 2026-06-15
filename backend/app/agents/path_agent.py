@@ -56,6 +56,7 @@ class PathAgent:
         course_topics: list[str],
         student_profile: dict | None = None,
         total_days: int = 30,
+        daily_topics: int = 3,
     ) -> dict:
         """生成学习路径
 
@@ -63,11 +64,12 @@ class PathAgent:
             course_topics: 课程所有知识点列表
             student_profile: 学生画像
             total_days: 路径总天数
+            daily_topics: 每天学习的知识点数量
 
         Returns:
             {title, description, total_days, nodes, edges, daily_plan}
         """
-        user_prompt = self._build_prompt(course_topics, student_profile, total_days)
+        user_prompt = self._build_prompt(course_topics, student_profile, total_days, daily_topics)
 
         response = await mc_module.minimax_client.chat(
             messages=[{"role": "user", "content": user_prompt}],
@@ -108,9 +110,11 @@ class PathAgent:
         course_topics: list[str],
         student_profile: dict | None,
         total_days: int,
+        daily_topics: int = 3,
     ) -> str:
-        parts = [f"请为以下课程知识点设计 {total_days} 天的学习路径："]
+        parts = [f"请为以下课程知识点设计 {total_days} 天的学习计划："]
         parts.append(f"\n知识点列表：{', '.join(course_topics)}")
+        parts.append(f"共 {len(course_topics)} 个知识点")
 
         if student_profile:
             # 根据学生画像调整学习路径
@@ -145,6 +149,7 @@ class PathAgent:
                 parts.append("\n学生学习目标不明确，请在路径开头说明学习价值和应用场景。")
 
         parts.append(f"\n总天数: {total_days}")
+        parts.append(f"每天学习 {daily_topics} 个知识点")
         parts.append("\n请返回 JSON 格式。只返回 JSON。")
 
         return "\n".join(parts)

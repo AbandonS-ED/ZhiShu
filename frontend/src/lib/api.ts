@@ -346,12 +346,13 @@ export interface LearningPathData {
 }
 
 export const pathApi = {
-  // SSE 流式生成学习路径
+  // SSE 流式生成学习计划
   generateStream(
     student_id: string,
     course_topics: string[],
     onEvent: (e: ChatEvent) => void,
-    total_days = 30
+    total_days = 30,
+    daily_topics = 3
   ): () => void {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 120_000)
@@ -362,7 +363,7 @@ export const pathApi = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ student_id, course_topics, total_days }),
+      body: JSON.stringify({ student_id, course_topics, total_days, daily_topics }),
       signal: controller.signal,
     })
       .then(async (res) => {
@@ -400,6 +401,8 @@ export const pathApi = {
     ),
   get: (student_id: string, path_id: string) =>
     request<LearningPathData>(`/path/${student_id}/${path_id}`),
+  delete: (student_id: string, path_id: string) =>
+    request<{ message: string }>(`/path/${student_id}/${path_id}`, { method: 'DELETE' }),
 }
 
 // ===== Tutor =====

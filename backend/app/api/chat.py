@@ -245,6 +245,7 @@ async def _handle_single_agent_stream(
 
         prompt = document_agent._build_prompt(kp, student_profile, "all")
         stream_text = ""
+        prev_display_len = 0
         async for token in mc_module.minimax_client.chat_stream(
             messages=[{"role": "user", "content": prompt}],
             system=document_agent.SYSTEM_PROMPT,
@@ -252,8 +253,12 @@ async def _handle_single_agent_stream(
             temperature=0.7,
         ):
             stream_text += token
-            if token:
-                yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+            # 去掉 <think> 标签后再推送
+            display = _strip_think(stream_text)
+            new_content = display[prev_display_len:]
+            prev_display_len = len(display)
+            if new_content:
+                yield f"data: {json.dumps({'type': 'token', 'content': new_content}, ensure_ascii=False)}\n\n"
 
         result = document_agent._parse_response(stream_text)
 
@@ -290,6 +295,7 @@ async def _handle_single_agent_stream(
 
         prompt = mindmap_agent._build_prompt(kp, student_profile)
         stream_text = ""
+        prev_display_len = 0
         async for token in mc_module.minimax_client.chat_stream(
             messages=[{"role": "user", "content": prompt}],
             system=mindmap_agent.SYSTEM_PROMPT,
@@ -297,8 +303,12 @@ async def _handle_single_agent_stream(
             temperature=0.7,
         ):
             stream_text += token
-            if token:
-                yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+            # 去掉 <think> 标签后再推送
+            display = _strip_think(stream_text)
+            new_content = display[prev_display_len:]
+            prev_display_len = len(display)
+            if new_content:
+                yield f"data: {json.dumps({'type': 'token', 'content': new_content}, ensure_ascii=False)}\n\n"
 
         result = mindmap_agent._parse_response(stream_text)
 
@@ -346,7 +356,6 @@ async def _handle_single_agent_stream(
         stream_text = ""
         sep = "---JSON_DATA---"
         sep_found = False
-        prev_display_len = 0
         async for token in mc_module.minimax_client.chat_stream(
             messages=[{"role": "user", "content": prompt}],
             system=STREAM_EXERCISE_SYSTEM,
@@ -356,12 +365,7 @@ async def _handle_single_agent_stream(
             stream_text += token
             if sep in stream_text:
                 sep_found = True
-            if not sep_found:
-                display = _strip_think(stream_text)
-                new_content = display[prev_display_len:]
-                prev_display_len = len(display)
-                if new_content:
-                    yield f"data: {json.dumps({'type': 'token', 'content': new_content}, ensure_ascii=False)}\n\n"
+            # exercise 意图不推送 token 内容，只在完成后显示题目列表
 
         # 解析 JSON
         if sep in stream_text:
@@ -446,7 +450,7 @@ async def _handle_single_agent_stream(
 
     elif intent == "path":
         # 学习路径
-        yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在规划学习路径...'}, ensure_ascii=False)}\n\n"
+        yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在规划学习计划...'}, ensure_ascii=False)}\n\n"
 
         topics = [t.strip() for t in kp.split(",") if t.strip()]
         if not topics:
@@ -459,7 +463,7 @@ async def _handle_single_agent_stream(
         )
 
         # 切片推 token
-        final_response = f"📚 学习路径已生成：{result.get('title', '')}\n\n共 {len(result.get('nodes', []))} 个知识点，{len(result.get('edges', []))} 条依赖关系"
+        final_response = f"📚 学习计划已生成：{result.get('title', '')}\n\n共 {len(result.get('nodes', []))} 个知识点，{len(result.get('edges', []))} 条依赖关系"
         for i in range(0, len(final_response), 8):
             chunk = final_response[i:i + 8]
             if chunk:
@@ -554,7 +558,7 @@ async def _handle_state_graph_stream(
             elif node_output.get("exercise_result"):
                 yield f"data: {json.dumps({'type': 'progress', 'progress': 0.6, 'message': '练习题生成完成，正在整理内容...'}, ensure_ascii=False)}\n\n"
             elif node_output.get("path_result"):
-                yield f"data: {json.dumps({'type': 'progress', 'progress': 0.6, 'message': '学习路径生成完成，正在整理内容...'}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'progress', 'progress': 0.6, 'message': '学习计划生成完成，正在整理内容...'}, ensure_ascii=False)}\n\n"
 
         # 累积：每个节点的输出合并到 final_state
         if isinstance(node_output, dict):

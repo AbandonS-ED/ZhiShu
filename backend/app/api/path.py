@@ -1,4 +1,4 @@
-"""学习路径 API — 含 SSE 流式"""
+"""学习计划 API — 含 SSE 流式"""
 
 import json
 import uuid
@@ -26,6 +26,7 @@ class PathGenerateRequest(BaseModel):
     course_id: str | None = None
     course_topics: list[str]
     total_days: int = 30
+    daily_topics: int = 3  # 每天学习的知识点数量
 
     @field_validator("student_id", "course_id")
     @classmethod
@@ -41,7 +42,7 @@ class PathGenerateRequest(BaseModel):
 
 @router.post("/generate")
 async def generate_path(req: PathGenerateRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
-    """生成个性化学习路径"""
+    """生成个性化学习计划"""
     if str(user.id) != req.student_id:
         raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
 
@@ -66,7 +67,7 @@ async def generate_path(req: PathGenerateRequest, db: AsyncSession = Depends(get
         id=uuid.uuid4(),
         student_id=uuid.UUID(req.student_id),
         course_id=uuid.UUID(req.course_id) if req.course_id else None,
-        title=path_data.get("title", f"{req.total_days}天学习路径"),
+        title=path_data.get("title", f"学习计划"),
         description=path_data.get("description", ""),
         total_days=req.total_days,
         daily_plan=path_data.get("daily_plan", []),
@@ -91,7 +92,7 @@ async def generate_path(req: PathGenerateRequest, db: AsyncSession = Depends(get
 
 @router.post("/generate/stream")
 async def generate_path_stream(req: PathGenerateRequest, db: AsyncSession = Depends(get_db), user: Student = Depends(get_current_user)):
-    """SSE 流式生成学习路径"""
+    """SSE 流式生成学习计划"""
     if str(user.id) != req.student_id:
         raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
 
@@ -109,10 +110,10 @@ async def generate_path_stream(req: PathGenerateRequest, db: AsyncSession = Depe
             try:
                 yield f"data: {json.dumps({'type': 'progress', 'progress': 0.1, 'message': '正在分析课程内容...'}, ensure_ascii=False)}\n\n"
 
-                yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在生成学习路径...'}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在生成学习计划...'}, ensure_ascii=False)}\n\n"
 
                 path_data = await path_agent.generate(
-                    req.course_topics, student_profile, req.total_days
+                    req.course_topics, student_profile, req.total_days, req.daily_topics
                 )
 
                 yield f"data: {json.dumps({'type': 'progress', 'progress': 0.8, 'message': '正在保存路径...'}, ensure_ascii=False)}\n\n"
@@ -121,7 +122,7 @@ async def generate_path_stream(req: PathGenerateRequest, db: AsyncSession = Depe
                     id=uuid.uuid4(),
                     student_id=uuid.UUID(req.student_id),
                     course_id=uuid.UUID(req.course_id) if req.course_id else None,
-                    title=path_data.get("title", f"{req.total_days}天学习路径"),
+                    title=path_data.get("title", f"学习计划"),
                     description=path_data.get("description", ""),
                     total_days=req.total_days,
                     daily_plan=path_data.get("daily_plan", []),
@@ -159,7 +160,7 @@ async def get_paths(
     db: AsyncSession = Depends(get_db),
     user: Student = Depends(get_current_user),
 ):
-    """获取学生的所有学习路径"""
+    """获取学生的所有学习计划"""
     if user.id != student_id:
         raise HTTPException(status_code=403, detail="只能查看自己的数据")
     result = await db.execute(
@@ -187,7 +188,7 @@ async def get_path_detail(
     db: AsyncSession = Depends(get_db),
     user: Student = Depends(get_current_user),
 ):
-    """获取学习路径详情"""
+    """获取学习计划详情"""
     if user.id != student_id:
         raise HTTPException(status_code=403, detail="只能查看自己的数据")
     result = await db.execute(
@@ -208,3 +209,26 @@ async def get_path_detail(
         "nodes": path.metadata_.get("nodes", []),
         "edges": path.metadata_.get("edges", []),
     }
+
+
+@router.delete("/{student_id}/{path_id}")
+async def delete_path(
+    student_id: uuid.UUID = Depends(valid_student_id),
+    path_id: uuid.UUID = Depends(valid_path_id),
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    """删除学习计划"""
+    if user.id != student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的数据")
+    result = await db.execute(
+        select(LearningPath)
+        .where(LearningPath.id == path_id)
+        .where(LearningPath.student_id == student_id)
+    )
+    path = result.scalar_one_or_none()
+    if not path:
+        raise HTTPException(status_code=404, detail="计划不存在")
+    await db.delete(path)
+    await db.commit()
+    return {"message": "删除成功"}

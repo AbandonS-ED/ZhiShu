@@ -140,6 +140,26 @@ export default function DuihuaPage() {
               content = inner.answer
             } else if (inner.final_response) {
               content = inner.final_response
+            } else if (data.type === 'exercise' || inner.exercises) {
+              // exercise 意图：显示题目列表 + 跳转链接
+              const list = inner.exercises || []
+              const jumpLink = inner.jump_link || ''
+              content = `<p>📝 为你生成了 <strong>${list.length}</strong> 道练习题</p>`
+              if (jumpLink) {
+                content += `<p style="margin-top:12px;padding:10px;background:var(--brand-soft);border-radius:6px;border:1px solid var(--brand)">${jumpLink}</p>`
+              }
+            } else if (data.type === 'document' || inner.knowledge) {
+              // document 意图：显示知识内容
+              content = inner.knowledge || JSON.stringify(inner)
+            } else if (data.type === 'mindmap' || inner.mermaid_code) {
+              // mindmap 意图：显示思维导图
+              content = `🧠 思维导图\n\n${inner.mermaid_code || inner.mermaid || ''}`
+            } else if (data.type === 'path' || inner.nodes) {
+              // path 意图：显示路径信息
+              content = `📚 学习路径：${inner.title || ''}\n\n共 ${inner.nodes?.length || 0} 个知识点`
+            } else {
+              // 其他类型：显示 JSON 字符串
+              content = JSON.stringify(inner, null, 2)
             }
           } catch {
             // JSON 解析失败（截断/格式异常），尝试从纯文本中提取可读内容
@@ -197,6 +217,7 @@ export default function DuihuaPage() {
 
     let resultData: any = null
     let streamContent = ''
+    let isExerciseIntent = false
 
     abortRef.current = chatApi.stream(
       studentId,
@@ -215,14 +236,30 @@ export default function DuihuaPage() {
         // 逐 token 追加到当前 assistant 消息（存原始 markdown，显示时再渲染）
         if (e.type === 'token' && e.content) {
           streamContent += e.content
-          setMessages((prev) => {
-            const arr = [...prev]
-            arr[arr.length - 1] = { role: 'assistant', content: streamContent }
-            return arr
-          })
+          // exercise 意图在流式阶段不显示内容，只在完成后显示
+          if (!isExerciseIntent) {
+            setMessages((prev) => {
+              const arr = [...prev]
+              arr[arr.length - 1] = { role: 'assistant', content: streamContent }
+              return arr
+            })
+          }
         }
 
-        if (e.type === 'result') resultData = e.data
+        if (e.type === 'result') {
+          resultData = e.data
+          // 检测是否为 exercise 意图，立即清空之前显示的 token 内容
+          if (resultData?.type === 'exercise' || resultData?.data?.exercises) {
+            isExerciseIntent = true
+            // 清空流式显示的内容
+            streamContent = ''
+            setMessages((prev) => {
+              const arr = [...prev]
+              arr[arr.length - 1] = { role: 'assistant', content: '' }
+              return arr
+            })
+          }
+        }
 
         if (e.type === 'done' || e.type === 'error') {
           setStreaming(false)
@@ -242,8 +279,21 @@ export default function DuihuaPage() {
           } else if (resultData) {
             // 流式已通过 token 事件渲染完毕，这里只处理非流式结果（document/exercise/path/mindmap）
             const data = resultData.data || resultData
+
+            // exercise 意图：只显示题目列表 + 跳转链接，清空之前的流式内容
+            if (resultData.type === 'exercise' || data.exercises) {
+              const list = data.exercises || []
+              const renderedHtml = `<p>📝 为你生成了 <strong>${list.length}</strong> 道练习题</p>` +
+                (data.jump_link ? `<p style="margin-top:12px;padding:10px;background:var(--brand-soft);border-radius:6px;border:1px solid var(--brand)">${markdownToHtml(data.jump_link)}</p>` : '')
+              setMessages((prev) => {
+                const arr = [...prev]
+                arr[arr.length - 1] = { role: 'assistant', content: renderedHtml, rendered: true }
+                return arr
+              })
+              setGenResources((prev) => [...prev, { name: `${userMsg} · 练习题`, status: 'done' }])
+            }
             // 如果没有 token 内容（非流式 Agent），渲染完整结果
-            if (!streamContent) {
+            else if (!streamContent) {
               let html = ''
               if (resultData.type === 'exercise' || data.exercises) {
                 const list = data.exercises || []
@@ -283,7 +333,8 @@ export default function DuihuaPage() {
             } else if (streamContent) {
               // 流式已完成，把原始 markdown 渲染为 HTML
               let renderedHtml = markdownToHtml(streamContent)
-              // 追加跳转链接（exercise 意图）
+
+              // 追加跳转链接（其他意图）
               if (data.jump_link) {
                 renderedHtml += `<p style="margin-top:12px;padding:10px;background:var(--brand-soft);border-radius:6px;border:1px solid var(--brand)">${markdownToHtml(data.jump_link)}</p>`
               }

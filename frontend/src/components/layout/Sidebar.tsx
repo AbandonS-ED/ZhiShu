@@ -72,7 +72,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { href: '/duihua', label: '智能对话', tag: 'AI', svg: chatSvg },
       { href: '/profile', label: '学习画像', svg: userSvg },
       { href: '/resources', label: '资源中心', svg: bookSvg },
-      { href: '/path', label: '学习路径', svg: pathSvg },
+      { href: '/path', label: '学习计划', svg: pathSvg },
       { href: '/tiku', label: '练习题库', svg: checkSvg },
       { href: '/pinggu', label: '学习评估', svg: evalSvg },
     ],
