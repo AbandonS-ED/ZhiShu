@@ -43,6 +43,8 @@ ZhiShu/
 │   │   └── admin/components.tsx     # 管理后台共享组件（AdminCheckbox + BatchDeleteBar + useSelection）
 │   ├── src/stores/appStore.ts       # Zustand store（已接入 Sidebar 实时刷新）
 │   ├── src/types/index.ts           # TS 类型契约（13 接口）
+│   ├── src/hooks/usePageTimer.ts    # 页面停留计时器（自动上报学习时长）
+│   ├── src/components/RobotIcon.tsx # 极简机器人 SVG 图标
 │   └── .npmrc                       # npmmirror 国内镜像
 ├── backend/                         # FastAPI + 11 表 + 8 Agent + 10 Router + 13 Service
 │   ├── app/main.py                  # 10 router 注册 + lifespan 初始化
@@ -212,7 +214,7 @@ cd frontend && npm install && npm run dev / build / lint
 - **`chatApi.stream` 无超时/重试**
 - **Spark client 默认 base_url 指向智谱**（非讯飞）
 - **SSE 实现 4 处重复**（resource/exercise/path/chat）
-- **DB schema 漂移**：老 DB 不会自动迁移 `exercise_bank` 表和 `exercises.source` 列。修法：删 `DROP DATABASE zhishu` 重跑 `init_db.sql`，或手动执行 `migrate_exercise_bank.sql`。
+- **DB schema 漂移**：老 DB 不会自动迁移 `exercise_bank` 表、`exercises.source` 列、`resources.is_preset` 列。修法：删 `DROP DATABASE zhishu` 重跑 `init_db.sql`，或手动执行迁移脚本。
 - **`requirements.txt` 列出 `bcrypt>=4.0.0` 但旧 venv 没装**——clone 仓库后第一次 `pip install -r requirements.txt` 即可。
 - **`profile_agent` 调 LLM 报 `'HumanMessage' object is not subscriptable`** → ✅ **已重写**为 `initial_assessment_agent`（wyy 合并 PR，2026-06-13）
 
@@ -269,6 +271,9 @@ cd frontend && npm install && npm run dev / build / lint
 - ✅ **对话历史 JSON 解析**（2026-06-15）：前端加载 assistant 消息时自动解析 answer 字段
 - ✅ **首页 dashboard student_id 修复**（2026-06-15）：传入真实 student_id 而非硬编码默认值
 - ✅ **对话页刷新修复**（2026-06-15）：① sessionId localStorage 持久化（刷新自动恢复上次会话）② loadSession 渲染修复（rendered 统一 false + strip think 标签 + JSON 解析失败兜底）③ chat_messages.content VARCHAR(10000) → TEXT（避免长回复截断）
+- ✅ **骨架屏 loading**（2026-06-27）：resources/path/tiku/profile 4 页面替换文字 loading 为 shimmer 动画骨架屏
+- ✅ **Robot 图标**（2026-06-27）：新增 `components/RobotIcon.tsx` 极简机器人 SVG，替换 resources/tiku/pinggu 的 🤖 emoji
+- ✅ **学习时长追踪**（2026-06-27）：新增 `hooks/usePageTimer.ts`，5 页面自动记录停留时长 → learning_records 表 → 评估报告 daily_activity
 
 ## 架构与功能要点
 

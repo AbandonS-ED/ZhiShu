@@ -1,7 +1,7 @@
 # 智枢(SmartHub) - 多智能体个性化学习资源生成系统
 
 > 第十五届中国软件杯 A3 赛题。基于大模型的个性化资源生成与学习多智能体系统。
-> **最新状态（2026-06-15）**：对话页刷新修复（session持久化+渲染修复+DB content列改Text）+ 对话页出题→题库页做题 + 题库隐藏/清空 + AI出题数量可选 + 答案格式三层防护 + 题库去重限容。114 pytest 全过，**5 次**冒烟验证 9/9 PASS，管理员账号 `admin/admin123` 已就绪。
+> **最新状态（2026-06-27）**：骨架屏 loading（4 页面 shimmer 动画）+ Robot 图标（极简 SVG）+ 学习时长追踪（usePageTimer hook 自动上报）+ DB is_preset 列修复。114 pytest 全过，**5 次**冒烟验证 9/9 PASS，管理员账号 `admin/admin123` 已就绪。
 
 ## 技术栈
 
@@ -112,6 +112,9 @@ API 文档: http://localhost:8001/docs
 | **对话→题库联动** | ✅ StateGraph exercise 保存 DB + 跳转链接 + ?kp= 自动聚焦 |
 | **题库页增强** | ✅ 隐藏/清空 + AI 出题数量可选 + 答案格式三层防护 + 去重限容 |
 | **对话页刷新修复** | ✅ sessionId 持久化 + loadSession 渲染修复 + DB content 列改 TEXT |
+| **骨架屏 loading** | ✅ resources/path/tiku/profile 4 页面 shimmer 动画骨架屏 |
+| **Robot 图标** | ✅ components/RobotIcon.tsx 极简机器人 SVG，替换 🤖 emoji |
+| **学习时长追踪** | ✅ usePageTimer hook + 5 页面自动上报 + 评估报告 daily_activity |
 | 部署与交付 | ⚠️ Docker 配置完成但本地裸跑，LLM 比赛前需切讯飞星火 V4 |
 
 ## 评分项状态
