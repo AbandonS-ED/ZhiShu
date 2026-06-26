@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { chatApi, profileApi, evaluationApi, resourceApi, type StudentProfile } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { escapeHtml, markdownToHtml, extractAnswer } from '@/lib/utils'
+import { usePageTimer } from '@/hooks/usePageTimer'
 
 // Mermaid 渲染组件（客户端动态加载）
 let mermaid: any = null
@@ -83,6 +84,9 @@ export default function DuihuaPage() {
   const abortRef = useRef<(() => void) | null>(null)
   const studentId = getStudentId()
   const loadedSessionRef = useRef(false)
+
+  // 记录页面停留时间
+  usePageTimer('chat')
 
   // 组件卸载时中断 SSE
   useEffect(() => {

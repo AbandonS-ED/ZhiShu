@@ -73,6 +73,9 @@ export function extractAnswer(data: any): { answer: string; suggestion: string }
 export function markdownToHtml(md: string): string {
   if (!md) return ''
 
+  // 去除首尾空白，避免产生空 <p></p>
+  md = md.trim()
+
   // 先对 HTML 整体做安全转义（代码块内的除外）
   function esc(text: string): string {
     return text
@@ -154,8 +157,10 @@ export function markdownToHtml(md: string): string {
 
   // 段落（连续文本行合并）
   html = html.replace(/^(?!<[a-z/!]|$)(.+)$/gm, (_, t) => `<p>${esc(t)}</p>`)
-  // 清理空段落
-  html = html.replace(/<p>\s*<\/p>/g, '')
+  // 清理空段落（含换行符和空白）
+  html = html.replace(/<p>(?:&nbsp;|\s|<br\s*\/?>)*<\/p>/g, '')
+  // 合并连续换行
+  html = html.replace(/(<br\s*\/?>\s*){3,}/g, '<br><br>')
 
   // 还原代码块和行内代码
   html = html.replace(/\x00CB(\d+)\x00/g, (_, i) => codeBlocks[Number(i)])

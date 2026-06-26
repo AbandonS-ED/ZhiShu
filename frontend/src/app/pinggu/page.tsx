@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { tutorApi, evaluationApi, type EvaluationReport } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { showToast } from '@/lib/utils'
+import RobotIcon from '@/components/RobotIcon'
+import { usePageTimer } from '@/hooks/usePageTimer'
 
 // ═══ DATA ═══
 
@@ -239,6 +241,9 @@ export default function PingguPage() {
   const displayTopicAccuracy = useMemo(() => deriveTopicAccuracy(evalReport), [evalReport])
   const [evalLoading, setEvalLoading] = useState(true)
 
+  // 记录页面停留时间
+  usePageTimer('evaluation')
+
   useEffect(() => {
     evaluationApi.getReport(getStudentId())
       .then((r) => { setEvalReport(r); setCurrentScore(r.overall_score) })
@@ -315,7 +320,7 @@ export default function PingguPage() {
 
       {/* AI 智能评估问答 */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0', padding: 12, background: 'var(--brand-soft)', borderRadius: 8 }}>
-        <span style={{ fontSize: 14, fontWeight: 600 }}>🤖 AI 评估：</span>
+        <span style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}><RobotIcon size={18} /> AI 评估：</span>
         <input
           value={askInput}
           onChange={e => setAskInput(e.target.value)}
