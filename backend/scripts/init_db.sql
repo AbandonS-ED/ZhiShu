@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS resources (
     knowledge_point VARCHAR(200),
     difficulty INTEGER DEFAULT 50,
     is_favorited BOOLEAN DEFAULT FALSE,
+    is_preset BOOLEAN DEFAULT FALSE,
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );

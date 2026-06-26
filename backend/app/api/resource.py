@@ -496,6 +496,7 @@ async def generate_exercises_stream(req: ExerciseGenRequest, db: AsyncSession = 
                 sep = "---JSON_DATA---"
                 sep_found = False
                 prev_display_len = 0
+                stream_token_count = 0
                 async for token in mc_module.minimax_client.chat_stream(
                     messages=[{"role": "user", "content": prompt}],
                     system=STREAM_EXERCISE_SYSTEM,
@@ -503,6 +504,7 @@ async def generate_exercises_stream(req: ExerciseGenRequest, db: AsyncSession = 
                     temperature=0.7,
                 ):
                     stream_text += token
+                    stream_token_count += 1
                     if sep in stream_text:
                         sep_found = True
                     if not sep_found:
@@ -512,6 +514,10 @@ async def generate_exercises_stream(req: ExerciseGenRequest, db: AsyncSession = 
                         prev_display_len = len(display)
                         if new_content:
                             yield f"data: {json.dumps({'type': 'token', 'content': new_content}, ensure_ascii=False)}\n\n"
+                    # 每 30 个 token 发一次进度
+                    if stream_token_count % 30 == 0:
+                        dots = '.' * ((stream_token_count // 30) % 4)
+                        yield f"data: {json.dumps({'type': 'progress', 'progress': 0.5, 'message': f'正在生成练习题{dots}'}, ensure_ascii=False)}\n\n"
 
                 # 解析 JSON（从 ---JSON_DATA--- 之后提取，失败则回退到原 parser）
                 if sep in stream_text:

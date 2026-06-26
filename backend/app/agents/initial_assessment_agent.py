@@ -285,6 +285,7 @@ class InitialAssessmentAgent:
         marker = "---ASSESS_DATA---"
         marker_found = False
         token_count = 0
+        first_token = True
         try:
             async for token in mc_module.minimax_client.chat_stream(
                 messages=messages,
@@ -301,15 +302,25 @@ class InitialAssessmentAgent:
                     clean = _filter_think(before)
                     new_part = clean[yielded_len:]
                     if new_part:
-                        yield f"data: {json.dumps({'type': 'token', 'content': new_part}, ensure_ascii=False)}\n\n"
+                        # 第一个 token 去掉开头的换行
+                        if first_token:
+                            new_part = new_part.lstrip('\n')
+                            first_token = False
+                        if new_part:
+                            yield f"data: {json.dumps({'type': 'token', 'content': new_part}, ensure_ascii=False)}\n\n"
                     marker_found = True
 
                 if not marker_found:
                     clean = _filter_think(collected_raw)
                     new_part = clean[yielded_len:]
                     if new_part:
-                        yield f"data: {json.dumps({'type': 'token', 'content': new_part}, ensure_ascii=False)}\n\n"
-                        yielded_len = len(clean)
+                        # 第一个 token 去掉开头的换行
+                        if first_token:
+                            new_part = new_part.lstrip('\n')
+                            first_token = False
+                        if new_part:
+                            yield f"data: {json.dumps({'type': 'token', 'content': new_part}, ensure_ascii=False)}\n\n"
+                            yielded_len = len(clean)
 
             # 获取用户回答用于客观置信度计算
             user_answer = ""
@@ -409,6 +420,9 @@ class InitialAssessmentAgent:
                         }
             except (json.JSONDecodeError, KeyError):
                 logger.warning(f"Failed to parse ASSESS_DATA from response")
+
+        # 去掉文本前后的换行和空格
+        text = text.strip()
 
         # 回退机制：如果 LLM 没有返回 ASSESS_DATA，使用默认分数
         if not has_assess_data:
