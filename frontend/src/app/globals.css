@@ -681,6 +681,21 @@ code, .mono { font-family: 'JetBrains Mono', monospace; font-weight: 400; }
 .km-mini-fill{height:100%;border-radius:2px}
 .km-pct{font-weight:600;font-variant-numeric:tabular-nums;min-width:36px;text-align:right}
 .km-attempts{font-variant-numeric:tabular-nums}
+
+/* ═══ GENERATING SPINNER ═══ */
+.gen-loading{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xs);font-size:13px;color:var(--ink-2)}
+.gen-spinner{width:14px;height:14px;border:2px solid var(--ink-4);border-top-color:var(--ink);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+.gen-loading span{animation:textPulse 1.5s ease-in-out infinite}
+@keyframes textPulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes skeletonShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.skeleton{background:linear-gradient(90deg,var(--line) 25%,var(--bg-subtle) 50%,var(--line) 75%);background-size:200% 100%;animation:skeletonShimmer 1.5s ease-in-out infinite;border-radius:var(--r-xs)}
+.skeleton-line{height:14px;margin-bottom:10px}
+.skeleton-line.w60{width:60%}
+.skeleton-line.w40{width:40%}
+.skeleton-line.w80{width:80%}
+.skeleton-line.w100{width:100%}
+.skeleton-card{padding:16px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.skeleton-card+.skeleton-card{margin-top:12px}
 .record-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-2);font-size:12.5px}
 .record-item:last-child{border-bottom:none}
 .ri-time{font-size:11px;color:var(--ink-4);min-width:120px;font-variant-numeric:tabular-nums}

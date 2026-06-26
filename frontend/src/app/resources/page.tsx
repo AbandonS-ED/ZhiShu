@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { resourceApi, evaluationApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { showToast } from '@/lib/utils'
+import RobotIcon from '@/components/RobotIcon'
+import { usePageTimer } from '@/hooks/usePageTimer'
 
 // ═══ TYPES ═══
 type ResourceType = 'explanation' | 'mindmap' | 'exercise' | 'code' | 'audio'
@@ -185,6 +187,13 @@ export default function ResourcesPage() {
   const [apiResources, setApiResources] = useState<Resource[]>([])
   const [loading, setLoading] = useState(true)
 
+  // 记录页面停留时间
+  usePageTimer('resource')
+
+  // 消息队列
+  const msgQueueRef = useRef<string[]>([])
+  const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     setAudioBars(Array.from({ length: 24 }, () => Math.random() * 16 + 4))
     setDetailAudioBars(Array.from({ length: 40 }, () => Math.random() * 20 + 4))
@@ -208,11 +217,35 @@ export default function ResourcesPage() {
     loadResources()
   }, [loadResources])
 
+  // 处理消息队列：每条消息至少显示 2.5 秒
+  const processMsgQueue = useCallback(() => {
+    if (msgTimerRef.current) return
+    const queue = msgQueueRef.current
+    if (queue.length === 0) return
+    const msg = queue.shift()!
+    setGenResult(msg)
+    if (queue.length > 0) {
+      msgTimerRef.current = setTimeout(() => {
+        msgTimerRef.current = null
+        processMsgQueue()
+      }, 2500)
+    }
+  }, [])
+
+  const clearMsgQueue = useCallback(() => {
+    msgQueueRef.current = []
+    if (msgTimerRef.current) {
+      clearTimeout(msgTimerRef.current)
+      msgTimerRef.current = null
+    }
+  }, [])
+
   // 生成资源（支持单个或批量）
   const generate = async () => {
     if (!genInput.trim() || generating) return
     setGenerating(true)
     setGenResult('正在分析知识点...')
+    clearMsgQueue()
 
     // 检查是否是批量生成（用逗号分隔）
     const knowledgePoints = genInput.split(/[,，、]/).map(s => s.trim()).filter(s => s.length > 0)
@@ -220,7 +253,8 @@ export default function ResourcesPage() {
     if (knowledgePoints.length > 1) {
       // 批量生成
       try {
-        setGenResult(`正在批量生成 ${knowledgePoints.length} 个知识点的资源...`)
+        msgQueueRef.current.push(`正在批量生成 ${knowledgePoints.length} 个知识点的资源...`)
+        processMsgQueue()
         const result = await resourceApi.batchGenerate(getStudentId(), knowledgePoints)
 
         const successCount = result.success
@@ -234,8 +268,10 @@ export default function ResourcesPage() {
         resultMsg += `\n知识点：${knowledgePoints.join('、')}`
 
         setGenResult(resultMsg)
+        clearMsgQueue()
         loadResources()
       } catch (err) {
+        clearMsgQueue()
         setGenResult(`❌ 批量生成失败: ${err instanceof Error ? err.message : '未知错误'}`)
       } finally {
         setGenerating(false)
@@ -248,13 +284,16 @@ export default function ResourcesPage() {
         genInput.trim(),
         (e) => {
           if (e.type === 'progress' && e.message) {
-            setGenResult(e.message)
+            msgQueueRef.current.push(e.message)
+            processMsgQueue()
           }
           if (e.type === 'token' && e.content) {
+            clearMsgQueue()
             streamContent += e.content
             setGenResult(streamContent.slice(0, 500) + (streamContent.length > 500 ? '...' : ''))
           }
           if (e.type === 'result' && e.data) {
+            clearMsgQueue()
             const data = e.data as Record<string, unknown>
             const content = data.content as Record<string, unknown> || {}
             const knowledge = String(content.knowledge || '')
@@ -270,7 +309,11 @@ export default function ResourcesPage() {
             }).catch(() => {})
           }
           if (e.type === 'error') {
+            clearMsgQueue()
             setGenResult(`❌ ${e.message || '调用失败'}`)
+          }
+          if (e.type === 'done') {
+            setTimeout(() => clearMsgQueue(), 3000)
           }
           if (e.type === 'done' || e.type === 'error') {
             setGenerating(false)
@@ -370,7 +413,7 @@ export default function ResourcesPage() {
 
       {/* AI 生成面板 */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0', padding: 12, background: 'var(--brand-soft)', borderRadius: 8 }}>
-        <span style={{ fontSize: 14, fontWeight: 600 }}>🤖 AI 生成：</span>
+        <span style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}><RobotIcon size={18} /> AI 生成：</span>
         <input
           value={genInput}
           onChange={e => setGenInput(e.target.value)}
@@ -384,9 +427,16 @@ export default function ResourcesPage() {
         </button>
       </div>
       {genResult && (
-        <div style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12, fontSize: 13, whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>
-          {genResult}
-        </div>
+        generating ? (
+          <div className="gen-loading">
+            <div className="gen-spinner" />
+            <span>{genResult}</span>
+          </div>
+        ) : (
+          <div style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12, fontSize: 13, whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>
+            {genResult}
+          </div>
+        )
       )}
 
       {/* Stats */}
@@ -399,8 +449,14 @@ export default function ResourcesPage() {
       {/* Grid */}
       <div className={`res-grid${view === 'list' ? ' list-view' : ''}`}>
         {loading ? (
-          <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 0', color: 'var(--ink-3)' }}>
-            <div style={{ fontSize: '14px', fontWeight: 500 }}>加载中...</div>
+          <div style={{ gridColumn: '1/-1', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="skeleton-card">
+                <div className="skeleton skeleton-line w60" />
+                <div className="skeleton skeleton-line w100" />
+                <div className="skeleton skeleton-line w40" />
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 0', color: 'var(--ink-3)' }}>

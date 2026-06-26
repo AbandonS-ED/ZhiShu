@@ -1093,8 +1093,27 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-        <div style={{ fontSize: 14, color: '#A8A29E', animation: 'pulse 1.5s infinite' }}>加载中...</div>
+      <div style={{ padding: '12px 0' }}>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
+          <div className="skeleton" style={{ width: 80, height: 80, borderRadius: '50%' }} />
+          <div style={{ flex: 1 }}>
+            <div className="skeleton skeleton-line w60" style={{ height: 20 }} />
+            <div className="skeleton skeleton-line w40" />
+          </div>
+        </div>
+        <div className="skeleton-card">
+          <div className="skeleton skeleton-line w60" style={{ height: 18 }} />
+          <div className="skeleton skeleton-line w100" />
+          <div className="skeleton skeleton-line w80" />
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 12 }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="skeleton-card" style={{ textAlign: 'center' }}>
+              <div className="skeleton" style={{ width: 48, height: 48, borderRadius: '50%', margin: '0 auto 8px' }} />
+              <div className="skeleton skeleton-line w40" style={{ margin: '0 auto' }} />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }

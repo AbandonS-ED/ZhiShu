@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { pathApi, evaluationApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
+import { usePageTimer } from '@/hooks/usePageTimer'
 
 // ═══ TYPES ═══
 interface PathNode {
@@ -83,6 +84,13 @@ export default function PathPage() {
   const [genResult, setGenResult] = useState('')
   const [loading, setLoading] = useState(true)
 
+  // 记录页面停留时间
+  usePageTimer('path')
+
+  // 消息队列
+  const msgQueueRef = useRef<string[]>([])
+  const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // 加载计划列表
   const loadPaths = useCallback(async () => {
     try {
@@ -128,11 +136,35 @@ export default function PathPage() {
     loadPaths()
   }, [loadPaths])
 
+  // 处理消息队列
+  const processMsgQueue = useCallback(() => {
+    if (msgTimerRef.current) return
+    const queue = msgQueueRef.current
+    if (queue.length === 0) return
+    const msg = queue.shift()!
+    setGenResult(msg)
+    if (queue.length > 0) {
+      msgTimerRef.current = setTimeout(() => {
+        msgTimerRef.current = null
+        processMsgQueue()
+      }, 2500)
+    }
+  }, [])
+
+  const clearMsgQueue = useCallback(() => {
+    msgQueueRef.current = []
+    if (msgTimerRef.current) {
+      clearTimeout(msgTimerRef.current)
+      msgTimerRef.current = null
+    }
+  }, [])
+
   // 生成计划
   const generatePath = () => {
     if (!genInput.trim() || generating) return
     setGenerating(true)
     setGenResult('正在生成学习计划...')
+    clearMsgQueue()
 
     const topics = genInput.split(/[,，、\s]+/).filter(Boolean)
     pathApi.generateStream(
@@ -140,9 +172,11 @@ export default function PathPage() {
       topics,
       (e) => {
         if (e.type === 'progress' && e.message) {
-          setGenResult(e.message)
+          msgQueueRef.current.push(e.message)
+          processMsgQueue()
         }
         if (e.type === 'result' && e.data) {
+          clearMsgQueue()
           const data = e.data
           setGenResult(`✅ 已生成「${data.title || ''}」\n共 ${data.total_days || 0} 天，${data.nodes?.length || 0} 个知识点`)
           loadPaths()
@@ -155,7 +189,11 @@ export default function PathPage() {
           }).catch(() => {})
         }
         if (e.type === 'error') {
+          clearMsgQueue()
           setGenResult(`❌ ${e.message || '调用失败'}`)
+        }
+        if (e.type === 'done') {
+          setTimeout(() => clearMsgQueue(), 3000)
         }
         if (e.type === 'done' || e.type === 'error') {
           setGenerating(false)
@@ -227,9 +265,26 @@ export default function PathPage() {
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '80px 0', color: 'var(--ink-4)' }}>
-        <div className="spinner" style={{ display: 'inline-block', width: 24, height: 24, marginBottom: 12 }}></div>
-        <div style={{ fontSize: 14 }}>加载中...</div>
+      <div style={{ padding: '12px 0' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
+          <div className="skeleton" style={{ width: 120, height: 36, borderRadius: 8 }} />
+          <div className="skeleton" style={{ width: 80, height: 36, borderRadius: 8 }} />
+        </div>
+        <div className="skeleton-card">
+          <div className="skeleton skeleton-line w60" style={{ height: 18 }} />
+          <div className="skeleton skeleton-line w100" />
+          <div className="skeleton skeleton-line w80" />
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="skeleton" style={{ width: 100, height: 80, borderRadius: 8 }} />
+            ))}
+          </div>
+        </div>
+        <div className="skeleton-card" style={{ marginTop: 12 }}>
+          <div className="skeleton skeleton-line w40" style={{ height: 18 }} />
+          <div className="skeleton skeleton-line w100" />
+          <div className="skeleton skeleton-line w60" />
+        </div>
       </div>
     )
   }
@@ -309,10 +364,17 @@ export default function PathPage() {
         )}
       </div>
       {genResult && (
-        <div style={{ padding: '12px 16px', background: genResult.startsWith('✅') ? 'var(--success-soft)' : genResult.startsWith('❌') ? 'var(--danger-soft)' : 'var(--surface)', border: `1px solid ${genResult.startsWith('✅') ? 'var(--success)' : genResult.startsWith('❌') ? 'var(--danger)' : 'var(--border)'}`, borderRadius: 8, marginBottom: 12, fontSize: 13, whiteSpace: 'pre-wrap', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-          <span style={{ fontSize: 16, flexShrink: 0 }}>{genResult.startsWith('✅') ? '✅' : genResult.startsWith('❌') ? '❌' : '⏳'}</span>
-          <span>{genResult.replace(/^[✅❌⏳]\s*/, '')}</span>
-        </div>
+        generating ? (
+          <div className="gen-loading">
+            <div className="gen-spinner" />
+            <span>{genResult.replace(/^[✅❌⏳]\s*/, '')}</span>
+          </div>
+        ) : (
+          <div style={{ padding: '12px 16px', background: genResult.startsWith('✅') ? 'var(--success-soft)' : genResult.startsWith('❌') ? 'var(--danger-soft)' : 'var(--surface)', border: `1px solid ${genResult.startsWith('✅') ? 'var(--success)' : genResult.startsWith('❌') ? 'var(--danger)' : 'var(--border)'}`, borderRadius: 8, marginBottom: 12, fontSize: 13, whiteSpace: 'pre-wrap', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <span style={{ fontSize: 16, flexShrink: 0 }}>{genResult.startsWith('✅') ? '✅' : genResult.startsWith('❌') ? '❌' : '⏳'}</span>
+            <span>{genResult.replace(/^[✅❌⏳]\s*/, '')}</span>
+          </div>
+        )
       )}
 
       {/* 计划描述 */}

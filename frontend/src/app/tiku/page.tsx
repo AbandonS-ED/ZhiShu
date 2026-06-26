@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { exerciseApi, evaluationApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { markdownToHtml } from '@/lib/utils'
+import RobotIcon from '@/components/RobotIcon'
+import { usePageTimer } from '@/hooks/usePageTimer'
 
 const BASE_URL = 'http://localhost:8001/api/v1'
 const HIDDEN_KEY = 'zhishu_hidden_exercises'
@@ -109,6 +111,14 @@ export default function TikuPage() {
   const [loading, setLoading] = useState(true)
   const [confirmDlg, setConfirmDlg] = useState<{ message: string; onConfirm: () => void } | null>(null)
 
+  // 记录页面停留时间
+  usePageTimer('exercise')
+
+  // 消息队列：确保每条进度消息至少显示 1.5 秒
+  const msgQueueRef = useRef<string[]>([])
+  const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastMsgTimeRef = useRef(0)
+
   // 从 URL 读取 ?kp=xxx，自动填入知识点输入框
   useEffect(() => {
     const kp = new URLSearchParams(window.location.search).get('kp')
@@ -149,18 +159,49 @@ export default function TikuPage() {
     localStorage.removeItem(HIDDEN_KEY)
   }, [])
 
+  // 处理消息队列：每条消息至少显示 2.5 秒
+  const processMsgQueue = useCallback(() => {
+    if (msgTimerRef.current) return
+    const queue = msgQueueRef.current
+    if (queue.length === 0) return
+
+    const msg = queue.shift()!
+    setGenResult(msg)
+    lastMsgTimeRef.current = Date.now()
+
+    // 如果队列还有消息，2.5 秒后处理下一条
+    if (queue.length > 0) {
+      msgTimerRef.current = setTimeout(() => {
+        msgTimerRef.current = null
+        processMsgQueue()
+      }, 2500)
+    }
+  }, [])
+
+  // 清空消息队列
+  const clearMsgQueue = useCallback(() => {
+    msgQueueRef.current = []
+    if (msgTimerRef.current) {
+      clearTimeout(msgTimerRef.current)
+      msgTimerRef.current = null
+    }
+  }, [])
+
   // AI 出题
   const generateExercises = () => {
     if (!genInput.trim() || generating) return
     setGenerating(true)
     setGenResult('正在生成...')
+    clearMsgQueue()
 
     exerciseApi.generateStream(
       getStudentId(),
       genInput.trim(),
       (e) => {
         if (e.type === 'progress' && e.message) {
-          setGenResult(e.message)
+          // 将消息加入队列
+          msgQueueRef.current.push(e.message)
+          processMsgQueue()
         }
         if (e.type === 'result' && e.data) {
           const data = e.data
@@ -176,6 +217,7 @@ export default function TikuPage() {
             source: 'ai',
           }))
           setExercises((prev) => [...newExs, ...prev])
+          // 不在这里清队列，让 "正在防幻觉验证..." 和 "正在保存..." 显示完
           setGenResult(`已生成 ${data.count || newExs.length} 道「${data.knowledge_point || genInput.trim()}」题目`)
           evaluationApi.recordAction({
             student_id: getStudentId(),
@@ -186,7 +228,12 @@ export default function TikuPage() {
           }).catch(() => {})
         }
         if (e.type === 'error') {
+          clearMsgQueue()
           setGenResult(`${e.message || '调用失败'}`)
+        }
+        if (e.type === 'done') {
+          // done 时延迟清队列，让最后的消息显示完
+          setTimeout(() => clearMsgQueue(), 3000)
         }
         if (e.type === 'done' || e.type === 'error') {
           setGenerating(false)
@@ -309,14 +356,39 @@ export default function TikuPage() {
   const ringColor = answerPct >= 80 ? 'var(--success)' : answerPct >= 40 ? 'var(--warm)' : 'var(--ink-3)'
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: 60, color: 'var(--ink-3)' }}>加载题池中...</div>
+    return (
+      <div style={{ padding: '12px 0' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 16 }}>
+          <div className="skeleton" style={{ width: 100, height: 36, borderRadius: 8 }} />
+          <div className="skeleton" style={{ width: 60, height: 36, borderRadius: 8 }} />
+        </div>
+        <div className="skeleton-card">
+          <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+            <div className="skeleton" style={{ width: 64, height: 64, borderRadius: '50%' }} />
+            <div style={{ flex: 1 }}>
+              <div className="skeleton skeleton-line w60" style={{ height: 18 }} />
+              <div className="skeleton skeleton-line w40" />
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, marginTop: 12 }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="skeleton-card">
+              <div className="skeleton skeleton-line w80" />
+              <div className="skeleton skeleton-line w60" />
+              <div className="skeleton skeleton-line w40" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
     <>
       {/* AI 生成面板 */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0', padding: 14, background: 'var(--brand-soft)', borderRadius: 10, border: '1px solid var(--border)' }}>
-        <span style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap' }}>AI 出题</span>
+        <span style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}><RobotIcon size={18} /> AI 出题</span>
         <input
           value={genInput}
           onChange={e => setGenInput(e.target.value)}
@@ -396,7 +468,14 @@ export default function TikuPage() {
         </button>
       </div>
       {genResult && (
-        <div style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12, fontSize: 13 }} dangerouslySetInnerHTML={{ __html: markdownToHtml(genResult) }} />
+        generating ? (
+          <div className="gen-loading">
+            <div className="gen-spinner" />
+            <span>{genResult}</span>
+          </div>
+        ) : (
+          <div style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12, fontSize: 13 }} dangerouslySetInnerHTML={{ __html: markdownToHtml(genResult) }} />
+        )
       )}
 
       {/* Stats */}
