@@ -485,6 +485,25 @@ export interface EvaluationReport {
   daily_activity: Array<{ date: string; count: number; duration_minutes: number }>
   overall_score: number
   recommendations: string[]
+  report: {
+    overall_evaluation: string
+    strengths: Array<{ name: string; mastery: number; description: string }>
+    weak_points: Array<{ name: string; mastery: number; description: string }>
+    error_prone_areas: Array<{ name: string; error_rate: number; description: string }>
+    recommendations: string[]
+    progress_trend: {
+      score_change: number
+      duration_change: number
+      description: string
+    }
+  }
+  profile: {
+    comprehension: number
+    memory: number
+    application: number
+    imagination: number
+    focus: number
+  }
 }
 
 export const evaluationApi = {
