@@ -12,7 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **课程切入点**：人工智能导论
 - **主仓库**：<https://github.com/AbandonS-ED/ZhiShu>
 
-## 仓库现状（2026-06-15）
+## 仓库现状（2026-06-27）
 
 ```
 ZhiShu/
@@ -128,7 +128,7 @@ ZhiShu/
 - ✅ **防幻觉三层验证** + 4 个 SSE 流式端点
 - ✅ **RAG 管道**（document_parser → text_chunker → embedding → vector_store.search → reranker）
 - ✅ **练习题 dual-format 流式**（markdown + JSON 同传）
-- ✅ **端到端冒烟测试 5 次 9/9 PASS**
+- ✅ **端到端冒烟测试 6 次 9/9 PASS**
 - ✅ **114 pytest 全过**（7 文件：agents / anti_hallucination / api / json_parser / message_bus / state_graph / strip_think）
 - ✅ **多轮对话上下文**（最近 10 条消息）
 - ✅ **公共题库系统**（`exercise_bank` 表 + 6 admin 端点 + `/resource/exercises/pool` 题池合并随机抽题）
@@ -140,6 +140,7 @@ ZhiShu/
 - ✅ **题库去重 + 限容**（difflib 相似度 >0.85 判重，每知识点最多 20 道 AI 题）
 - ✅ **对话历史 JSON 解析**（前端加载 assistant 消息时自动解析 `answer` 字段）
 - ✅ **对话页刷新修复**（sessionId 持久化 + loadSession 渲染修复 + DB content 列改 TEXT）
+- ✅ **评估报告 AI 化**（LLM 生成自然语言报告 + 7 天趋势对比 + 知识点掌握度统计 + 易错点分析 + 规则引擎降级）
 
 ## 技术栈（已锁定，不要换）
 
@@ -274,6 +275,7 @@ cd frontend && npm install && npm run dev / build / lint
 - ✅ **骨架屏 loading**（2026-06-27）：resources/path/tiku/profile 4 页面替换文字 loading 为 shimmer 动画骨架屏
 - ✅ **Robot 图标**（2026-06-27）：新增 `components/RobotIcon.tsx` 极简机器人 SVG，替换 resources/tiku/pinggu 的 🤖 emoji
 - ✅ **学习时长追踪**（2026-06-27）：新增 `hooks/usePageTimer.ts`，5 页面自动记录停留时长 → learning_records 表 → 评估报告 daily_activity
+- ✅ **评估报告 AI 化**（2026-06-27）：evaluation_service.py 重写——新增 LLM 报告生成 (`_generate_llm_report`)、趋势计算 (`_calculate_trend`)、知识点掌握度统计 (`_get_exercise_details`)、规则引擎降级 (`_generate_fallback_report`)，评估 API 返回 report + profile 字段；前端 pinggu 页移除全部硬编码改动态渲染 LLM 报告
 
 ## 架构与功能要点
 
@@ -391,6 +393,19 @@ LLM 一份输出 = 人类可读 markdown + `---JSON_DATA---` + 结构化 JSON。
 - [docs/设计文档/项目设计文档-完整版.md](docs/设计文档/项目设计文档-完整版.md)
 - [AGENTS.md](AGENTS.md)
 - [开发进度.md](开发进度.md)
+
+## 工作准则
+
+| 荣 | 耻 |
+|---|---|
+| 以认真查询为荣 | 以聘猜接口为耻 |
+| 以寻求确认为荣 | 以模糊执行为耻 |
+| 以人类确认为荣 | 以臆想业务为耻 |
+| 以复用现有为荣 | 以创造接口为耻 |
+| 以主动测试为荣 | 以跳过验证为耻 |
+| 以遵循规范为荣 | 以破坏架构为耻 |
+| 以诚实无知为荣 | 以假装理解为耻 |
+| 以谨慎重构为荣 | 以盲目修改为耻 |
 
 ## 提交规范
 

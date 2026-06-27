@@ -1,6 +1,37 @@
 # 端到端冒烟测试报告
 
-> 最后更新：2026-06-11（管理后台 + bcrypt 角色权限 + 批量删除）
+> 最后更新：2026-06-27（评估报告 AI 化 — 第 6 次冒烟验证）
+
+## 第六次（2026-06-27）— 评估报告 AI 化验证
+
+> **背景**：评估报告从规则引擎升级为 LLM 生成（MiniMax/Spark），新增趋势计算、知识点统计、易错点分析
+> **检测方式**：API 调用 + 前端渲染验证
+
+### 验证清单
+
+| 验证项 | 方法 | 结果 |
+|---|---|---|
+| 后端 LLM 报告生成 | `GET /evaluation/report/{student_id}` → 检查 `report` 字段 | ✅ 返回 `overall_evaluation`/`strengths`/`weak_points`/`recommendations`/`progress_trend` |
+| LLM 响应 JSON 解析 | `_parse_llm_response` 对 3 种格式（直接 JSON / 代码块 / 空） | ✅ 全部正确解析或降级 |
+| LLM 失败降级 | 模拟 API 超时 → `_generate_fallback_report` | ✅ 规则引擎输出完整报告结构 |
+| 趋势计算 | `_calculate_trend` 近7天 vs 之前7天 | ✅ score_change / duration_change |
+| 知识点掌握度统计 | `_get_exercise_details` 按知识点聚合 | ✅ 含 error_rate / correct_count |
+| 前端 pinggu 页无硬编码 | 检查页面资源: `dimensions` / `knowledgeTable` / `weeklyHours` / `topicAccuracy` / `records` | ✅ 全部移除，替换为 fallback 默认值 |
+| 前端渲染 LLM 报告 | `evalReport.report.strengths` / `weak_points` / `error_prone_areas` | ✅ 动态渲染 4 个区域 |
+| 前端空数据状态 | 新注册用户首次进入 pinggu 页 | ✅ 显示"暂无评估报告数据" |
+| 前端加载状态 | `evalLoading=true` 时显示 RobotIcon + "AI 正在分析您的学习数据..." | ✅ |
+| npm run lint | `cd frontend && npm run lint` | ✅ 0 errors |
+| npm run build | `cd frontend && npm run build` | ✅ 18 路由编译通过 |
+
+### 关键发现
+
+- **LLM 报告质量**：生成的 `overall_evaluation` 包含学生姓名 + 综合评分 + 等级 + 日均学习时长的完整摘要
+- **趋势判断准确**：近 7 天 vs 之前 7 天的正确率和时长对比数据符合预期
+- **降级策略稳健**：任何 LLM 调用异常（超时/JSON解析失败/空响应）自动降级到规则引擎
+- **前端重构彻底**：pinggu 页从 240+ 行硬编码数据降至仅有 fallback 默认值，所有展示依赖后端 API
+- **`[...new Set()]` → `Array.from(new Set())`**：资源页修复 Set 解构在旧 Node 版本的兼容性问题
+
+---
 
 ## 第五次（2026-06-11）— 管理后台 + 角色权限验证
 

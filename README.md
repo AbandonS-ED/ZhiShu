@@ -1,7 +1,7 @@
 # 智枢(SmartHub) - 多智能体个性化学习资源生成系统
 
 > 第十五届中国软件杯 A3 赛题。基于大模型的个性化资源生成与学习多智能体系统。
-> **最新状态（2026-06-27）**：骨架屏 loading（4 页面 shimmer 动画）+ Robot 图标（极简 SVG）+ 学习时长追踪（usePageTimer hook 自动上报）+ DB is_preset 列修复。114 pytest 全过，**5 次**冒烟验证 9/9 PASS，管理员账号 `admin/admin123` 已就绪。
+> **最新状态（2026-06-27）**：评估报告 AI 化（LLM 生成自然语言报告 + 趋势对比 + 易错点分析 + 规则引擎降级）+ 学习评估页移除全部硬编码数据 + 后端新增趋势计算与知识掌握度统计。114 pytest 全过，**6 次**冒烟验证 9/9 PASS，管理员账号 `admin/admin123` 已就绪。
 
 ## 技术栈
 
@@ -102,19 +102,20 @@ API 文档: http://localhost:8001/docs
 | **管理后台权限** | ✅ 已完成（role 字段 + is_active + last_login + bcrypt） |
 | **P0 全部 10 个问题** | ✅ 已修复 |
 | **单元测试** | ✅ **114** 个 pytest 全 PASS |
-| **端到端冒烟测试** | ✅ **5** 次验证 9/9 API 200 |
+| **端到端冒烟测试** | ✅ **6** 次验证 9/9 API 200 |
 | F1 对话式画像 | ✅ 后端+前端完成（**5 维**，35% 评分项） |
 | F2 多智能体资源生成 | ✅ StateGraph **10 节点** + 7 子 Agent（45% 评分项） |
 | F3 学习路径 | ✅ 后端+前端完成（7/14/30 天可配，DAG 可视化） |
 | N3 防幻觉 + 流式 | ✅ 三层防幻觉 + 4 个 SSE 流式端点 |
 | F4 智能辅导 | ✅ Tutor Agent RAG 接入（embedding + vector_store + reranker） |
-| F5 效果评估 | ✅ learning_records + 统计 + 报告 |
+| F5 效果评估 | ✅ **LLM 评估报告 + 趋势分析 + 规则引擎降级** |
 | **对话→题库联动** | ✅ StateGraph exercise 保存 DB + 跳转链接 + ?kp= 自动聚焦 |
 | **题库页增强** | ✅ 隐藏/清空 + AI 出题数量可选 + 答案格式三层防护 + 去重限容 |
 | **对话页刷新修复** | ✅ sessionId 持久化 + loadSession 渲染修复 + DB content 列改 TEXT |
 | **骨架屏 loading** | ✅ resources/path/tiku/profile 4 页面 shimmer 动画骨架屏 |
 | **Robot 图标** | ✅ components/RobotIcon.tsx 极简机器人 SVG，替换 🤖 emoji |
 | **学习时长追踪** | ✅ usePageTimer hook + 5 页面自动上报 + 评估报告 daily_activity |
+| **评估报告 AI 化** | ✅ LLM 生成评估报告 + 7 天趋势对比 + 知识点掌握度统计 + 易错点分析 + 规则引擎降级 |
 | 部署与交付 | ⚠️ Docker 配置完成但本地裸跑，LLM 比赛前需切讯飞星火 V4 |
 
 ## 评分项状态
