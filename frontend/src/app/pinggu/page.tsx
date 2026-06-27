@@ -9,64 +9,28 @@ import { usePageTimer } from '@/hooks/usePageTimer'
 
 // ═══ DATA ═══
 
-const dimensions = [
-  { name: '知识基础', icon: '📚', bg: 'var(--info-soft)', color: 'var(--info)', score: 72, detail: '掌握搜索算法和 ML 基础，深度学习需加强' },
-  { name: '认知风格', icon: '🧠', bg: 'var(--success-soft)', color: 'var(--success)', score: 80, detail: '视觉学习偏好，理解力强' },
-  { name: '学习目标', icon: '🎯', bg: 'var(--warm-soft)', color: 'var(--warm)', score: 90, detail: '目标明确，执行度高' },
-  { name: '易错点', icon: '⚠️', bg: 'var(--danger-soft)', color: 'var(--danger)', score: 55, detail: '梯度计算和正则化常出错' },
-  { name: '学习节奏', icon: '⏱️', bg: 'var(--info-soft)', color: 'var(--info)', score: 70, detail: '日均 2.4h，节奏稳定' },
-  { name: '兴趣方向', icon: '💡', bg: 'var(--success-soft)', color: 'var(--success)', score: 85, detail: 'NLP 和大模型方向兴趣浓厚' },
+// 默认 fallback 数据
+const defaultDimensions = [
+  { name: '知识基础', icon: '📚', bg: 'var(--info-soft)', color: 'var(--info)', score: 0, detail: '暂无数据' },
+  { name: '认知风格', icon: '🧠', bg: 'var(--success-soft)', color: 'var(--success)', score: 0, detail: '暂无数据' },
+  { name: '学习目标', icon: '🎯', bg: 'var(--warm-soft)', color: 'var(--warm)', score: 0, detail: '暂无数据' },
+  { name: '易错点', icon: '⚠️', bg: 'var(--danger-soft)', color: 'var(--danger)', score: 0, detail: '暂无数据' },
+  { name: '学习节奏', icon: '⏱️', bg: 'var(--info-soft)', color: 'var(--info)', score: 0, detail: '暂无数据' },
+  { name: '兴趣方向', icon: '💡', bg: 'var(--success-soft)', color: 'var(--success)', score: 0, detail: '暂无数据' },
 ]
 
-const weeklyHours = [
-  { day: '周一', val: 2.0 }, { day: '周二', val: 3.2 }, { day: '周三', val: 1.5 },
-  { day: '周四', val: 2.8 }, { day: '周五', val: 4.2 }, { day: '周六', val: 3.5 },
+const defaultWeeklyHours = [
+  { day: '周一', val: 0 }, { day: '周二', val: 0 }, { day: '周三', val: 0 },
+  { day: '周四', val: 0 }, { day: '周五', val: 0 }, { day: '周六', val: 0 },
   { day: '周日', val: 0 },
 ]
 
-const topicAccuracy = [
-  { name: '搜索算法', pct: 85 }, { name: '知识表示', pct: 72 }, { name: 'ML基础', pct: 62 },
-  { name: 'CNN', pct: 55 }, { name: 'NLP', pct: 48 }, { name: 'RNN', pct: 35 },
-  { name: '强化学习', pct: 22 },
+const defaultTopicAccuracy = [
+  { name: '暂无数据', pct: 0 },
 ]
 
-const knowledgeTable = [
-  { name: 'A* 搜索算法', mastery: 85, attempts: 12, accuracy: 92 },
-  { name: 'Dijkstra 算法', mastery: 78, attempts: 8, accuracy: 88 },
-  { name: '知识表示方法', mastery: 72, attempts: 6, accuracy: 83 },
-  { name: '机器学习基础', mastery: 62, attempts: 15, accuracy: 67 },
-  { name: 'CNN 卷积网络', mastery: 55, attempts: 10, accuracy: 60 },
-  { name: 'Transformer', mastery: 48, attempts: 7, accuracy: 57 },
-  { name: '反向传播', mastery: 40, attempts: 5, accuracy: 50 },
-  { name: 'RNN 与 LSTM', mastery: 35, attempts: 4, accuracy: 45 },
-  { name: '强化学习', mastery: 22, attempts: 3, accuracy: 33 },
-]
-
-const records = [
-  { time: '06-06 16:42', icon: '✅', bg: 'var(--success-soft)', color: 'var(--success)', text: '完成 <strong>A* 算法</strong> 练习', score: '92' },
-  { time: '06-06 15:30', icon: '📄', bg: 'var(--info-soft)', color: 'var(--info)', text: '查看 <strong>反向传播推导</strong> 文档' },
-  { time: '06-06 14:15', icon: '🗺️', bg: 'var(--success-soft)', color: 'var(--success)', text: '生成 <strong>Transformer</strong> 思维导图' },
-  { time: '06-06 11:20', icon: '✅', bg: 'var(--success-soft)', color: 'var(--success)', text: '完成 <strong>ML 基础</strong> 练习', score: '78' },
-  { time: '06-05 21:40', icon: '💬', bg: 'var(--warm-soft)', color: 'var(--warm)', text: '对话学习 <strong>CNN 卷积网络</strong>' },
-  { time: '06-05 20:10', icon: '✅', bg: 'var(--success-soft)', color: 'var(--success)', text: '完成 <strong>搜索算法</strong> 练习', score: '88' },
-  { time: '06-05 18:30', icon: '🗺️', bg: 'var(--success-soft)', color: 'var(--success)', text: '生成 <strong>CNN</strong> 思维导图' },
-  { time: '06-05 15:00', icon: '📄', bg: 'var(--info-soft)', color: 'var(--info)', text: '查看 <strong>A* 算法详解</strong> 文档' },
-  { time: '06-04 22:15', icon: '✅', bg: 'var(--success-soft)', color: 'var(--success)', text: '完成 <strong>知识表示</strong> 练习', score: '83' },
-  { time: '06-04 20:00', icon: '💬', bg: 'var(--warm-soft)', color: 'var(--warm)', text: '对话学习 <strong>Transformer 注意力</strong>' },
-  { time: '06-04 17:30', icon: '💻', bg: 'var(--accent-soft)', color: 'var(--ink-2)', text: '学习 <strong>决策树 Python 实现</strong> 代码' },
-  { time: '06-04 14:00', icon: '✅', bg: 'var(--success-soft)', color: 'var(--success)', text: '完成 <strong>判断题</strong> 专项练习', score: '70' },
-  { time: '06-03 21:30', icon: '📄', bg: 'var(--info-soft)', color: 'var(--info)', text: '查看 <strong>RNN 与 LSTM 对比</strong>' },
-  { time: '06-03 19:00', icon: '💬', bg: 'var(--warm-soft)', color: 'var(--warm)', text: '对话学习 <strong>梯度下降法</strong>' },
-  { time: '06-03 16:00', icon: '✅', bg: 'var(--success-soft)', color: 'var(--success)', text: '完成 <strong>ML 选择题</strong> 练习', score: '65' },
-  { time: '06-02 22:00', icon: '🗺️', bg: 'var(--success-soft)', color: 'var(--success)', text: '生成 <strong>知识表示</strong> 思维导图' },
-  { time: '06-02 20:15', icon: '✅', bg: 'var(--success-soft)', color: 'var(--success)', text: '完成 <strong>强化学习概念</strong> 练习', score: '45' },
-  { time: '06-02 17:00', icon: '🎧', bg: 'var(--danger-soft)', color: 'var(--danger)', text: '收听 <strong>强化学习概念速听</strong> 音频' },
-  { time: '06-01 21:30', icon: '💬', bg: 'var(--warm-soft)', color: 'var(--warm)', text: '对话学习 <strong>反向传播算法</strong>' },
-  { time: '06-01 18:00', icon: '📄', bg: 'var(--info-soft)', color: 'var(--info)', text: '查看 <strong>CNN 图像分类</strong> 文档' },
-  { time: '06-01 15:30', icon: '✅', bg: 'var(--success-soft)', color: 'var(--success)', text: '完成 <strong>Dijkstra</strong> 练习', score: '90' },
-  { time: '06-01 13:00', icon: '💻', bg: 'var(--accent-soft)', color: 'var(--ink-2)', text: '学习 <strong>CNN PyTorch 实战</strong> 代码' },
-  { time: '05-31 22:00', icon: '🗺️', bg: 'var(--success-soft)', color: 'var(--success)', text: '生成 <strong>强化学习</strong> 思维导图' },
-  { time: '05-31 19:30', icon: '💬', bg: 'var(--warm-soft)', color: 'var(--warm)', text: '初始学习画像生成' },
+const defaultKnowledgeTable = [
+  { name: '暂无数据', mastery: 0, attempts: 0, accuracy: 0 },
 ]
 
 // ═══ HELPERS ═══
@@ -76,10 +40,10 @@ function scoreColor(s: number) {
 
 // 把后端 EvaluationReport 派生为页面所需的展示数据
 function deriveDimensions(report: EvaluationReport | null) {
-  if (!report) return dimensions
+  if (!report) return defaultDimensions
   const km = report.knowledge_mastery || {}
   const entries = Object.entries(km)
-  if (entries.length === 0) return dimensions
+  if (entries.length === 0) return defaultDimensions
   // 取前 6 个知识点 → 6 个维度卡
   return entries.slice(0, 6).map(([name, info], i) => ({
     name: name.length > 8 ? name.slice(0, 8) + '…' : name,
@@ -92,10 +56,10 @@ function deriveDimensions(report: EvaluationReport | null) {
 }
 
 function deriveKnowledgeTable(report: EvaluationReport | null) {
-  if (!report) return knowledgeTable
+  if (!report) return defaultKnowledgeTable
   const km = report.knowledge_mastery || {}
   const entries = Object.entries(km)
-  if (entries.length === 0) return knowledgeTable
+  if (entries.length === 0) return defaultKnowledgeTable
   return entries.map(([name, info]) => ({
     name,
     mastery: Math.round(info.avg_score),
@@ -105,9 +69,9 @@ function deriveKnowledgeTable(report: EvaluationReport | null) {
 }
 
 function deriveWeeklyHours(report: EvaluationReport | null) {
-  if (!report) return weeklyHours
+  if (!report) return defaultWeeklyHours
   const daily = report.daily_activity || []
-  if (daily.length === 0) return weeklyHours
+  if (daily.length === 0) return defaultWeeklyHours
   const dayNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
   // 取最近 7 天，按日期排序
   return daily.slice(0, 7).reverse().map((d) => {
@@ -117,8 +81,9 @@ function deriveWeeklyHours(report: EvaluationReport | null) {
 }
 
 function deriveTopicAccuracy(report: EvaluationReport | null) {
-  if (!report) return topicAccuracy
+  if (!report) return defaultTopicAccuracy
   const km = report.knowledge_mastery || {}
+  if (Object.keys(km).length === 0) return defaultTopicAccuracy
   return Object.entries(km).slice(0, 7).map(([name, info]) => ({
     name: name.length > 6 ? name.slice(0, 6) + '…' : name,
     pct: Math.round(info.avg_score),
@@ -283,9 +248,10 @@ export default function PingguPage() {
     return () => {
       cancelAnimationFrame(animFrameId)
     }
-  }, [])
+  }, [evalReport?.overall_score])
 
-  // Records pagination
+  // Records pagination - 暂时移除硬编码记录
+  const records: Array<{ time: string; icon: string; bg: string; color: string; text: string; score?: string }> = []
   const totalPages = Math.ceil(records.length / recordsPerPage)
   const start = (recordPage - 1) * recordsPerPage
   const pageRecords = records.slice(start, start + recordsPerPage)
@@ -444,35 +410,72 @@ export default function PingguPage() {
             <span className="tag tag-dark">AI 生成</span>
           </div>
           <div className="card-bd">
-            <div className="eval-report">
-              <h4>总体评价</h4>
-              <p>张明远同学在本阶段的学习中表现<span className="er-highlight">良好</span>，综合评分为 <strong>78 分</strong>。学习态度积极，日均学习时长稳定在 2.4 小时，能够主动使用 AI 辅导工具深化理解。</p>
+            {evalLoading ? (
+              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>
+                <div style={{ marginBottom: 8 }}><RobotIcon size={24} /></div>
+                AI 正在分析您的学习数据...
+              </div>
+            ) : evalReport?.report ? (
+              <div className="eval-report">
+                <h4>总体评价</h4>
+                <p>{evalReport.report.overall_evaluation}</p>
 
-              <h4>优势领域</h4>
-              <ul>
-                <li><strong>搜索算法</strong>：掌握度 85%，A* 和 Dijkstra 算法理解扎实，能正确区分两者的适用场景</li>
-                <li><strong>知识表示</strong>：掌握度 72%，对语义网络和谓词逻辑有较好理解</li>
-                <li><strong>学习目标</strong>：目标明确（考研 + 课程高分），执行力评分 90</li>
-              </ul>
+                {evalReport.report.strengths && evalReport.report.strengths.length > 0 && (
+                  <>
+                    <h4>优势领域</h4>
+                    <ul>
+                      {evalReport.report.strengths.map((s, i) => (
+                        <li key={i}><strong>{s.name}</strong>（掌握度 {s.mastery}%）：{s.description}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
 
-              <h4>薄弱环节</h4>
-              <ul>
-                <li><strong>强化学习</strong>（掌握度 22%）：仅了解基础概念，Q-Learning 和策略梯度需系统学习</li>
-                <li><strong>RNN 与 LSTM</strong>（掌握度 35%）：序列建模和门控机制理解不够深入</li>
-                <li><strong>易错点</strong>：梯度计算、损失函数选择、正则化方法常出错，正确率低于 50%</li>
-              </ul>
+                {evalReport.report.weak_points && evalReport.report.weak_points.length > 0 && (
+                  <>
+                    <h4>薄弱环节</h4>
+                    <ul>
+                      {evalReport.report.weak_points.map((w, i) => (
+                        <li key={i}><strong>{w.name}</strong>（掌握度 {w.mastery}%）：{w.description}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
 
-              <h4>学习建议</h4>
-              <ul>
-                <li>本周重点攻克 <span className="er-tag tag-warm">Transformer</span> <span className="er-tag tag-danger">RNN</span>，为后续 NLP 学习打基础</li>
-                <li>增加反向传播的练习量，建议每天做 2-3 道相关计算题</li>
-                <li>利用晚间高效时段（20:00-22:00）学习难度较高的强化学习内容</li>
-                <li>建议结合代码实践加深理解，尤其是 CNN 和 Transformer 的 PyTorch 实现</li>
-              </ul>
+                {evalReport.report.error_prone_areas && evalReport.report.error_prone_areas.length > 0 && (
+                  <>
+                    <h4>易错点</h4>
+                    <ul>
+                      {evalReport.report.error_prone_areas.map((e, i) => (
+                        <li key={i}><strong>{e.name}</strong>（错误率 {e.error_rate}%）：{e.description}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
 
-              <h4>进步趋势</h4>
-              <p>较上周相比，练习正确率提升了 <span className="er-highlight">+5%</span>，学习时长增加了 <span className="er-highlight">+4.2h</span>。继续保持当前节奏，预计 18 天内可完成全部课程学习路径。</p>
-            </div>
+                {evalReport.report.recommendations && evalReport.report.recommendations.length > 0 && (
+                  <>
+                    <h4>学习建议</h4>
+                    <ul>
+                      {evalReport.report.recommendations.map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+
+                {evalReport.report.progress_trend && (
+                  <>
+                    <h4>进步趋势</h4>
+                    <p>{evalReport.report.progress_trend.description}</p>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>
+                暂无评估报告数据
+              </div>
+            )}
           </div>
         </div>
 
@@ -511,34 +514,42 @@ export default function PingguPage() {
           <span className="tag tag-dark">{records.length} 条记录</span>
         </div>
         <div className="card-bd">
-          {pageRecords.map((r, i) => (
-            <div key={i} className="record-item">
-              <span className="ri-time">{r.time}</span>
-              <div className="ri-icon" style={{ background: r.bg, color: r.color }}>{r.icon}</div>
-              <span className="ri-text" dangerouslySetInnerHTML={{ __html: r.text }} />
-              {r.score ? (
-                <span className="ri-score" style={{ color: scoreColor(+r.score) }}>{r.score}</span>
-              ) : (
-                <span className="ri-score" style={{ color: 'var(--ink-4)' }}>—</span>
-              )}
+          {records.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>
+              暂无学习记录
             </div>
-          ))}
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="records-pagination">
-              <button className="pg-btn" disabled={recordPage === 1} onClick={() => setRecordPage((p) => p - 1)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => (
-                <button key={i} className={`pg-btn${recordPage === i + 1 ? ' active' : ''}`} onClick={() => setRecordPage(i + 1)}>
-                  {i + 1}
-                </button>
+          ) : (
+            <>
+              {pageRecords.map((r, i) => (
+                <div key={i} className="record-item">
+                  <span className="ri-time">{r.time}</span>
+                  <div className="ri-icon" style={{ background: r.bg, color: r.color }}>{r.icon}</div>
+                  <span className="ri-text" dangerouslySetInnerHTML={{ __html: r.text }} />
+                  {r.score ? (
+                    <span className="ri-score" style={{ color: scoreColor(+r.score) }}>{r.score}</span>
+                  ) : (
+                    <span className="ri-score" style={{ color: 'var(--ink-4)' }}>—</span>
+                  )}
+                </div>
               ))}
-              <button className="pg-btn" disabled={recordPage === totalPages} onClick={() => setRecordPage((p) => p + 1)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
-              </button>
-            </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="records-pagination">
+                  <button className="pg-btn" disabled={recordPage === 1} onClick={() => setRecordPage((p) => p - 1)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6" /></svg>
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => (
+                    <button key={i} className={`pg-btn${recordPage === i + 1 ? ' active' : ''}`} onClick={() => setRecordPage(i + 1)}>
+                      {i + 1}
+                    </button>
+                  ))}
+                  <button className="pg-btn" disabled={recordPage === totalPages} onClick={() => setRecordPage((p) => p + 1)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6" /></svg>
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
