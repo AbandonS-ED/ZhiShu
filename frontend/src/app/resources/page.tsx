@@ -131,7 +131,7 @@ function extractContentFromApi(resource: {
       expl: String(ex.explanation || ''),
     }))
     result.count = exercises.length
-    result.exTypes = [...new Set(exercises.map((ex) => getExerciseTypeLabel(String(ex.type || ''))))]
+    result.exTypes = Array.from(new Set(exercises.map((ex) => getExerciseTypeLabel(String(ex.type || '')))))
   } else if (type === 'code') {
     result.code = String(content.code || '')
   } else if (type === 'audio') {

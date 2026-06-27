@@ -1,24 +1,13 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { pathApi, evaluationApi } from '@/lib/api'
+import { pathApi, evaluationApi, type PathNode as ApiPathNode, type PathEdge as ApiPathEdge } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { usePageTimer } from '@/hooks/usePageTimer'
 
 // ═══ TYPES ═══
-interface PathNode {
-  id: string
-  label: string
-  type: string
-  difficulty: number
-  estimated_hours: number
-}
-
-interface PathEdge {
-  source: string
-  target: string
-  relation: string
-}
+interface PathNode extends ApiPathNode {}
+interface PathEdge extends ApiPathEdge {}
 
 interface DailyPlanItem {
   day: number
@@ -96,7 +85,7 @@ export default function PathPage() {
     try {
       setLoading(true)
       const data = await pathApi.list(getStudentId())
-      setPaths(data)
+      setPaths(data as PathData[])
       if (data.length > 0 && !currentPath) {
         await loadPathDetail(data[0].path_id)
       }
@@ -111,7 +100,7 @@ export default function PathPage() {
   const loadPathDetail = async (pathId: string) => {
     try {
       const data = await pathApi.get(getStudentId(), pathId)
-      setCurrentPath(data)
+      setCurrentPath(data as PathData)
       setSelectedNode(null)
     } catch {
       // 静默失败
@@ -425,7 +414,7 @@ export default function PathPage() {
                 <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--ink-4)' }}>
                   <div style={{ fontSize: '32px', marginBottom: '12px' }}>📚</div>
                   <div style={{ fontSize: '14px', fontWeight: 500 }}>暂无学习计划</div>
-                  <div style={{ fontSize: '12px', marginTop: '4px', marginBottom: '16px' }}>输入知识点生成计划，或在对话页说"生成XX学习路径"</div>
+                  <div style={{ fontSize: '12px', marginTop: '4px', marginBottom: '16px' }}>输入知识点生成计划，或在对话页说&quot;生成XX学习路径&quot;</div>
                   <button onClick={() => {
                     setGenInput('机器学习,深度学习,CNN,RNN,Transformer')
                     setTimeout(() => generatePath(), 100)

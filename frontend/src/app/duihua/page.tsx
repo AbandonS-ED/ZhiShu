@@ -383,7 +383,7 @@ export default function DuihuaPage() {
     : []
 
   const weakTopics: string[] = profile?.dimensions?.weak_topics
-    ? (profile.dimensions.weak_topics as string[])
+    ? (profile.dimensions.weak_topics as unknown as string[])
     : profile?.dimensions
       ? Object.entries(profile.dimensions)
           .filter(([, v]) => v && typeof v === 'object' && (v as { score?: number }).score !== undefined && (v as { score: number }).score < 40)
@@ -520,7 +520,8 @@ export default function DuihuaPage() {
                       onClick={() => {
                         const btn = document.getElementById(`like-btn-${i}`)
                         const dislikeBtn = document.getElementById(`dislike-btn-${i}`)
-                        const isActive = btn?.classList.toggle('active')
+                        if (!btn) return
+                        const isActive = btn.classList.toggle('active')
                         if (isActive) {
                           btn.style.color = 'var(--brand)'
                           btn.style.background = 'var(--brand-soft)'
@@ -543,7 +544,8 @@ export default function DuihuaPage() {
                       onClick={() => {
                         const btn = document.getElementById(`dislike-btn-${i}`)
                         const likeBtn = document.getElementById(`like-btn-${i}`)
-                        const isActive = btn?.classList.toggle('active')
+                        if (!btn) return
+                        const isActive = btn.classList.toggle('active')
                         if (isActive) {
                           btn.style.color = 'var(--danger)'
                           btn.style.background = 'var(--danger-soft)'
