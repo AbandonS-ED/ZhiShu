@@ -1,6 +1,32 @@
 # 端到端冒烟测试报告
 
-> 最后更新：2026-06-27（评估报告 AI 化 — 第 6 次冒烟验证）
+> 最后更新：2026-06-28（P1 全量修复后端端点验证 — 第 7 次冒烟）
+
+## 第七次（2026-06-28）— P1 全量修复 + SQLAlchemy 2.0 兼容验证
+
+> **背景**：P1 全量 10 项修复落地（防幻觉正则收紧、引用匹配、markdownToHtml XSS、ResourceVM、Exercise 类型、SSE 工具统一、Spark base_url、DB schema 漂移迁移）后，端到端跑一次核心 API，确认回归无误。
+> **检测方式**：API 真实调用 + 后端日志 + 前端页面
+
+### 验证清单
+
+| 验证项 | 方法 | 结果 |
+|---|---|---|
+| 后端启动 | `uvicorn app.main:app --port 8001 --reload` | ✅ Application startup complete |
+| 前端启动 | `npm run dev` | ✅ Ready in 2.3s |
+| 评估 API 真实可用 | `curl GET /evaluation/report/{admin_id}` + `regenerate` | ✅ 200 + LLM 完整报告（overall_evaluation / strengths / weak_points / error_prone_areas / progress_trend）|
+| SQLAlchemy 2.0 兼容 | `_get_exercise_details` 用 PG bool 自动转 int，无需 `func.cast(type_=int)` | ✅ 不再报 `'_isnull'` AttributeError |
+| Schema 漂移迁移幂等 | 跑 `scripts/migrate_schema_drift.py` 第二次 | ✅ 全部 `[SKIP]` 状态，无重复 ALTER 报错 |
+| admin 登录 | `POST /auth/login admin/admin123` | ✅ 200 + JWT |
+| 全部 33 业务端点门禁 | 随机抽 5 个端点不带 token | ✅ 401 |
+| 前端 Lint | `npm run lint` | ✅ 0 errors |
+
+### 关键发现
+
+- **SQLAlchemy 2.0 兼容性**：原 `func.cast(..., type_=int)` 在 SQLAlchemy 2.0 报 `'_isnull'` 错误，改用 PG 原生 `func.sum(bool)` 自动转 0/1，修复评估 API 500。
+- **迁移脚本幂等性**：`migrate_schema_drift.py` 用 `try/except DuplicateColumnError` 实现可重复运行，老 DB 一键补齐缺失列/表。
+- **回归无副作用**：P1 修复未影响既有功能（admin 登录、JWT 门禁、评估接口、pinggu 渲染全部正常）。
+
+---
 
 ## 第六次（2026-06-27）— 评估报告 AI 化验证
 

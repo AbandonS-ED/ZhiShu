@@ -17,6 +17,8 @@
 | 以诚实无知为荣 | 以假装理解为耻 |
 | 以谨慎重构为荣 | 以盲目修改为耻 |
 
+> ⚠️ 工作准则只在文首出现一次。后面如有重复请删除。
+
 ## 硬约束
 
 - **LLM**：开发用 MiniMax-M3，base_url `https://api.minimax.chat/v1`（**没有 `i`**，不是 `minimaxi`）。比赛前切星火：`LLM_PROVIDER=spark` + `SPARK_API_KEY=xxx`。讯飞鉴权只用 `Authorization: Bearer {api_key}`，不拼 api_secret。
@@ -71,7 +73,7 @@ cd frontend && npm run build                       # 18 页面
 | `chat_messages.content` 截断 | 长回复 JSON 超 10000 字符报错 | 已改 `Text` 类型，迁移：`ALTER TABLE chat_messages ALTER COLUMN content TYPE TEXT` |
 | 根 layout 共用 | admin 路由继承学生端 Sidebar/Header | `NO_SHELL_ROUTES` 必须加 `/admin` |
 | CSS fadeIn 缺失 | 登录页右侧表单 `opacity:0` 不可见 | `globals.css` 已有 `@keyframes fadeIn` 兜底 |
-| DB schema 漂移 | 老 DB 缺 `exercise_bank` 表 / `exercises.source` 列 / `resources.is_preset` 列 | 删库重建：`DROP DATABASE zhishu` + 重跑 `init_db.sql` |
+| DB schema 漂移 | 老 DB 缺 `evaluation_reports` 表 / `is_preset` 列 / `chat_messages.content` TEXT | 跑 `venv\Scripts\python scripts/migrate_schema_drift.py` 幂等修复所有缺失项 |
 
 ## 关键架构事实
 
@@ -82,23 +84,13 @@ cd frontend && npm run build                       # 18 页面
 - **题库出题**：StateGraph exercise 意图 → 保存到 `exercises` 表（去重 + 限容 20 道/知识点）→ 回复追加 `[👉 点击前往题库作答](/tiku?kp=xxx)`
 - **防幻觉**：6 Agent 接 `validate()`（Document/Exercise 走三层，其他走 `skip_llm=True` 快速模式）
 - **RAG**：`document_parser → text_chunker → embedding → vector_store.search → reranker`
-- **认证**：bcrypt + JWT（HS256，7 天），全 33 端点 `Depends(get_current_user)` 门禁
+- **认证**：bcrypt + JWT（HS256，7 天），全 **41 端点** `Depends(get_current_user)` 门禁
 - **管理后台**：独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，题库 CRUD 6 端点
 - **页面停留计时**：`hooks/usePageTimer.ts` 自动记录页面停留时长（<3s 不记录），上报到 `learning_records` 表
 - **Robot 图标**：`components/RobotIcon.tsx` 极简 SVG（天线 + 圆眼 + 微笑弧线嘴），用于 AI 生成按钮
-
-## 工作准则
-
-| 荣 | 耻 |
-|---|---|
-| 以认真查询为荣 | 以聘猜接口为耻 |
-| 以寻求确认为荣 | 以模糊执行为耻 |
-| 以人类确认为荣 | 以臆想业务为耻 |
-| 以复用现有为荣 | 以创造接口为耻 |
-| 以主动测试为荣 | 以跳过验证为耻 |
-| 以遵循规范为荣 | 以破坏架构为耻 |
-| 以诚实无知为荣 | 以假装理解为耻 |
-| 以谨慎重构为荣 | 以盲目修改为耻 |
+- **统一 SSE 工具**：`frontend/src/lib/sse.ts` + `backend/app/core/sse_utils.py` 替代 api.ts 4 处重复实现，含 3 次重试 + 指数退避 + 120s 超时
+- **评估报告**：评估 API 优先读 `evaluation_reports` 缓存表；无缓存则实时调 LLM 生成；Celery `tasks/evaluation_tasks.py` 每天 4 点预生成
+- **预置资源**：5 个人工智能导论课程资源（`is_preset=true`），通过 `init_preset_resources.py` 初始化
 
 ## 提交规范
 
