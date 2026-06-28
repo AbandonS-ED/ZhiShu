@@ -176,7 +176,25 @@ class EvaluationService:
         db: AsyncSession,
         student_id: str,
     ) -> dict:
-        """生成学习评估报告"""
+        """获取学习评估报告（优先读取预生成缓存，无则实时生成）"""
+        from app.models.evaluation_report import EvaluationReport
+        from datetime import date
+
+        # 优先读取今天的预生成报告
+        today = date.today()
+        cached_result = await db.execute(
+            select(EvaluationReport).where(
+                EvaluationReport.student_id == uuid.UUID(student_id),
+                EvaluationReport.report_date == today,
+            )
+        )
+        cached_report = cached_result.scalar_one_or_none()
+        if cached_report:
+            logger.info(f"使用预生成报告: student_id={student_id}, date={today}")
+            return cached_report.report_data
+
+        # 无缓存，实时生成
+        logger.info(f"实时生成报告: student_id={student_id}")
         stats = await self.get_statistics(db, student_id, days=30)
 
         # 获取学生信息
@@ -254,8 +272,9 @@ class EvaluationService:
             trend=trend,
         )
 
-        return {
+        report_data = {
             "student_id": student_id,
+            "generated_at": datetime.utcnow().isoformat(),
             "summary": {
                 "total_resources": total_resources,
                 "total_exercises": total_exercises,
@@ -272,6 +291,24 @@ class EvaluationService:
             "report": llm_report,
             "profile": self._extract_profile(profile),
         }
+
+        # 存入缓存（新用户实时生成后缓存）
+        try:
+            cached_record = EvaluationReport(
+                id=uuid.uuid4(),
+                student_id=uuid.UUID(student_id),
+                report_date=today,
+                report_data=report_data,
+                overall_score=report_data["overall_score"],
+            )
+            db.add(cached_record)
+            await db.commit()
+            logger.info(f"报告已缓存: student_id={student_id}, date={today}")
+        except Exception as e:
+            logger.warning(f"报告缓存失败: {e}")
+            await db.rollback()
+
+        return report_data
 
     def _generate_recommendations(self, stats: dict, avg_score: float) -> list[str]:
         """生成学习建议"""
@@ -300,11 +337,12 @@ class EvaluationService:
         since = datetime.utcnow() - timedelta(days=30)
 
         # 按知识点统计正确/错误数
+        # SQLAlchemy 2.0 中 func.sum(bool) 在 PG 上自动转 0/1，无需 case()
         result = await db.execute(
             select(
                 Exercise.knowledge_point,
                 func.count(Exercise.id).label("total"),
-                func.sum(func.cast(Exercise.is_correct == 1, type_=int)).label("correct_count"),
+                func.sum(Exercise.is_correct).label("correct_count"),
             )
             .where(
                 Exercise.student_id == sid,

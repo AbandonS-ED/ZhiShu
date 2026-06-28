@@ -183,6 +183,17 @@ CREATE TABLE IF NOT EXISTS learning_activity_logs (
 CREATE INDEX IF NOT EXISTS idx_learning_activity_logs_student_id ON learning_activity_logs(student_id);
 CREATE INDEX IF NOT EXISTS idx_learning_activity_logs_type ON learning_activity_logs(activity_type);
 
+CREATE TABLE IF NOT EXISTS evaluation_reports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL,
+    report_date DATE NOT NULL,
+    report_data JSONB NOT NULL,
+    overall_score FLOAT,
+    generated_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(student_id, report_date)
+);
+CREATE INDEX IF NOT EXISTS idx_evaluation_reports_student_date ON evaluation_reports(student_id, report_date);
+
 -- 6. 完成
 \echo '✅ 数据库 zhishu 初始化完成，共 11 张表 + 16 个索引'
 \echo '   students / student_profiles / document_chunks'

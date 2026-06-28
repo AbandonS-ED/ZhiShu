@@ -76,8 +76,21 @@ async def get_evaluation_report(
     db: AsyncSession = Depends(get_db),
     user: Student = Depends(get_current_user),
 ):
-    """生成学习评估报告"""
+    """获取学习评估报告"""
     if user.id != student_id:
         raise HTTPException(status_code=403, detail="只能查看自己的数据")
+    report = await evaluation_service.get_evaluation_report(db, str(student_id))
+    return report
+
+
+@router.post("/report/{student_id}/regenerate")
+async def regenerate_evaluation_report(
+    student_id: uuid.UUID = Depends(valid_student_id),
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    """重新生成学习评估报告"""
+    if user.id != student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的数据")
     report = await evaluation_service.get_evaluation_report(db, str(student_id))
     return report
