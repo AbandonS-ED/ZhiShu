@@ -205,7 +205,7 @@ export default function TikuPage() {
           processMsgQueue()
         }
         if (e.type === 'result' && e.data) {
-          const data = e.data
+          const data = e.data as { knowledge_point?: string; exercises?: Array<Record<string, unknown>>; count?: number }
           const newExs: Exercise[] = (data.exercises || []).map((ex: any) => ({
             exercise_id: ex.exercise_id || `ai-${Date.now()}-${Math.random()}`,
             type: ex.type as Exercise['type'],

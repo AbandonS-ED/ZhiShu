@@ -6,6 +6,9 @@ import { getStudentId } from '@/lib/student'
 import { showToast } from '@/lib/utils'
 import RobotIcon from '@/components/RobotIcon'
 import { usePageTimer } from '@/hooks/usePageTimer'
+import SmartInput from './components/SmartInput'
+import RecFeed from './components/RecFeed'
+import { useRecommendations } from './hooks/useRecommendations'
 
 // ═══ TYPES ═══
 // UI 视图模型（区别于 api.ts 的 API 类型，用于前端渲染）
@@ -169,6 +172,7 @@ function getAnswerIndex(ex: Record<string, unknown>): number {
 
 // ═══ MAIN PAGE ═══
 export default function ResourcesPage() {
+  const [mainTab, setMainTab] = useState<'feed' | 'all'>('feed')
   const [filter, setFilter] = useState<FilterType>('all')
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [search, setSearch] = useState('')
@@ -184,6 +188,9 @@ export default function ResourcesPage() {
 
   // 记录页面停留时间
   usePageTimer('resource')
+
+  // 推荐 Feed 数据
+  const { data: recItems, loading: recLoading, error: recError, mutate: recMutate } = useRecommendations()
 
   // 消息队列
   const msgQueueRef = useRef<string[]>([])
@@ -358,6 +365,38 @@ export default function ResourcesPage() {
 
   return (
     <>
+      {/* 主 Tab 切换 */}
+      <div className="resources-tabs">
+        <button
+          className={`tab-btn${mainTab === 'feed' ? ' active' : ''}`}
+          onClick={() => setMainTab('feed')}
+        >
+          🤖 推荐 Feed
+        </button>
+        <button
+          className={`tab-btn${mainTab === 'all' ? ' active' : ''}`}
+          onClick={() => setMainTab('all')}
+        >
+          📚 全部资源
+        </button>
+      </div>
+
+      {/* 推荐 Feed Tab */}
+      {mainTab === 'feed' && (
+        <div className="feed-tab">
+          <SmartInput onBatchStart={recMutate} />
+          <RecFeed
+            items={recItems ?? []}
+            loading={recLoading}
+            error={recError}
+            onRefresh={recMutate}
+          />
+        </div>
+      )}
+
+      {/* 全部资源 Tab — 原有内容完全不动 */}
+      {mainTab === 'all' && (
+      <>
       {/* Toolbar */}
       <div className="res-toolbar">
         <div className="search-wrap">
@@ -639,6 +678,8 @@ export default function ResourcesPage() {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </>
   )

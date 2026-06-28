@@ -1,5 +1,5 @@
 // 智枢 API 客户端
-// 后端 baseURL: http://localhost:8001
+// 开发环境直连后端 8001（CORS 已在后端配置 localhost:3000）
 const BASE_URL = 'http://localhost:8001/api/v1'
 
 import type { Resource, ResourceContent, Exercise } from '@/types'
@@ -7,6 +7,34 @@ export type { Resource, ResourceContent, Exercise }
 import { createEventStream, type ChatEvent } from './sse'
 
 export type { ChatEvent }
+
+// 通用 SSE 事件类型
+export interface ChatEvent {
+  type: 'session' | 'progress' | 'result' | 'done' | 'error' | 'token'
+  session_id?: string
+  progress?: number
+  message?: string
+  content?: string
+  data?: unknown
+}
+
+// 学习包生成 SSE 事件类型
+export interface GenerationEvent {
+  type: 'progress' | 'token' | 'result' | 'error' | 'done' | 'validation'
+  progress?: number
+  message?: string
+  current_agent?: string
+  content?: string
+  data?: {
+    resource_id?: string
+    knowledge_point?: string
+    phase?: string
+    content?: Record<string, unknown>
+  }
+  passed?: boolean
+  confidence?: number
+  issues?: string[]
+}
 
 // 通用 fetch 封装（自动带 token）
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -172,6 +200,90 @@ export const resourceApi = {
       method: 'POST',
       body: JSON.stringify({ student_id, title, resource_type, content, knowledge_point }),
     }),
+
+  // ── 推荐 + 学习包（新功能）───────────────────────────────
+  getRecommendations: (student_id: string, limit = 10) =>
+    request<{ recommendations: Array<{
+      knowledge_point: string
+      reason: string
+      reason_type: string
+      priority_score: number
+      suggested_phases: string[]
+      existing_resources: { learn: boolean; practice: boolean; review: boolean }
+      estimated_minutes: number
+    }> }>('/resource/recommendations', {
+      method: 'POST',
+      body: JSON.stringify({ student_id, limit }),
+    }),
+
+  getLearningPackage: (student_id: string, knowledge_point: string, phase: string) =>
+    request<{
+      knowledge_point: string
+      phase: string
+      resources: Array<Record<string, unknown>>
+      next_phase: string | null
+      progress: { learn: boolean; practice: boolean; review: boolean }
+    }>(`/resource/learning-package?student_id=${student_id}&knowledge_point=${encodeURIComponent(knowledge_point)}&phase=${phase}`),
+
+  // 生成学习包（JSON 完整返回）
+  generateLearningPackage: (
+    student_id: string,
+    knowledge_point: string,
+    phase: string
+  ) =>
+    request<{
+      resource_id: string
+      knowledge_point: string
+      phase: string
+      content: Record<string, unknown>
+    }>('/resource/learning-package/generate/stream', {
+      method: 'POST',
+      body: JSON.stringify({ student_id, knowledge_point, phase }),
+    }),
+
+  // SSE 流式生成学习包
+  generateLearningPackageStream(
+    student_id: string,
+    knowledge_point: string,
+    phase: string,
+    onEvent: (e: GenerationEvent) => void
+  ): () => void {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 300_000) // 5min
+    const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
+    fetch(`${BASE_URL}/resource/learning-package/generate/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ student_id, knowledge_point, phase }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`)
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try { onEvent(JSON.parse(line.slice(6))) } catch {}
+            }
+          }
+        }
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') onEvent({ type: 'error', message: err.message })
+      })
+      .finally(() => clearTimeout(timeout))
+    return () => { clearTimeout(timeout); controller.abort() }
+  },
 }
 
 // ===== Exercise =====
