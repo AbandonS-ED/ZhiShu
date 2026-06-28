@@ -124,7 +124,18 @@ class DocumentAgent:
         return "\n".join(parts)
 
     def _parse_response(self, content: str) -> dict:
-        return parse_json_response(content, {"knowledge": content, "code": "", "audio_script": ""})
+        result = parse_json_response(content, {"knowledge": content, "code": "", "audio_script": ""})
+        # 二次清理：JSON 字符串值内部可能仍含 think-tag（MiniMax 把 JSON 序列化时保留了标签原文）
+        for key in ("knowledge", "code", "audio_script"):
+            if isinstance(result.get(key), str):
+                val = result[key]
+                # 去掉 <think>...</think> 标签（可能嵌套多层）
+                while "<think>" in val and "</think>" in val:
+                    start = val.find("<think>")
+                    end = val.find("</think>") + len("</think>")
+                    val = val[:start] + val[end:]
+                result[key] = val.strip()
+        return result
 
 
 document_agent = DocumentAgent()

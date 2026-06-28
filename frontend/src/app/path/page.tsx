@@ -166,7 +166,7 @@ export default function PathPage() {
         }
         if (e.type === 'result' && e.data) {
           clearMsgQueue()
-          const data = e.data
+          const data = e.data as PathData
           setGenResult(`✅ 已生成「${data.title || ''}」\n共 ${data.total_days || 0} 天，${data.nodes?.length || 0} 个知识点`)
           loadPaths()
           evaluationApi.recordAction({
