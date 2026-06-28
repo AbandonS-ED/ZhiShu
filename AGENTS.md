@@ -24,9 +24,9 @@
 - **LLM**：开发用 MiniMax-M3，base_url `https://api.minimax.chat/v1`（**没有 `i`**，不是 `minimaxi`）。比赛前切星火：`LLM_PROVIDER=spark` + `SPARK_API_KEY=xxx`。讯飞鉴权只用 `Authorization: Bearer {api_key}`，不拼 api_secret。
 - **禁用** Google Fonts / Vercel / Sentry / OpenAI（中国不可达）。字体走 `frontend/src/app/fonts/` 本地 woff + `next/font/local`。
 - **pip** 加 `-i https://pypi.tuna.tsinghua.edu.cn/simple`；npm 走 `frontend/.npmrc` 的 `registry.npmmirror.com`。
-- **端口**：后端 **8001**（不要 8000），前端 3000。`api.ts:3` 的 `BASE_URL` 已同步。`start_backend.ps1` 写死了 8000 和旧路径，**不要用**。
+- **端口**：后端 **8001**（不要 8000），前端 3000。`api.ts:3` 的 `BASE_URL` 已同步。用 `start.ps1` 一键启动，`stop.ps1` 一键停止。
 - **bcrypt**：只用 `import bcrypt`，**不要引入 passlib**（冲突）。
-- **勿提交** `.env` / API 密钥 / `venv/` / `node_modules/`。
+- **勿提交** `.env` / API 密钥 / `venv/` / `node_modules/` / `.service-pids.json`。
 
 ## 命令
 
@@ -37,16 +37,23 @@ psql -U postgres -f backend/scripts/init_db.sql
 # 初始化管理员（可重复跑，默认 admin / admin123 / role=admin）
 cd backend && venv\Scripts\python scripts\init_admin.py
 
-# 后端
+# 一键启停（推荐）
+.\start.ps1              # 同时启动后端 8001 + 前端 3000
+.\stop.ps1               # 杀所有 python/node 进程
+
+# 或手动启动后端
 cd backend && python -m venv venv && venv\Scripts\activate
 pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
-# 首次安装会自动装 bcrypt>=4.0.0，旧 venv 可能缺
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 # Swagger: http://localhost:8001/docs
 
-# 前端（必须先起后端，否则登录报网络错误）
+# 手动启动前端（必须先起后端，否则登录报网络错误）
 cd frontend && npm install && npm run dev
 # 管理后台: http://localhost:3000/admin/login（admin / admin123）
+
+# Celery 定时任务（评估报告每天 4 点自动生成）
+cd backend && celery -A app.core.celery_config worker --loglevel=info
+cd backend && celery -A app.core.celery_config beat --loglevel=info
 
 # 测试
 cd backend && python -m pytest tests/ -v          # 114 pytest
@@ -74,6 +81,10 @@ cd frontend && npm run build                       # 18 页面
 | 根 layout 共用 | admin 路由继承学生端 Sidebar/Header | `NO_SHELL_ROUTES` 必须加 `/admin` |
 | CSS fadeIn 缺失 | 登录页右侧表单 `opacity:0` 不可见 | `globals.css` 已有 `@keyframes fadeIn` 兜底 |
 | DB schema 漂移 | 老 DB 缺 `evaluation_reports` 表 / `is_preset` 列 / `chat_messages.content` TEXT | 跑 `venv\Scripts\python scripts/migrate_schema_drift.py` 幂等修复所有缺失项 |
+| regenerate 未删旧缓存 | 重新生成后返回过期数据 | POST 端点必须 `delete where student_id=X and report_date=Y` **再调** LLM |
+| `.service-pids.json` 泄漏 | 服务 PID 文件被 git 跟踪 | 已加 `.gitignore`，勿提交 |
+| Celery import 路径 | `from app.core.celery_config import app` 报错 | celery 必须在 `backend/` 目录下执行，确保 PYTHONPATH 正确 |
+| start.ps1 端口冲突 | 第二次启动报端口占用 | 先 `.\stop.ps1` 再 `.\start.ps1`（确保 kill 干净） |
 
 ## 关键架构事实
 
@@ -89,7 +100,8 @@ cd frontend && npm run build                       # 18 页面
 - **页面停留计时**：`hooks/usePageTimer.ts` 自动记录页面停留时长（<3s 不记录），上报到 `learning_records` 表
 - **Robot 图标**：`components/RobotIcon.tsx` 极简 SVG（天线 + 圆眼 + 微笑弧线嘴），用于 AI 生成按钮
 - **统一 SSE 工具**：`frontend/src/lib/sse.ts` + `backend/app/core/sse_utils.py` 替代 api.ts 4 处重复实现，含 3 次重试 + 指数退避 + 120s 超时
-- **评估报告**：评估 API 优先读 `evaluation_reports` 缓存表；无缓存则实时调 LLM 生成；Celery `tasks/evaluation_tasks.py` 每天 4 点预生成
+- **评估报告**：评估 API 优先读 `evaluation_reports` 缓存表；无缓存则实时调 LLM 生成；Celery `tasks/evaluation_tasks.py` 每天 4 点预生成；前端 `/pinggu` 页面支持重新生成按钮 + 消息队列轮播加载动画 + 生成时间显示
+- **一键启停**：`start.ps1`（启动后端 8001 + 前端 3000）+ `stop.ps1`（杀所有 python/node 进程），解决 Windows uvicorn --reload 孤儿 socket 问题
 - **预置资源**：5 个人工智能导论课程资源（`is_preset=true`），通过 `init_preset_resources.py` 初始化
 
 ## 提交规范

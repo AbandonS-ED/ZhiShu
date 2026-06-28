@@ -1,7 +1,7 @@
 # 智枢(SmartHub) - 多智能体个性化学习资源生成系统
 
 > 第十五届中国软件杯 A3 赛题。基于大模型的个性化资源生成与学习多智能体系统。
-> **最新状态（2026-06-28）**：P1 全量修复（10 项：防幻觉正则收紧 / 引用匹配 / markdownToHtml XSS / ResourceVM 统一 / Exercise 类型对齐 / **统一 SSE 工具 sse.ts+sse_utils.py** / Spark 默认 base_url / **DB schema 漂移迁移脚本** / SQLAlchemy 2.0 兼容 / eval API 真实可用）+ 预生成评估报告缓存（`evaluation_reports` 表 + Celery `tasks/evaluation_tasks.py` 每天 4 点跑）。114 pytest 全过，**7 次**冒烟验证 9/9 PASS，管理员账号 `admin/admin123` 已就绪。
+> **最新状态（2026-06-29）**：评估报告缓存 + 定时生成（`evaluation_reports` 表 + Celery 每天 4 点）+ 重新生成按钮 + 加载动画消息队列轮播 + 生成时间显示 + `regenerate` POST 端点 + 一键启动/停止脚本（`start.ps1`/`stop.ps1` 解决孤儿 socket）。114 pytest 全过，**7 次**冒烟验证 9/9 PASS，管理员账号 `admin/admin123` 已就绪。
 
 ## 技术栈
 
@@ -81,10 +81,14 @@ cd frontend
 npm install
 npm run dev     # http://localhost:3000
 
-# 4. 单元测试（119 pytest）
+# 4. 一键启停（替代 2+3 的手动步骤）
+.\start.ps1     # 同时启动后端+前端
+.\stop.ps1      # 杀所有 python/node 进程
+
+# 5. 单元测试（119 pytest）
 cd backend && python -m pytest tests/ -v
 
-# 5. 端到端冒烟测试（7 次 9/9 PASS）
+# 6. 端到端冒烟测试（7 次 9/9 PASS）
 cd backend && python -m tests.smoke_test
 ```
 
@@ -124,6 +128,10 @@ API 文档: http://localhost:8001/docs
 | **Robot 图标** | ✅ components/RobotIcon.tsx 极简机器人 SVG，替换 🤖 emoji |
 | **学习时长追踪** | ✅ usePageTimer hook + 5 页面自动上报 + 评估报告 daily_activity |
 | **评估报告 AI 化** | ✅ LLM 生成评估报告 + 7 天趋势对比 + 知识点掌握度统计 + 易错点分析 + 规则引擎降级 |
+| **评估报告缓存 + 定时生成** | ✅ `evaluation_reports` 表 + Celery 每天 4 点定时 + 实时生成兜底 |
+| **评估报告重新生成** | ✅ POST `/report/{student_id}/regenerate` 端点 + 前端按钮 + 先删旧缓存再生成 |
+| **评估报告加载动画** | ✅ 消息队列轮播 + spinner + 文字脉冲，4 条进度消息各 3s |
+| **一键启停脚本** | ✅ `start.ps1` + `stop.ps1`，杀所有 python/node 进程解决孤儿 socket |
 | **预生成评估报告** | ✅ evaluation_reports 表 + Celery daily 4 点任务，API 优先读缓存 |
 | 部署与交付 | ⚠️ Docker 配置完成但本地裸跑，LLM 比赛前需切讯飞星火 V4 |
 

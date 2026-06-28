@@ -118,7 +118,7 @@ ZhiShu/
 └── docker-compose.yml               # postgres+pgvector / redis / minio（未启用）
 ```
 
-**实际状态（2026-06-28）**：
+**实际状态（2026-06-29）**：
 
 - ✅ **学生端 9 页面** 1:1 复刻模板 + 9/9 全部接入 API（含登录/注册 + 设置页）
 - ✅ **管理后台 9 页面** 1:1 复刻 `houtai.html` 模板 + 批量删除 + 搜索筛选 + 详情弹窗 + **题库 CRUD 已实联 admin_exercises API**
@@ -126,30 +126,23 @@ ZhiShu/
 - ✅ **登录注册系统**：bcrypt + JWT + 全 41 个业务端点门禁
 - ✅ **管理后台权限**：`role` 字段 + `is_active` + `last_login` + 独立 token (`zhishu_admin_token`)
 - ✅ **5 维学生画像**（理解力/记忆力/应用转化/想象力/专注力 + confidence）：由 `initial_assessment_agent` 对话式评估
-- ✅ **P0 全部 10 个问题已修复**
-- ✅ **P1 全量修复**（2026-06-28）：防幻觉正则收紧、引用匹配、markdownToHtml XSS、ResourceVM 统一、Exercise 类型对齐、SSE 工具共享、Spark 默认 base_url、DB schema 漂移迁移
-- ✅ MiniMax-M3 LLM 端到端验证通过
-- ✅ **LangGraph StateGraph 10 节点编排**（master_agent.py 实际节点数）
+- ✅ **P0 全部 10 个问题已修复** + **P1 全量修复**
+- ✅ MiniMax-M3 LLM 端到端验证通过 + 星火切换就绪
+- ✅ **LangGraph StateGraph 10 节点编排**（master_agent.py）
 - ✅ **防幻觉三层验证** + 4 个 SSE 流式端点 + **统一 SSE 工具**（`sse.ts` + `sse_utils.py`）
 - ✅ **RAG 管道**（document_parser → text_chunker → embedding → vector_store.search → reranker）
 - ✅ **练习题 dual-format 流式**（markdown + JSON 同传）
-- ✅ **端到端冒烟测试 7 次 9/9 PASS**（最新 2026-06-27 评估报告 AI 化 + P1 修复）
-- ✅ **114 pytest 全过**（7 文件：agents / anti_hallucination / api / json_parser / message_bus / state_graph / strip_think）
-- ✅ **多轮对话上下文**（最近 10 条消息）
-- ✅ **公共题库系统**（`exercise_bank` 表 + 6 admin 端点 + `/resource/exercises/pool` 题池合并随机抽题）
-- ✅ **用户设置页面**（`/setting`：信息编辑 + 修改密码 + 账号信息展示）
-- ✅ **对话页出题 → 题库页做题**（StateGraph exercise 保存 DB + 跳转链接 + ?kp= 自动聚焦）
-- ✅ **题库页隐藏/清空**（localStorage 隐藏 + 侧边栏恢复 + 清空列表 + ConfirmDialog）
-- ✅ **AI 出题数量可选**（分段选择器 5/10/15/20，后端支持 1-50）
-- ✅ **答案格式三层防护**（Prompt 规范 + 后端 normalize_answer + 前端 parseAnswer 容错）
-- ✅ **题库去重 + 限容**（difflib 相似度 >0.85 判重，每知识点最多 20 道 AI 题）
-- ✅ **对话历史 JSON 解析**（前端加载 assistant 消息时自动解析 `answer` 字段）
-- ✅ **对话页刷新修复**（sessionId 持久化 + loadSession 渲染修复 + DB content 列改 TEXT）
-- ✅ **评估报告 AI 化**（LLM 生成自然语言报告 + 7 天趋势对比 + 知识点掌握度统计 + 易错点分析 + 规则引擎降级）
-- ✅ **预生成评估报告缓存**（`evaluation_reports` 表 + Celery `evaluation_tasks.generate_daily_reports` 每天 4 点跑）
+- ✅ **端到端冒烟测试 7 次 9/9 PASS**
+- ✅ **114 pytest 全过**（7 文件）
+- ✅ **评估报告 AI 化 + 缓存 + 定时生成**（`evaluation_reports` 表 + Celery 每天 4 点 + 实时生成兜底）
+- ✅ **评估报告重新生成**（POST `/report/{student_id}/regenerate` 端点 + 前端按钮）
+- ✅ **评估报告加载动画**（消息队列轮播 4 条进度消息各 3s + spinner）
+- ✅ **评估报告生成时间**（`generated_at` 字段 + 前端显示）
+- ✅ **一键启停脚本**（`start.ps1` + `stop.ps1`，杀所有 python/node 进程解决孤儿 socket）
+- ✅ **SQLAlchemy 2.0 兼容**（`func.cast` → `func.sum` + 缓存查询 `.limit(1)` 避免 MultipleResultsFound）
 - ✅ **骨架屏 loading**（resources/path/tiku/profile 4 页面 shimmer 动画）
-- ✅ **Robot 图标**（`components/RobotIcon.tsx` 替换 resources/tiku/pinggu 的 🤖 emoji）
-- ✅ **学习时长追踪**（`hooks/usePageTimer.ts`，5 页面自动上报 learning_records 表）
+- ✅ **Robot 图标**（`components/RobotIcon.tsx` 替换 🤖 emoji）
+- ✅ **学习时长追踪**（`hooks/usePageTimer.ts`，5 页面自动上报）
 
 ## 技术栈（已锁定，不要换）
 
@@ -184,14 +177,22 @@ pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 # Swagger: http://localhost:8001/docs
 
+# 前端
+cd frontend && npm install && npm run dev
+
+# 一键启停（替代上面两行）
+.\start.ps1     # 同时启动后端+前端
+.\stop.ps1      # 杀所有 python/node 进程
+
+# Celery 定时任务（评估报告每天 4 点生成）
+cd backend && celery -A app.core.celery_config worker --loglevel=info
+cd backend && celery -A app.core.celery_config beat --loglevel=info
+
 # 测试（114 pytest，需 PG 5432）
 cd backend && python -m pytest tests/ -v
 
 # 端到端冒烟
 cd backend && python -m tests.smoke_test
-
-# 前端
-cd frontend && npm install && npm run dev / build / lint
 ```
 
 **端口**：后端 8001（匹配 `frontend/src/lib/api.ts` 的 `BASE_URL`，**不要用 8000**：Windows 端口僵尸 socket 问题）。

@@ -58,6 +58,7 @@ $RECYCLE.BIN/
 postgres_data/
 minio_data/
 redis_data/
+.service-pids.json
 
 # ===== 测试 / 报告产物 =====
 coverage/
