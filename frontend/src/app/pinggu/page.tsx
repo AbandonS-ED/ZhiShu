@@ -188,6 +188,13 @@ function BarChart({ data }: { data: Array<{ name: string; pct: number }> }) {
   )
 }
 
+const PROGRESS_MSGS = [
+  '正在查询学习记录...',
+  '正在分析知识掌握度...',
+  '正在分析易错点...',
+  'AI 正在生成评估报告...',
+]
+
 // ═══ MAIN PAGE ═══
 export default function PingguPage() {
   const [currentScore, setCurrentScore] = useState(0)
@@ -200,6 +207,10 @@ export default function PingguPage() {
   const [askResult, setAskResult] = useState<{ question: string; answer: string; suggestion: string } | null>(null)
   const [evalReport, setEvalReport] = useState<EvaluationReport | null>(null)
   const [regenerating, setRegenerating] = useState(false)
+  const [progressMsg, setProgressMsg] = useState('')
+
+  const msgQueueRef = useRef<string[]>([])
+  const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const displayDimensions = useMemo(() => deriveDimensions(evalReport), [evalReport])
   const displayKnowledgeTable = useMemo(() => deriveKnowledgeTable(evalReport), [evalReport])
@@ -211,10 +222,39 @@ export default function PingguPage() {
   usePageTimer('evaluation')
 
   useEffect(() => {
+    msgQueueRef.current = [...PROGRESS_MSGS]
+
+    const processQueue = () => {
+      if (msgTimerRef.current) return
+      const queue = msgQueueRef.current
+      if (queue.length === 0) return
+      setProgressMsg(queue.shift()!)
+      if (queue.length > 0) {
+        msgTimerRef.current = setTimeout(() => {
+          msgTimerRef.current = null
+          processQueue()
+        }, 3000)
+      }
+    }
+    processQueue()
+
     evaluationApi.getReport(getStudentId())
       .then((r) => { setEvalReport(r); setCurrentScore(r.overall_score) })
       .catch(() => {})
-      .finally(() => setEvalLoading(false))
+      .finally(() => {
+        setEvalLoading(false)
+        if (msgTimerRef.current) {
+          clearTimeout(msgTimerRef.current)
+          msgTimerRef.current = null
+        }
+      })
+
+    return () => {
+      if (msgTimerRef.current) {
+        clearTimeout(msgTimerRef.current)
+        msgTimerRef.current = null
+      }
+    }
   }, [])
 
   const askAi = async () => {
@@ -442,9 +482,9 @@ export default function PingguPage() {
           </div>
           <div className="card-bd">
             {evalLoading ? (
-              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-3)' }}>
-                <div style={{ marginBottom: 8 }}><RobotIcon size={24} /></div>
-                AI 正在分析您的学习数据...
+              <div className="gen-loading" style={{ justifyContent: 'center', padding: '24px 20px', border: 'none' }}>
+                <div className="gen-spinner" />
+                <span>{progressMsg || 'AI 正在分析您的学习数据...'}</span>
               </div>
             ) : evalReport?.report ? (
               <div className="eval-report">

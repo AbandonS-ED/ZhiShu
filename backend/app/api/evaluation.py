@@ -1,13 +1,16 @@
 """效果评估 API — F5"""
 
 import uuid
+from datetime import date
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from fastapi import HTTPException
 from app.core.database import get_db
 from app.core.dependencies import valid_student_id, get_current_user
 from app.models.student import Student
+from app.models.evaluation_report import EvaluationReport
 from app.services.evaluation_service import evaluation_service
 
 router = APIRouter()
@@ -92,5 +95,20 @@ async def regenerate_evaluation_report(
     """重新生成学习评估报告"""
     if user.id != student_id:
         raise HTTPException(status_code=403, detail="只能操作自己的数据")
+
+    # 删除今日旧缓存
+    today = date.today()
+    existing = await db.execute(
+        select(EvaluationReport).where(
+            EvaluationReport.student_id == student_id,
+            EvaluationReport.report_date == today,
+        ).limit(1)
+    )
+    old = existing.scalar_one_or_none()
+    if old:
+        await db.delete(old)
+        await db.commit()
+
+    # 重新生成
     report = await evaluation_service.get_evaluation_report(db, str(student_id))
     return report

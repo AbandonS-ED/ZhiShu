@@ -7,7 +7,7 @@ from datetime import datetime, date
 from celery import shared_task
 from sqlalchemy import select
 from app.core.celery_config import celery_app
-from app.core.database import async_session_factory
+from app.core.database import async_session
 from app.models.student import Student
 from app.models.evaluation_report import EvaluationReport
 from app.services.evaluation_service import evaluation_service
@@ -26,7 +26,7 @@ async def _generate_daily_reports_async():
     today = date.today()
     logger.info(f"开始生成每日评估报告: {today}")
 
-    async with async_session_factory() as db:
+    async with async_session() as db:
         try:
             # 查询所有学生
             result = await db.execute(

@@ -186,7 +186,7 @@ class EvaluationService:
             select(EvaluationReport).where(
                 EvaluationReport.student_id == uuid.UUID(student_id),
                 EvaluationReport.report_date == today,
-            )
+            ).limit(1)
         )
         cached_report = cached_result.scalar_one_or_none()
         if cached_report:
