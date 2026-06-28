@@ -1,6 +1,8 @@
 'use client'
 import { useRouter } from 'next/navigation'
 import type { PhaseType } from '../types'
+import Icon from '@/components/Icon'
+import type { ReactNode } from 'react'
 import { usePhaseGeneration } from '../hooks/usePhaseGeneration'
 
 const PHASE_LABELS: Record<PhaseType, string> = {
@@ -9,11 +11,11 @@ const PHASE_LABELS: Record<PhaseType, string> = {
   review: '复习',
 }
 
-const PHASE_AGENT_LABELS: Record<string, string> = {
-  document: '📄 文档',
-  exercise: '📝 练习',
-  validator: '🔍 验证',
-  storage: '💾 存储',
+const PHASE_AGENT_LABELS: Record<string, ReactNode> = {
+  document: <><Icon name="doc" size={14} className="inline-icon" /> 文档</>,
+  exercise: <><Icon name="edit" size={14} className="inline-icon" /> 练习</>,
+  validator: <><Icon name="search" size={14} className="inline-icon" /> 验证</>,
+  storage: <><Icon name="save" size={14} className="inline-icon" /> 存储</>,
 }
 
 interface PhaseButtonProps {
@@ -89,7 +91,7 @@ export default function PhaseButton({
         </div>
         <div className="phase-info">
           <span className="phase-agent">
-            {PHASE_AGENT_LABELS[state.current_agent] ?? state.current_agent ?? '🤖'}
+            {PHASE_AGENT_LABELS[state.current_agent] ?? state.current_agent ?? <Icon name="robot" size={14} />}
           </span>
           <span className="phase-msg">{state.message || '生成中...'}</span>
           <span className="phase-pct">{state.progress}%</span>
@@ -112,7 +114,7 @@ export default function PhaseButton({
   if (state.status === 'error' && isThisPhase) {
     return (
       <button className="phase-btn phase-btn-error" onClick={handleClick}>
-        <span className="phase-icon">⚠</span>
+        <span className="phase-icon"><Icon name="warning" size={14} /></span>
         <span>重试</span>
       </button>
     )

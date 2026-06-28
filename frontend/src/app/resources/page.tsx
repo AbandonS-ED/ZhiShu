@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { resourceApi, evaluationApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { showToast } from '@/lib/utils'
 import RobotIcon from '@/components/RobotIcon'
+import Icon from '@/components/Icon'
 import { usePageTimer } from '@/hooks/usePageTimer'
 import SmartInput from './components/SmartInput'
 import RecFeed from './components/RecFeed'
@@ -44,11 +45,11 @@ interface ResourceVM {
 
 // ═══ ICONS ═══
 const typeIcons: Record<ResourceType, { icon: string; bg: string; color: string }> = {
-  explanation: { icon: '📄', bg: 'var(--info-soft)', color: 'var(--info)' },
-  mindmap: { icon: '🗺️', bg: 'var(--success-soft)', color: 'var(--success)' },
-  exercise: { icon: '📝', bg: 'var(--warm-soft)', color: 'var(--warm)' },
-  code: { icon: '💻', bg: 'var(--accent-soft)', color: 'var(--ink-2)' },
-  audio: { icon: '🎧', bg: 'var(--danger-soft)', color: 'var(--danger)' },
+  explanation: { icon: 'doc', bg: 'var(--info-soft)', color: 'var(--info)' },
+  mindmap: { icon: 'map', bg: 'var(--success-soft)', color: 'var(--success)' },
+  exercise: { icon: 'edit', bg: 'var(--warm-soft)', color: 'var(--warm)' },
+  code: { icon: 'code', bg: 'var(--accent-soft)', color: 'var(--ink-2)' },
+  audio: { icon: 'audio', bg: 'var(--danger-soft)', color: 'var(--danger)' },
 }
 const typeLabels: Record<ResourceType, string> = {
   explanation: '知识点讲解', mindmap: '思维导图', exercise: '练习题', code: '代码示例', audio: '音频',
@@ -154,6 +155,15 @@ function getExerciseTypeLabel(type: string): string {
     coding: '编程',
   }
   return map[type] || type
+}
+
+function renderGenResult(text: string): React.ReactNode {
+  const parts = text.split(/(✅|❌)/g)
+  return parts.map((part, i) => {
+    if (part === '✅') return <Icon key={i} name="check" size={16} className="inline-icon" />
+    if (part === '❌') return <Icon key={i} name="close" size={16} className="inline-icon" />
+    return part
+  })
 }
 
 function getAnswerIndex(ex: Record<string, unknown>): number {
@@ -371,13 +381,13 @@ export default function ResourcesPage() {
           className={`tab-btn${mainTab === 'feed' ? ' active' : ''}`}
           onClick={() => setMainTab('feed')}
         >
-          🤖 推荐 Feed
+          <Icon name="robot" size={16} className="inline-icon" /> 推荐 Feed
         </button>
         <button
           className={`tab-btn${mainTab === 'all' ? ' active' : ''}`}
           onClick={() => setMainTab('all')}
         >
-          📚 全部资源
+          <Icon name="book" size={16} className="inline-icon" /> 全部资源
         </button>
       </div>
 
@@ -468,7 +478,7 @@ export default function ResourcesPage() {
           </div>
         ) : (
           <div style={{ padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12, fontSize: 13, whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>
-            {genResult}
+{renderGenResult(genResult)}
           </div>
         )
       )}
@@ -494,7 +504,7 @@ export default function ResourcesPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 0', color: 'var(--ink-3)' }}>
-            <div style={{ fontSize: '36px', marginBottom: '12px' }}>📭</div>
+            <div style={{ fontSize: '36px', marginBottom: '12px' }}><Icon name="inbox" size={36} /></div>
             <div style={{ fontSize: '14px', fontWeight: 500 }}>没有找到匹配的资源</div>
             <div style={{ fontSize: '12.5px', marginTop: '4px' }}>尝试更换筛选条件或搜索关键词</div>
           </div>

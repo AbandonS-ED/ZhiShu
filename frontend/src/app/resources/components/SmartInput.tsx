@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { resourceApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
+import Icon from '@/components/Icon'
 
 interface SmartInputProps {
   onBatchStart?: () => void  // 开始批量生成时回调
@@ -61,7 +62,7 @@ export default function SmartInput({ onBatchStart }: SmartInputProps) {
           onClick={handleSubmit}
           disabled={batchLoading || !value.trim()}
         >
-          {batchLoading ? '生成中...' : '▶ 生成'}
+          {batchLoading ? '生成中...' : <><Icon name="play" size={16} /> 生成</>}
         </button>
       </div>
       {error && <p className="smart-error">{error}</p>}

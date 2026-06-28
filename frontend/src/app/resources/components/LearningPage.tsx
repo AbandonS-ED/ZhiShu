@@ -5,6 +5,7 @@ import { resourceApi, evaluationApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { markdownToHtml } from '@/lib/utils'
 import { usePhaseGeneration } from '../hooks/usePhaseGeneration'
+import Icon from '@/components/Icon'
 import type { PhaseType, LearningPackage } from '../types'
 
 // ── 内联 Mermaid 渲染（复用 duihua/page.tsx 逻辑）────────────
@@ -111,7 +112,7 @@ export default function LearningPage({ knowledge_point }: { knowledge_point: str
           </div>
         )}
         {genState.status === 'done' && (
-          <button className="btn-primary" onClick={fetchPkg}>🔄 刷新查看</button>
+          <button className="btn-primary" onClick={fetchPkg}><Icon name="refresh" size={16} className="inline-icon" /> 刷新查看</button>
         )}
       </div>
     )
@@ -128,7 +129,7 @@ export default function LearningPage({ knowledge_point }: { knowledge_point: str
       <div className="lp-content">
         {knowledge && (
           <div className="lp-section">
-            <h3>📖 知识讲解</h3>
+            <h3><Icon name="book" size={20} /> 知识讲解</h3>
             <div
               className="lp-text"
               dangerouslySetInnerHTML={{ __html: markdownToHtml(String(knowledge.content ?? '')) }}
@@ -137,12 +138,12 @@ export default function LearningPage({ knowledge_point }: { knowledge_point: str
         )}
         {mindmap && mindmap.mermaid && (
           <div className="lp-section">
-            <h3>🗺️ 思维导图</h3>
+            <h3><Icon name="map" size={20} /> 思维导图</h3>
             <MermaidDiagram code={mindmap.mermaid} id={knowledge_point} />
           </div>
         )}
         <button className="btn-primary lp-complete" onClick={recordComplete}>
-          ✅ 我已完成学习
+          <Icon name="check" size={16} className="inline-icon" /> 我已完成学习
         </button>
       </div>
     )
@@ -155,7 +156,7 @@ export default function LearningPage({ knowledge_point }: { knowledge_point: str
 
     return (
       <div className="lp-content">
-        <h3>📝 练习题</h3>
+        <h3><Icon name="edit" size={20} /> 练习题</h3>
         <div className="lp-exercises">
           {exercises.map((ex: any, i: number) => (
             <div key={i} className="lp-exercise-card">
@@ -196,7 +197,7 @@ export default function LearningPage({ knowledge_point }: { knowledge_point: str
             </div>
           ))}
         </div>
-        <button className="btn-primary" onClick={recordComplete}>✅ 完成练习</button>
+        <button className="btn-primary" onClick={recordComplete}><Icon name="check" size={16} className="inline-icon" /> 完成练习</button>
       </div>
     )
   }
@@ -210,7 +211,7 @@ export default function LearningPage({ knowledge_point }: { knowledge_point: str
       <div className="lp-content">
         {summary && (
           <div className="lp-section">
-            <h3>📋 总结卡片</h3>
+            <h3><Icon name="clipboard" size={20} /> 总结卡片</h3>
             <div
               className="lp-text"
               dangerouslySetInnerHTML={{ __html: String(summary.content ?? '').replace(/\n/g, '<br>') }}
@@ -219,11 +220,11 @@ export default function LearningPage({ knowledge_point }: { knowledge_point: str
         )}
         {code && (
           <div className="lp-section">
-            <h3>💻 代码示例</h3>
+            <h3><Icon name="code" size={20} /> 代码示例</h3>
             <pre className="lp-code"><code>{code.content ?? code.code ?? ''}</code></pre>
           </div>
         )}
-        <button className="btn-primary" onClick={recordComplete}>✅ 完成复习</button>
+        <button className="btn-primary" onClick={recordComplete}><Icon name="check" size={16} className="inline-icon" /> 完成复习</button>
       </div>
     )
   }

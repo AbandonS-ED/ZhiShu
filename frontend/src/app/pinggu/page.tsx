@@ -6,17 +6,18 @@ import { getStudentId } from '@/lib/student'
 import { showToast } from '@/lib/utils'
 import RobotIcon from '@/components/RobotIcon'
 import { usePageTimer } from '@/hooks/usePageTimer'
+import Icon from '@/components/Icon'
 
 // ═══ DATA ═══
 
 // 默认 fallback 数据
 const defaultDimensions = [
-  { name: '知识基础', icon: '📚', bg: 'var(--info-soft)', color: 'var(--info)', score: 0, detail: '暂无数据' },
-  { name: '认知风格', icon: '🧠', bg: 'var(--success-soft)', color: 'var(--success)', score: 0, detail: '暂无数据' },
-  { name: '学习目标', icon: '🎯', bg: 'var(--warm-soft)', color: 'var(--warm)', score: 0, detail: '暂无数据' },
-  { name: '易错点', icon: '⚠️', bg: 'var(--danger-soft)', color: 'var(--danger)', score: 0, detail: '暂无数据' },
-  { name: '学习节奏', icon: '⏱️', bg: 'var(--info-soft)', color: 'var(--info)', score: 0, detail: '暂无数据' },
-  { name: '兴趣方向', icon: '💡', bg: 'var(--success-soft)', color: 'var(--success)', score: 0, detail: '暂无数据' },
+  { name: '知识基础', icon: 'book', bg: 'var(--info-soft)', color: 'var(--info)', score: 0, detail: '暂无数据' },
+  { name: '认知风格', icon: 'brain', bg: 'var(--success-soft)', color: 'var(--success)', score: 0, detail: '暂无数据' },
+  { name: '学习目标', icon: 'target', bg: 'var(--warm-soft)', color: 'var(--warm)', score: 0, detail: '暂无数据' },
+  { name: '易错点', icon: 'warning', bg: 'var(--danger-soft)', color: 'var(--danger)', score: 0, detail: '暂无数据' },
+  { name: '学习节奏', icon: 'clock', bg: 'var(--info-soft)', color: 'var(--info)', score: 0, detail: '暂无数据' },
+  { name: '兴趣方向', icon: 'lightbulb', bg: 'var(--success-soft)', color: 'var(--success)', score: 0, detail: '暂无数据' },
 ]
 
 const defaultWeeklyHours = [
@@ -47,7 +48,7 @@ function deriveDimensions(report: EvaluationReport | null) {
   // 取前 6 个知识点 → 6 个维度卡
   return entries.slice(0, 6).map(([name, info], i) => ({
     name: name.length > 8 ? name.slice(0, 8) + '…' : name,
-    icon: ['📚', '🧠', '🎯', '⚠️', '⏱️', '💡'][i] || '📌',
+    icon: ['book', 'brain', 'target', 'warning', 'clock', 'lightbulb'][i] || 'book',
     bg: 'var(--info-soft)',
     color: 'var(--info)',
     score: Math.round(info.avg_score),
@@ -265,7 +266,7 @@ export default function PingguPage() {
       const r = await tutorApi.ask(getStudentId(), askInput.trim())
       setAskResult({ question: r.question, answer: r.answer, suggestion: r.suggestion })
     } catch (e: any) {
-      setAskResult({ question: askInput, answer: `❌ 调用失败: ${e.message}`, suggestion: '' })
+      setAskResult({ question: askInput, answer: `调用失败: ${e.message}`, suggestion: '' })
     } finally {
       setAskLoading(false)
     }
@@ -358,10 +359,13 @@ export default function PingguPage() {
       {askResult && (
         <div style={{ padding: 16, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12 }}>
           <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>Q: {askResult.question}</div>
-          <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{askResult.answer}</div>
+          <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+            {(askResult.answer.startsWith('调用失败')) && <Icon name="close" size={14} className="inline-icon" />}
+            {askResult.answer}
+          </div>
           {askResult.suggestion && (
             <div style={{ marginTop: 10, padding: 10, background: 'var(--success-soft)', borderRadius: 6, fontSize: 12 }}>
-              💡 <strong>建议：</strong>{askResult.suggestion}
+              <Icon name="lightbulb" size={14} className="inline-icon" /> <strong>建议：</strong>{askResult.suggestion}
             </div>
           )}
         </div>
@@ -390,7 +394,7 @@ export default function PingguPage() {
           {displayDimensions.map((d, i) => (
             <div key={`${d.name}-${i}`} className="dim-bar-card" style={{ opacity: 0, animation: `fadeUp .4s var(--ease) ${i * 0.06}s forwards` }}>
               <div className="db-top">
-                <div className="db-icon" style={{ background: d.bg, color: d.color }}>{d.icon}</div>
+                <div className="db-icon" style={{ background: d.bg, color: d.color }}><Icon name={d.icon as any} size={20} /></div>
                 <div className="db-name">{d.name}</div>
                 <div className="db-score" style={{ color: scoreColor(d.score) }}>{d.score}</div>
               </div>

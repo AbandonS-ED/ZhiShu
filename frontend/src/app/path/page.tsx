@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { pathApi, evaluationApi, type PathNode as ApiPathNode, type PathEdge as ApiPathEdge } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { usePageTimer } from '@/hooks/usePageTimer'
+import Icon from '@/components/Icon'
 
 // ═══ TYPES ═══
 interface PathNode extends ApiPathNode {}
@@ -71,6 +72,7 @@ export default function PathPage() {
   const [genDailyTopics, setGenDailyTopics] = useState(3)
   const [generating, setGenerating] = useState(false)
   const [genResult, setGenResult] = useState('')
+  const [genResultType, setGenResultType] = useState<'success' | 'error' | ''>('')
   const [loading, setLoading] = useState(true)
 
   // 记录页面停留时间
@@ -152,7 +154,7 @@ export default function PathPage() {
   const generatePath = () => {
     if (!genInput.trim() || generating) return
     setGenerating(true)
-    setGenResult('正在生成学习计划...')
+    setGenResult('正在生成学习计划...'); setGenResultType('')
     clearMsgQueue()
 
     const topics = genInput.split(/[,，、\s]+/).filter(Boolean)
@@ -167,7 +169,8 @@ export default function PathPage() {
         if (e.type === 'result' && e.data) {
           clearMsgQueue()
           const data = e.data as PathData
-          setGenResult(`✅ 已生成「${data.title || ''}」\n共 ${data.total_days || 0} 天，${data.nodes?.length || 0} 个知识点`)
+          setGenResult(`已生成「${data.title || ''}」\n共 ${data.total_days || 0} 天，${data.nodes?.length || 0} 个知识点`)
+          setGenResultType('success')
           loadPaths()
           evaluationApi.recordAction({
             student_id: getStudentId(),
@@ -179,7 +182,8 @@ export default function PathPage() {
         }
         if (e.type === 'error') {
           clearMsgQueue()
-          setGenResult(`❌ ${e.message || '调用失败'}`)
+          setGenResult(e.message || '调用失败')
+          setGenResultType('error')
         }
         if (e.type === 'done') {
           setTimeout(() => clearMsgQueue(), 3000)
@@ -295,7 +299,7 @@ export default function PathPage() {
             </select>
             {currentPath && (
               <button onClick={() => deletePath(currentPath.path_id)} style={{ padding: '6px 10px', background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 6, cursor: 'pointer', fontSize: 12 }} title="删除计划">
-                🗑️
+                <Icon name="trash" size={16} />
               </button>
             )}
           </div>
@@ -356,12 +360,14 @@ export default function PathPage() {
         generating ? (
           <div className="gen-loading">
             <div className="gen-spinner" />
-            <span>{genResult.replace(/^[✅❌⏳]\s*/, '')}</span>
+            <span>{genResult}</span>
           </div>
         ) : (
-          <div style={{ padding: '12px 16px', background: genResult.startsWith('✅') ? 'var(--success-soft)' : genResult.startsWith('❌') ? 'var(--danger-soft)' : 'var(--surface)', border: `1px solid ${genResult.startsWith('✅') ? 'var(--success)' : genResult.startsWith('❌') ? 'var(--danger)' : 'var(--border)'}`, borderRadius: 8, marginBottom: 12, fontSize: 13, whiteSpace: 'pre-wrap', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            <span style={{ fontSize: 16, flexShrink: 0 }}>{genResult.startsWith('✅') ? '✅' : genResult.startsWith('❌') ? '❌' : '⏳'}</span>
-            <span>{genResult.replace(/^[✅❌⏳]\s*/, '')}</span>
+          <div style={{ padding: '12px 16px', background: genResultType === 'success' ? 'var(--success-soft)' : genResultType === 'error' ? 'var(--danger-soft)' : 'var(--surface)', border: `1px solid ${genResultType === 'success' ? 'var(--success)' : genResultType === 'error' ? 'var(--danger)' : 'var(--border)'}`, borderRadius: 8, marginBottom: 12, fontSize: 13, whiteSpace: 'pre-wrap', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <span style={{ fontSize: 16, flexShrink: 0 }}>
+              {genResultType === 'success' ? <Icon name="check" size={16} className="inline-icon" /> : genResultType === 'error' ? <Icon name="close" size={16} className="inline-icon" /> : <Icon name="clock" size={16} className="inline-icon" />}
+            </span>
+            <span>{genResult}</span>
           </div>
         )
       )}
@@ -369,7 +375,7 @@ export default function PathPage() {
       {/* 计划描述 */}
       {currentPath?.description && (
         <div style={{ padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, marginBottom: 12, fontSize: 13, color: 'var(--ink-2)' }}>
-          <span style={{ fontWeight: 500, color: 'var(--ink)' }}>📋 {currentPath.title}</span>
+          <span style={{ fontWeight: 500, color: 'var(--ink)' }}><Icon name="clipboard" size={16} /> {currentPath.title}</span>
           <span style={{ margin: '0 8px', color: 'var(--ink-4)' }}>·</span>
           <span>{currentPath.description}</span>
         </div>
@@ -412,7 +418,7 @@ export default function PathPage() {
             <div className="card-bd" id="graphArea">
               {layoutNodes.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--ink-4)' }}>
-                  <div style={{ fontSize: '32px', marginBottom: '12px' }}>📚</div>
+                  <div style={{ marginBottom: '12px' }}><Icon name="book" size={32} /></div>
                   <div style={{ fontSize: '14px', fontWeight: 500 }}>暂无学习计划</div>
                   <div style={{ fontSize: '12px', marginTop: '4px', marginBottom: '16px' }}>输入知识点生成计划，或在对话页说&quot;生成XX学习路径&quot;</div>
                   <button onClick={() => {
@@ -496,9 +502,9 @@ export default function PathPage() {
                 <div className="dp-row">
                   <span className="dp-label">关联资源</span>
                   <div className="dp-resources">
-                    <button className="dp-res-btn" onClick={() => window.location.href = `/duihua?msg=讲解${selectedData.label}`}>📄 讲解</button>
-                    <button className="dp-res-btn" onClick={() => window.location.href = `/duihua?msg=画${selectedData.label}思维导图`}>🗺️ 导图</button>
-                    <button className="dp-res-btn" onClick={() => window.location.href = `/duihua?msg=出5道${selectedData.label}练习题`}>📝 练习</button>
+                    <button className="dp-res-btn" onClick={() => window.location.href = `/duihua?msg=讲解${selectedData.label}`}><Icon name="doc" size={16} /> 讲解</button>
+                    <button className="dp-res-btn" onClick={() => window.location.href = `/duihua?msg=画${selectedData.label}思维导图`}><Icon name="map" size={16} /> 导图</button>
+                    <button className="dp-res-btn" onClick={() => window.location.href = `/duihua?msg=出5道${selectedData.label}练习题`}><Icon name="edit" size={16} /> 练习</button>
                   </div>
                 </div>
               </div>
@@ -509,7 +515,7 @@ export default function PathPage() {
           ) : (
             <div className="detail-panel">
               <div className="detail-placeholder">
-                <div className="dp-icon">👆</div>
+                <div className="dp-icon"><Icon name="point" size={24} /></div>
                 <p>点击计划图中的节点<br />查看知识点详情</p>
               </div>
             </div>

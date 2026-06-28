@@ -138,7 +138,7 @@ class RecommendationService:
             .limit(500)
         )
         recent_chat_kps: dict[str, int] = {}
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
         for (content, created_at) in chat_result.all():
             if created_at and created_at < thirty_days_ago:
                 continue

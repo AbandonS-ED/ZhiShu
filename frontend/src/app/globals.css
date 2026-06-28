@@ -1711,3 +1711,6 @@ body.auth-mode .auth-root{min-height:100vh}
 .lp-complete{margin-top:8px}
 .btn-primary{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;border-radius:var(--r-xs);font-size:13.5px;font-weight:500;cursor:pointer;border:none;background:var(--ink);color:#fff;transition:opacity .15s}
 .btn-primary:hover{opacity:.88}
+
+/* ═══ INLINE ICON ═══ */
+.inline-icon{vertical-align:middle;margin-right:4px;display:inline}

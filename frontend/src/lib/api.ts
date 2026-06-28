@@ -8,16 +8,6 @@ import { createEventStream, type ChatEvent } from './sse'
 
 export type { ChatEvent }
 
-// 通用 SSE 事件类型
-export interface ChatEvent {
-  type: 'session' | 'progress' | 'result' | 'done' | 'error' | 'token'
-  session_id?: string
-  progress?: number
-  message?: string
-  content?: string
-  data?: unknown
-}
-
 // 学习包生成 SSE 事件类型
 export interface GenerationEvent {
   type: 'progress' | 'token' | 'result' | 'error' | 'done' | 'validation'

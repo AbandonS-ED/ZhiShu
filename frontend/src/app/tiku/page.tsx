@@ -6,6 +6,7 @@ import { getStudentId } from '@/lib/student'
 import { markdownToHtml } from '@/lib/utils'
 import RobotIcon from '@/components/RobotIcon'
 import { usePageTimer } from '@/hooks/usePageTimer'
+import Icon from '@/components/Icon'
 
 const BASE_URL = 'http://localhost:8001/api/v1'
 const HIDDEN_KEY = 'zhishu_hidden_exercises'
@@ -531,7 +532,7 @@ export default function TikuPage() {
           {/* Exercises */}
           {filtered.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--ink-3)' }}>
-              <div style={{ fontSize: '32px', marginBottom: '10px' }}>📝</div>
+              <div style={{ marginBottom: '10px' }}><Icon name="book" size={32} /></div>
               <div style={{ fontSize: '14px' }}>暂无题目</div>
               <div style={{ fontSize: 12, marginTop: 8 }}>试试 AI 出题，或让管理员往题库添加题目</div>
             </div>
