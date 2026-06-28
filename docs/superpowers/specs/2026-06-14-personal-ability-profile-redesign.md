@@ -1,5 +1,7 @@
 # 个人底层能力画像重构方案
 
+> **状态同步**: 2026-06-28 — 5 维画像重构已完成。本文档作为重构动机存档。
+
 ## 动机
 
 旧的6维画像（knowledge_mastery, learning_style, cognitive_level, interest, weak_topics, learning_pace）存在以下问题：
