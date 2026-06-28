@@ -118,11 +118,11 @@ ZhiShu/
 └── docker-compose.yml               # postgres+pgvector / redis / minio（未启用）
 ```
 
-**实际状态（2026-06-29）**：
+**实际状态（2026-07-06）**：
 
 - ✅ **学生端 9 页面** 1:1 复刻模板 + 9/9 全部接入 API（含登录/注册 + 设置页）
 - ✅ **管理后台 9 页面** 1:1 复刻 `houtai.html` 模板 + 批量删除 + 搜索筛选 + 详情弹窗 + **题库 CRUD 已实联 admin_exercises API**
-- ✅ 后端完整：**12 表 + 8 Agent + 41 唯一 API 端点** + **13 Service**（含 6 个 auth 端点 + 6 个 admin 端点）
+- ✅ 后端完整：**12 表 + 8 Agent + 41 唯一 API 端点** + **14 Service**（含 6 个 auth 端点 + 6 个 admin 端点）
 - ✅ **登录注册系统**：bcrypt + JWT + 全 41 个业务端点门禁
 - ✅ **管理后台权限**：`role` 字段 + `is_active` + `last_login` + 独立 token (`zhishu_admin_token`)
 - ✅ **5 维学生画像**（理解力/记忆力/应用转化/想象力/专注力 + confidence）：由 `initial_assessment_agent` 对话式评估
@@ -134,14 +134,12 @@ ZhiShu/
 - ✅ **练习题 dual-format 流式**（markdown + JSON 同传）
 - ✅ **端到端冒烟测试 7 次 9/9 PASS**
 - ✅ **114 pytest 全过**（7 文件）
-- ✅ **评估报告 AI 化 + 缓存 + 定时生成**（`evaluation_reports` 表 + Celery 每天 4 点 + 实时生成兜底）
-- ✅ **评估报告重新生成**（POST `/report/{student_id}/regenerate` 端点 + 前端按钮）
-- ✅ **评估报告加载动画**（消息队列轮播 4 条进度消息各 3s + spinner）
-- ✅ **评估报告生成时间**（`generated_at` 字段 + 前端显示）
+- ✅ **评估报告 AI 化 + 缓存 + 定时生成 + 重新生成 + 加载动画**
+- ✅ **资源中心重构**：推荐 Feed + 推荐服务（`recommendation_service.py`）+ 三阶段学习包（Learn/Practice/Review）+ 应用内加载
+- ✅ **全量 UI emoji 替换为 SVG Icon 组件**（`components/Icon.tsx` 30 个图标，统一 `stroke="currentColor"` 风格）
 - ✅ **一键启停脚本**（`start.ps1` + `stop.ps1`，杀所有 python/node 进程解决孤儿 socket）
-- ✅ **SQLAlchemy 2.0 兼容**（`func.cast` → `func.sum` + 缓存查询 `.limit(1)` 避免 MultipleResultsFound）
+- ✅ **SQLAlchemy 2.0 兼容 + 推荐接口时区 bug 修复**
 - ✅ **骨架屏 loading**（resources/path/tiku/profile 4 页面 shimmer 动画）
-- ✅ **Robot 图标**（`components/RobotIcon.tsx` 替换 🤖 emoji）
 - ✅ **学习时长追踪**（`hooks/usePageTimer.ts`，5 页面自动上报）
 
 ## 技术栈（已锁定，不要换）

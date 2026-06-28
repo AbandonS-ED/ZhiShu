@@ -1,7 +1,7 @@
 # 智枢(SmartHub) - 多智能体个性化学习资源生成系统
 
 > 第十五届中国软件杯 A3 赛题。基于大模型的个性化资源生成与学习多智能体系统。
-> **最新状态（2026-06-29）**：评估报告缓存 + 定时生成（`evaluation_reports` 表 + Celery 每天 4 点）+ 重新生成按钮 + 加载动画消息队列轮播 + 生成时间显示 + `regenerate` POST 端点 + 一键启动/停止脚本（`start.ps1`/`stop.ps1` 解决孤儿 socket）。114 pytest 全过，**7 次**冒烟验证 9/9 PASS，管理员账号 `admin/admin123` 已就绪。
+> **最新状态（2026-06-29）**：资源中心重构（推荐 Feed + Learn/Practice/Review 三阶段学习包）+ 全量 UI emoji 替换为 SVG Icon 组件（30 个图标）+ 评估报告缓存 + 定时生成 + 重新生成按钮 + 加载动画消息队列轮播 + 一键启停脚本。114 pytest 全过，**7 次**冒烟验证 9/9 PASS，管理员账号 `admin/admin123` 已就绪。
 
 ## 技术栈
 
@@ -125,7 +125,9 @@ API 文档: http://localhost:8001/docs
 | **题库页增强** | ✅ 隐藏/清空 + AI 出题数量可选 + 答案格式三层防护 + 去重限容 |
 | **对话页刷新修复** | ✅ sessionId 持久化 + loadSession 渲染修复 + DB content 列改 TEXT |
 | **骨架屏 loading** | ✅ resources/path/tiku/profile 4 页面 shimmer 动画骨架屏 |
-| **Robot 图标** | ✅ components/RobotIcon.tsx 极简机器人 SVG，替换 🤖 emoji |
+| **Robot 图标** | ✅ `components/RobotIcon.tsx` 极简机器人 SVG |
+| **SVG 图标集** | ✅ `components/Icon.tsx` 30 个图标，统一替换全部 UI emoji |
+| **资源中心重构（二期）** | ✅ 推荐 Feed + 推荐服务 `recommendation_service.py` + Learn/Practice/Review 三阶段学习包 + 应用内加载 |
 | **学习时长追踪** | ✅ usePageTimer hook + 5 页面自动上报 + 评估报告 daily_activity |
 | **评估报告 AI 化** | ✅ LLM 生成评估报告 + 7 天趋势对比 + 知识点掌握度统计 + 易错点分析 + 规则引擎降级 |
 | **评估报告缓存 + 定时生成** | ✅ `evaluation_reports` 表 + Celery 每天 4 点定时 + 实时生成兜底 |

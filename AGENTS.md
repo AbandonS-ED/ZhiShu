@@ -85,6 +85,8 @@ cd frontend && npm run build                       # 18 页面
 | `.service-pids.json` 泄漏 | 服务 PID 文件被 git 跟踪 | 已加 `.gitignore`，勿提交 |
 | Celery import 路径 | `from app.core.celery_config import app` 报错 | celery 必须在 `backend/` 目录下执行，确保 PYTHONPATH 正确 |
 | start.ps1 端口冲突 | 第二次启动报端口占用 | 先 `.\stop.ps1` 再 `.\start.ps1`（确保 kill 干净） |
+| recommendation_service 时区 | 推荐接口报 500，`datetime.utcnow()` 与 DB offset-aware 时间比较失败 | 用 `datetime.now(timezone.utc)` 替代 `datetime.utcnow()` |
+| ChatEvent 接口冲突 | api.ts 同时 import 和本地声明 ChatEvent，build 报 `conflicts with local declaration` | 删除本地 `interface ChatEvent`，统一用 `'./sse'` 导出的类型 |
 
 ## 关键架构事实
 
@@ -99,8 +101,10 @@ cd frontend && npm run build                       # 18 页面
 - **管理后台**：独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，题库 CRUD 6 端点
 - **页面停留计时**：`hooks/usePageTimer.ts` 自动记录页面停留时长（<3s 不记录），上报到 `learning_records` 表
 - **Robot 图标**：`components/RobotIcon.tsx` 极简 SVG（天线 + 圆眼 + 微笑弧线嘴），用于 AI 生成按钮
+- **SVG 图标集**：`components/Icon.tsx` 提供 30 个统一 SVG 图标（check/close/book/lightbulb/brain 等），`stroke="currentColor"` 风格匹配 RobotIcon，覆盖全部 UI 场景
 - **统一 SSE 工具**：`frontend/src/lib/sse.ts` + `backend/app/core/sse_utils.py` 替代 api.ts 4 处重复实现，含 3 次重试 + 指数退避 + 120s 超时
 - **评估报告**：评估 API 优先读 `evaluation_reports` 缓存表；无缓存则实时调 LLM 生成；Celery `tasks/evaluation_tasks.py` 每天 4 点预生成；前端 `/pinggu` 页面支持重新生成按钮 + 消息队列轮播加载动画 + 生成时间显示
+- **资源中心**：推荐 Feed + 三阶段学习包（Learn/Practice/Review）+ `recommendation_service.py` 基于画像/评估/对话/题库/路径的多维度打分推荐
 - **一键启停**：`start.ps1`（启动后端 8001 + 前端 3000）+ `stop.ps1`（杀所有 python/node 进程），解决 Windows uvicorn --reload 孤儿 socket 问题
 - **预置资源**：5 个人工智能导论课程资源（`is_preset=true`），通过 `init_preset_resources.py` 初始化
 
