@@ -124,4 +124,4 @@ class SparkClient:
             await self._client.aclose()
 
 
-spark_client = SparkClient(api_key="", base_url="")
+spark_client = SparkClient(api_key="")

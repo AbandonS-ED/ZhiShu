@@ -57,6 +57,8 @@ def sse_stream_response(
 ):
     """SSE 流式响应包装器
 
+    统一添加 Cache-Control / Connection / X-Accel-Buffering 头。
+
     用法:
         return sse_stream_response(my_event_generator())
 
@@ -69,4 +71,12 @@ def sse_stream_response(
         return sse_stream_response(my_generator())
     """
     from fastapi.responses import StreamingResponse
-    return StreamingResponse(generator, media_type=media_type)
+    return StreamingResponse(
+        generator,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

@@ -32,35 +32,39 @@ class PatternDetector:
     """
 
     SUSPICIOUS_PATTERNS = [
-        # 虚假年份引用（仅匹配明显未来年份，2030+）
-        (r"据\s*20[3-9]\d\s*年.*研究", "可能引用了未来年份的研究"),
-        (r"根据?\s*20[3-9]\d\s*年.*发表", "可能引用了未来年份的论文"),
-        (r"在\s*20[3-9]\d\s*年.*提出", "可能虚构了年份引用"),
+        # 虚假年份引用（仅匹配明显未来年份，2050+，避免误伤 2025-2049 的合理预测）
+        (r"据\s*20(?:5[0-9]|[6-9]\d)\s*年.*研究", "可能引用了未来年份的研究"),
+        (r"根据?\s*20(?:5[0-9]|[6-9]\d)\s*年.*发表", "可能引用了未来年份的论文"),
 
-        # 虚假期刊/会议（英文+中文）
-        (r"(?:Nature|Science|IEEE|ACM|ACL|NeurIPS|ICML)\s*(?:journal|proceedings|conference)", "可能虚构了期刊引用"),
-        (r"(?:在|于)\s*(?:Nature|Science|IEEE|ACM)\s*(?:上|发表|刊登)", "可能虚构了期刊引用"),
-        (r"(?:发表|刊登)\s*(?:在|于)\s*(?:Nature|Science|IEEE|ACM)", "可能虚构了期刊引用"),
+        # 虚假统计数据（仅匹配极端值 99%-100%）
+        (r"(?:准确率|成功率|效率)\s*(?:达到了?|达到?|为)\s*(?:99\.?\d*|100)\s*%", "可能夸大了统计数据（99%+）"),
+        (r"(?:超过|优于)\s*(?:99\.?\d*|100)\s*%", "可能夸大了比较数据（99%+）"),
 
-        # 虚假统计数据（仅匹配极端值，正常范围交给 SourceValidator）
-        (r"(?:准确率|成功率|效率)\s*(?:达到了?|达到?|为)\s*(?:9[89]|100)\s*%", "可能夸大了统计数据"),
-        (r"(?:超过|优于)\s*(?:9[89]|100)\s*%", "可能夸大了比较数据"),
-
-        # 绝对化表述
-        (r"(?:永远|绝对|一定)\s*(?:都是|都能|都会|可以)", "存在绝对化表述，可能是幻觉"),
-        (r"(?:100%\s*(?:正确|准确|有效))", "存在绝对化表述，可能是幻觉"),
+        # 绝对化表述（需要在具体上下文中才可疑）
+        (r"100%\s*(?:保证|正确|准确|有效)", "存在绝对化表述"),
     ]
+
+    # 严重度等级赋值（仅用于严重模式）
+    PATTERN_SEVERITY = {
+        "可能引用了未来年份的研究": 0.8,
+        "可能引用了未来年份的论文": 0.8,
+        "可能夸大了统计数据（99%+）": 0.5,
+        "可能夸大了比较数据（99%+）": 0.5,
+        "存在绝对化表述": 0.3,
+    }
 
     def detect(self, content: str) -> ValidationResult:
         issues = []
+        severity_sum = 0.0
         for pattern, desc in self.SUSPICIOUS_PATTERNS:
             if re.search(pattern, content):
                 issues.append(desc)
+                severity_sum += self.PATTERN_SEVERITY.get(desc, 0.5)
 
         return ValidationResult(
             passed=len(issues) == 0,
             issues=issues,
-            confidence=max(0.3, 1.0 - len(issues) * 0.2),
+            confidence=max(0.3, 1.0 - severity_sum),
             raw_content=content,
         )
 
@@ -74,32 +78,47 @@ class SourceValidator:
 
     def validate_citations(self, content: str, context_chunks: list[dict] | None = None) -> ValidationResult:
         issues = []
+        severity = 0.0
 
         # 检查是否有引用格式但无来源
         citation_patterns = [
-            r"\[(?:\d+|[a-zA-Z]+\s*\d{4})\]",  # [1] 或 [Smith 2023]
+            r"\[(?:\d+|[a-zA-Z]+\s*\d{4})\]",       # [1] 或 [Smith 2023]
+            r"\[来源\s*\d+\]",                        # [来源 1]
             r"(?:参考|引用|来源|出处)\s*[:：]",
         ]
 
         has_citations = any(re.search(p, content) for p in citation_patterns)
 
-        if has_citations and not context_chunks:
-            issues.append("内容包含引用格式但没有提供参考来源")
+        if has_citations:
+            if not context_chunks:
+                # 少量引用（≤2）可能是常见知识引用，不判定为问题
+                ref_count = len(re.findall(r"\[(?:\d+|[a-zA-Z]+\s*\d{4}|来源\s*\d+)\]", content))
+                if ref_count > 2:
+                    issues.append("内容包含 3 个以上引用格式但没有提供参考来源")
+                    severity = 0.3
 
-        # 检查引用的完整性（用索引匹配：[1] 对应第 1 个 context_chunk）
+        # 检查引用的完整性（支持 [1] 和 [来源 1] 两种格式）
         if context_chunks:
             max_index = len(context_chunks)
-            # 提取数字索引引用
+            # 提取数字索引引用（[1] 格式）
             refs = re.findall(r"\[(\d+)\]", content)
             for ref in refs:
                 idx = int(ref)
                 if idx < 1 or idx > max_index:
                     issues.append(f"引用 [{ref}] 超出来源范围（共 {max_index} 个来源）")
+                    severity = 0.4
+            # 提取 [来源 N] 格式
+            source_refs = re.findall(r"\[来源\s*(\d+)\]", content)
+            for ref in source_refs:
+                idx = int(ref)
+                if idx < 1 or idx > max_index:
+                    issues.append(f"引用 [来源 {ref}] 超出来源范围（共 {max_index} 个来源）")
+                    severity = 0.4
 
         return ValidationResult(
             passed=len(issues) == 0,
             issues=issues,
-            confidence=max(0.5, 1.0 - len(issues) * 0.25),
+            confidence=max(0.5, 1.0 - severity),
             raw_content=content,
         )
 
