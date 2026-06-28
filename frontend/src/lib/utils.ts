@@ -128,9 +128,15 @@ export function markdownToHtml(md: string): string {
   html = html.replace(/^## (.+)$/gm, (_, t) => `<h2 style="margin:16px 0 8px;font-size:16px">${esc(t)}</h2>`)
   html = html.replace(/^# (.+)$/gm, (_, t) => `<h1 style="margin:18px 0 10px;font-size:18px">${esc(t)}</h1>`)
 
-  // 加粗和斜体（内容已在后续段落中转义）
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
+  // 加粗和斜体（转义内容防止 XSS）
+  html = html.replace(/\*\*(.+?)\*\*/g, (_, t) => `<strong>${esc(t)}</strong>`)
+  html = html.replace(/\*(.+?)\*/g, (_, t) => `<em>${esc(t)}</em>`)
+
+  // 删除线（转义内容防止 XSS）
+  html = html.replace(/~~(.+?)~~/g, (_, t) => `<del>${esc(t)}</del>`)
+
+  // 行内公式 $...$（转义内容）
+  html = html.replace(/\$(.+?)\$/g, (_, t) => `<span class="math">${esc(t)}</span>`)
 
   // 无序列表
   html = html.replace(/^(?:- (.+)\n?)+/gm, (block) => {

@@ -10,14 +10,15 @@ import { usePageTimer } from '@/hooks/usePageTimer'
 const BASE_URL = 'http://localhost:8001/api/v1'
 const HIDDEN_KEY = 'zhishu_hidden_exercises'
 
+// 与 api.ts / types/index.ts 保持一致
 interface Exercise {
   exercise_id: string
   type: 'choice' | 'judge' | 'short_answer' | 'coding'
   question: string
-  options?: string[] | null
+  options?: string[]
   answer?: string
   explanation?: string
-  difficulty?: number
+  difficulty: number
   knowledge_point?: string
   source?: string
 }

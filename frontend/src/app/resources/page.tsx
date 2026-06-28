@@ -8,17 +8,18 @@ import RobotIcon from '@/components/RobotIcon'
 import { usePageTimer } from '@/hooks/usePageTimer'
 
 // ═══ TYPES ═══
+// UI 视图模型（区别于 api.ts 的 API 类型，用于前端渲染）
 type ResourceType = 'explanation' | 'mindmap' | 'exercise' | 'code' | 'audio'
 type FilterType = 'all' | 'favorites' | ResourceType
 
-interface Exercise {
+interface ExerciseVM {
   q: string
   opts: string[]
   ans: number
   expl: string
 }
 
-interface Resource {
+interface ResourceVM {
   id: string
   type: ResourceType
   title: string
@@ -34,7 +35,7 @@ interface Resource {
   duration?: string
   count?: number
   exTypes?: string[]
-  exercises?: Exercise[]
+  exercises?: ExerciseVM[]
   rawData?: Record<string, unknown>
 }
 
@@ -58,13 +59,11 @@ function esc(s: string) {
 function inferTypeFromContent(content: Record<string, unknown> | null, resourceType: string): ResourceType {
   if (!content) return 'explanation'
 
-  // 根据后端 resource_type 字段判断
   if (resourceType === 'mindmap' || content.mermaid_code || content.mermaid) return 'mindmap'
   if (resourceType === 'exercise' || content.exercises) return 'exercise'
   if (resourceType === 'code' || content.code) return 'code'
   if (resourceType === 'audio' || content.audio_script) return 'audio'
 
-  // 根据内容字段推断
   if (content.knowledge && !content.code) return 'explanation'
   if (content.code) return 'code'
 
@@ -80,18 +79,17 @@ function extractContentFromApi(resource: {
   difficulty: number
   is_favorited: boolean
   created_at: string
-}): Resource {
+}): ResourceVM {
   const content = resource.content || {}
   const type = inferTypeFromContent(content, resource.resource_type)
 
-  // 提取描述
   let desc = ''
   if (content.knowledge) {
     desc = String(content.knowledge).slice(0, 150) + (String(content.knowledge).length > 150 ? '...' : '')
   } else if (content.mermaid_code || content.mermaid) {
     desc = `思维导图：${resource.knowledge_point}`
   } else if (content.exercises) {
-    const exs = content.exercises as Exercise[]
+    const exs = content.exercises as ExerciseVM[]
     desc = `${exs.length} 道练习题`
   } else if (content.code) {
     desc = String(content.code).slice(0, 100) + '...'
@@ -101,8 +99,7 @@ function extractContentFromApi(resource: {
     desc = resource.title
   }
 
-  // 构建 Resource 对象
-  const result: Resource = {
+  const result: ResourceVM = {
     id: resource.resource_id,
     type,
     title: resource.title || resource.knowledge_point,
@@ -115,9 +112,7 @@ function extractContentFromApi(resource: {
     rawData: content,
   }
 
-  // 根据类型填充特定字段
   if (type === 'explanation') {
-    // 将 knowledge 转为 HTML（简单处理）
     const knowledge = String(content.knowledge || '')
     result.content = knowledge.replace(/\n/g, '<br>')
   } else if (type === 'mindmap') {
@@ -177,14 +172,14 @@ export default function ResourcesPage() {
   const [filter, setFilter] = useState<FilterType>('all')
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [search, setSearch] = useState('')
-  const [selectedRes, setSelectedRes] = useState<Resource | null>(null)
+  const [selectedRes, setSelectedRes] = useState<ResourceVM | null>(null)
   const [revealedAns, setRevealedAns] = useState<Set<string>>(new Set())
   const [audioBars, setAudioBars] = useState<number[]>([])
   const [detailAudioBars, setDetailAudioBars] = useState<number[]>([])
   const [generating, setGenerating] = useState(false)
   const [genResult, setGenResult] = useState<string>('')
   const [genInput, setGenInput] = useState('')
-  const [apiResources, setApiResources] = useState<Resource[]>([])
+  const [apiResources, setApiResources] = useState<ResourceVM[]>([])
   const [loading, setLoading] = useState(true)
 
   // 记录页面停留时间
@@ -348,7 +343,7 @@ export default function ResourcesPage() {
   }, [selectedRes])
 
   // 筛选资源
-  const filtered: Resource[] = apiResources.filter((r) => {
+  const filtered: ResourceVM[] = apiResources.filter((r) => {
     if (filter === 'favorites') return r.fav
     if (filter !== 'all') return r.type === (filter as ResourceType)
     return true

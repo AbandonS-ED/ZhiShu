@@ -199,6 +199,7 @@ export default function PingguPage() {
   const [askLoading, setAskLoading] = useState(false)
   const [askResult, setAskResult] = useState<{ question: string; answer: string; suggestion: string } | null>(null)
   const [evalReport, setEvalReport] = useState<EvaluationReport | null>(null)
+  const [regenerating, setRegenerating] = useState(false)
 
   const displayDimensions = useMemo(() => deriveDimensions(evalReport), [evalReport])
   const displayKnowledgeTable = useMemo(() => deriveKnowledgeTable(evalReport), [evalReport])
@@ -227,6 +228,21 @@ export default function PingguPage() {
       setAskResult({ question: askInput, answer: `❌ 调用失败: ${e.message}`, suggestion: '' })
     } finally {
       setAskLoading(false)
+    }
+  }
+
+  const regenerateReport = async () => {
+    if (regenerating) return
+    setRegenerating(true)
+    try {
+      const r = await evaluationApi.regenerateReport(getStudentId())
+      setEvalReport(r)
+      setCurrentScore(r.overall_score)
+      showToast('评估报告已重新生成')
+    } catch (e: any) {
+      showToast(`重新生成失败: ${e.message}`)
+    } finally {
+      setRegenerating(false)
     }
   }
 
@@ -407,7 +423,22 @@ export default function PingguPage() {
         <div className="card">
           <div className="card-hd">
             <h3>评估报告</h3>
-            <span className="tag tag-dark">AI 生成</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {evalReport?.generated_at && (
+                <span className="tag tag-info" style={{ fontSize: 11 }}>
+                  {new Date(evalReport.generated_at).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 生成
+                </span>
+              )}
+              <span className="tag tag-dark">AI 生成</span>
+              <button
+                className="btn btn-sm"
+                onClick={regenerateReport}
+                disabled={regenerating}
+                style={{ opacity: regenerating ? 0.6 : 1 }}
+              >
+                {regenerating ? '生成中...' : '重新生成'}
+              </button>
+            </div>
           </div>
           <div className="card-bd">
             {evalLoading ? (
