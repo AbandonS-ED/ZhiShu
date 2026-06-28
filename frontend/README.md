@@ -1,7 +1,7 @@
 # 智枢 (SmartHub) - 前端项目
 
 > 多智能体学习资源生成系统 · 前端部分（学生端 9 页 + 管理后台 9 页）
-> 最后更新：2026-06-14（5 维画像雷达图重设计 + 题库 CRUD 实联后端 + Zustand 接入 Sidebar）
+> 最后更新：2026-06-28（P1 全量修复 / 统一 SSE 工具 sse.ts / 评估报告 LLM 渲染 / SQLAlchemy 2.0 eval 修复）
 
 ## 技术栈
 
@@ -39,18 +39,21 @@ src/
 │       ├── chats/          # /admin/chats 对话记录
 │       ├── documents/      # /admin/documents 知识库
 │       └── agents/         # /admin/agents Agent 监控
-├── components/layout/      # 学生端共享布局组件
-│   ├── Sidebar.tsx         # 侧边栏导航（8 项菜单 + 用户信息 + 底部登出按钮）
-│   └── Header.tsx          # 顶部导航栏
+├── components/
+│   ├── layout/                # 学生端 Sidebar + Header
+│   └── RobotIcon.tsx          # ⭐ 极简机器人 SVG（替换 🤖 emoji）
+├── hooks/
+│   └── usePageTimer.ts        # ⭐ 页面停留计时器（自动上报 learning_records）
 ├── lib/
-│   ├── api.ts              # API 客户端（10 模块 + auth，自动带 token）
-│   ├── student.ts          # student_id 本地存储（zhishu_student）
-│   ├── utils.ts            # cn() + escapeHtml() + markdownToHtml() + extractAnswer()
-│   ├── admin/context.tsx   # ⭐ 管理后台共享状态（AdminProvider + useAdmin）
-│   └── admin/components.tsx # ⭐ 管理后台共享组件（AdminCheckbox + BatchDeleteBar + useSelection）
-├── stores/appStore.ts      # Zustand store（已接入 setting 页）
-├── types/index.ts          # TS 13 接口定义
-└── fonts/                  # 本地字体（GeistVF, GeistMonoVF）
+│   ├── api.ts                 # API 客户端（10 模块 + auth，自动带 token；SSE 委托 sse.ts）
+│   ├── sse.ts                 # ⭐ 统一 SSE 工具（createEventStream + 3 次重试 + 指数退避 + 120s 超时）
+│   ├── student.ts             # student_id 本地存储（zhishu_student）
+│   ├── utils.ts               # cn() + escapeHtml() + markdownToHtml() + extractAnswer() + showToast()
+│   ├── admin/context.tsx      # ⭐ 管理后台共享状态（AdminProvider + useAdmin）
+│   └── admin/components.tsx   # ⭐ 管理后台共享组件（AdminCheckbox + BatchDeleteBar + useSelection）
+├── stores/appStore.ts         # Zustand store（已接入 setting 页）
+├── types/index.ts             # TS 13 接口定义
+└── fonts/                     # 本地字体（GeistVF, GeistMonoVF）
 ```
 
 ## 快速开始
@@ -77,7 +80,7 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 | `/resources` | 资源中心 | 资源卡片 + 搜索/筛选 + 网格/列表视图 + 收藏 + 详情模态框 | ✅ **SSE 流式** |
 | `/path` | 学习路径 | DAG 图谱(SVG 边) + 概览统计 + 详情面板 + 每日计划 | ✅ **SSE 流式** |
 | `/tiku` | 练习题库 | 选择/判断/简答/编程 + 即时反馈 + 进度环形图 + 知识点分析 | ✅ **SSE 流式** (dual-format) |
-| `/pinggu` | 学习评估 | 评分环形动画 + 六维进度条 + 趋势折线图 + 正确率柱状图 + 评估报告 | ✅ AI 评估 |
+| `/pinggu` | 学习评估 | 评分环形动画 + 六维进度条 + 趋势折线图 + 正确率柱状图 + **LLM 评估报告**（优势/弱项/易错区 + 5 维画像 + 7 天趋势） | ✅ AI 评估 |
 | `/setting` | 账号设置 | 个人信息编辑 + 修改密码 | ✅ auth API |
 
 ### 管理后台（9 个页面，1:1 复刻 houtai.html）
@@ -96,7 +99,7 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 
 > 管理后台 exercises 页面已接入 `admin_exercises` API（CRUD + 批量导入），其余页面数据为模板硬编码（演示用）。
 
-端到端测试（4 次 9/9 PASS + 第 5 次管理后台验证）见 `../SMOKE_TEST_REPORT.md`。
+端到端测试（6 次 9/9 PASS + 第 7 次 P1 全量修复后 SQLAlchemy 2.0 兼容验证）见 `../SMOKE_TEST_REPORT.md`。
 
 ## 开发规范
 
@@ -110,6 +113,7 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 - XSS 防护：用户输入使用 `escapeHtml()` 转义（`utils.ts`）
 - Markdown 渲染：自定义 `markdownToHtml()`（`utils.ts`），不依赖 react-markdown
 - **认证**：`api.ts` 的 `request()` 自动带 `Authorization: Bearer` 头，401 自动跳登录页
+- **统一 SSE**：所有流式调用都走 `lib/sse.ts` 的 `createEventStream()`（3 次重试 + 指数退避 + 120s 超时 + AbortController 取消），不再 4 处重复实现
 - **student_id**：从 `localStorage.getItem('zhishu_student')` 读取（登录时存入）
 - **管理后台认证**：独立 `zhishu_admin_token` 存储，`/admin/login` 页面校验 `role === 'admin'`
 - **批量删除复用**：`useSelection` Hook + `BatchDeleteBar` + `AdminCheckbox` 共享组件，6 个列表页统一模式

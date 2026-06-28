@@ -1,6 +1,6 @@
 # 智枢(SmartHub) Backend
 
-> 最后更新：2026-06-14（端点 33 / StateGraph 10 节点 / 5 维画像 / 114 pytest）
+> 最后更新：2026-06-28（端点 33→41 / StateGraph 10 节点 / 5 维画像 / 12 表 / Celery 预生成 / 114 pytest / P1 全量修复）
 
 基于 FastAPI + 8 Agent 的多智能体学习资源生成系统后端。
 
@@ -11,7 +11,7 @@
 - **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 33 业务端点门禁
 - **角色**: `role` 字段（student / admin）+ `is_active` 软删除 + `last_login` 记录
 - **LLM**: MiniMax-M3（开发）→ 讯飞星火 V4（上线前切换 `LLM_PROVIDER=spark`）
-- **数据库**: PostgreSQL 18 + **11 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（当前未使用）
+- **数据库**: PostgreSQL 18 + **12 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（Celery broker，当前未起 worker）
 
 ## 快速开始
 
@@ -98,9 +98,16 @@ backend/
 └── .env                     # API Key（已 gitignore）
 ```
 
-## API 路由（33 个唯一端点）
+## API 路由（41 个唯一端点）
 
 > 唯一端点 = 唯一路径 + 方法组合。`backend/app/main.py` 注册 10 router，含 `/` 和 `/health` 根路由。
+> 端点变更历史：33（2026-06-14）→ 41（2026-06-28），新增 8 个端点：
+
+- `POST /profile/reset` / `GET /profile/assessment-status` / `PUT /profile/background`（profile 重置与背景）
+- `POST /resource/{id}/favorite`（资源收藏）
+- `POST /resource/batch-generate`（批量生成）
+- `POST /resource/save-from-chat`（对话保存资源）
+- `POST /evaluation/report/{student_id}/regenerate`（强制重生成报告，跳过缓存）
 
 ### 认证（auth.py）— 6 个端点
 
@@ -113,24 +120,30 @@ backend/
 | POST | `/api/v1/auth/change-password` | ✅ | 修改密码 |
 | GET | `/api/v1/auth/me/{student_id}` | ✅ | 按 ID 获取用户（仅自己） |
 
-### 学习画像（profile.py）— 2 个端点
+### 学习画像（profile.py）— 5 个端点
 
 | 方法 | 路径 | 门禁 | 说明 |
 |------|------|------|------|
 | POST | `/api/v1/profile/assess/stream` | ✅ | **SSE 流式 5 维画像评估**（Initial Assessment Agent） |
 | GET | `/api/v1/profile/me` | ✅ | 获取当前学生画像 |
+| POST | `/api/v1/profile/reset` | ✅ | **重置画像**，允许重新评估 |
+| GET | `/api/v1/profile/assessment-status` | ✅ | **获取评估状态**（用于恢复评估） |
+| PUT | `/api/v1/profile/background` | ✅ | **更新学习背景信息** |
 
-### 资源生成（resource.py）— 7 个端点
+### 资源生成（resource.py）— 11 个端点
 
 | 方法 | 路径 | 门禁 | 说明 |
 |------|------|------|------|
 | POST | `/api/v1/resource/generate` | ✅ | 生成学习资源（非流式） |
 | POST | `/api/v1/resource/generate/stream` | ✅ | SSE 流式资源生成 |
-| GET | `/api/v1/resource/list` | ✅ | 列出学生所有资源 |
+| GET | `/api/v1/resource/list` | ✅ | 列出学生所有资源（含预置 + 用户资源） |
 | POST | `/api/v1/resource/exercises/generate` | ✅ | 生成练习题（非流式） |
 | POST | `/api/v1/resource/exercises/generate/stream` | ✅ | SSE 流式练习题生成（dual-format） |
 | GET | `/api/v1/resource/exercises/{student_id}` | ✅ | 列出学生练习题 |
 | GET | `/api/v1/resource/exercises/pool` | ✅ | 获取练习题池（题库 + AI 生成，随机采样） |
+| POST | `/api/v1/resource/{id}/favorite` | ✅ | **收藏/取消收藏资源** |
+| POST | `/api/v1/resource/batch-generate` | ✅ | **批量生成多个知识点的资源** |
+| POST | `/api/v1/resource/save-from-chat` | ✅ | **从对话页保存资源到资源中心** |
 
 ### 学习路径（path.py）— 4 个端点
 
@@ -170,13 +183,14 @@ backend/
 | GET | `/api/v1/dashboard/stats` | ✅ | 统计数据聚合 |
 | GET | `/api/v1/dashboard/courses` | ✅ | 课程进度 |
 
-### 效果评估（evaluation.py）— 3 个端点
+### 效果评估（evaluation.py）— 4 个端点
 
 | 方法 | 路径 | 门禁 | 说明 |
 |------|------|------|------|
 | POST | `/api/v1/evaluation/record` | ✅ | 记录学习行为 |
 | GET | `/api/v1/evaluation/stats/{student_id}` | ✅ | 统计分析 |
-| GET | `/api/v1/evaluation/report/{student_id}` | ✅ | 评估报告 |
+| GET | `/api/v1/evaluation/report/{student_id}` | ✅ | 评估报告（**优先读 evaluation_reports 缓存，无则实时生成**） |
+| POST | `/api/v1/evaluation/report/{student_id}/regenerate` | ✅ | **强制重生成报告**，跳过缓存 |
 
 ### 管理端题库（admin_exercises.py）— 6 个端点
 
@@ -207,7 +221,7 @@ backend/
 | `services/content_safety.py` | 内容安全（敏感词过滤 + LLM 语义检查） | ✅ 已实现 |
 | `services/document_parser.py` | 文档解析器（PDF/DOCX/PPTX/MD/TXT） | ✅ 已实现 |
 | `services/embedding_service.py` | 向量化服务（MiniMax embeddings API） | ✅ 已实现 |
-| `services/evaluation_service.py` | 效果评估（行为跟踪 + 统计分析） | ✅ 已实现 |
+| `services/evaluation_service.py` | 效果评估（**LLM 报告生成 + 趋势 + 知识点统计 + 规则引擎降级**） | ✅ 已实现 |
 | `services/json_parser.py` | JSON 解析工具（消除重复代码） | ✅ 已实现 |
 | `services/reranker.py` | LLM 语义重排 | ✅ 已实现 |
 | `services/text_chunker.py` | 语义切片器（800字限制 + 重叠窗口） | ✅ 已实现 |
@@ -215,7 +229,7 @@ backend/
 
 ## 数据库
 
-**11 张表 + 14 个索引**（开发阶段去掉外键约束）：
+**12 张表 + 14 个索引**（开发阶段去掉外键约束）：
 
 | 表名 | 用途 | 索引 |
 |------|------|------|
@@ -230,12 +244,13 @@ backend/
 | `chat_messages` | 聊天消息 | `idx_chat_messages_session_id` |
 | `learning_records` | 学习行为记录（F5 评估） | `idx_learning_records_student_id` + `idx_learning_records_action` + `idx_learning_records_created_at` |
 | `learning_activity_logs` | 学习行为日志（wyy 独占） | — |
+| `evaluation_reports` | **预生成评估报告缓存**（Celery daily 4 点跑） | `idx_evaluation_reports_student_id` + 复合索引 `(student_id, report_date)` |
 
 ## 认证与权限
 
 - **密码哈希**：`bcrypt`（`core/security.py`）
 - **JWT**：HS256，7 天过期，密钥从 `JWT_SECRET` 环境变量读取
-- **门禁**：33 个业务端点全部加 `Depends(get_current_user)` + `student_id` 所有权校验
+- **门禁**：41 个业务端点全部加 `Depends(get_current_user)` + `student_id` 所有权校验
 - **角色隔离**：`students.role` 字段（`student` / `admin`），管理员通过 `_require_admin()` 额外校验
 - **软删除**：`is_active=false` 时登录返回 403
 - **登录审计**：登录成功后自动 `last_login = now()`
@@ -244,7 +259,7 @@ backend/
 
 - pgvector PostgreSQL 扩展未安装（Python 包已装），embedding 暂用 JSONB
 - Dockerfile 已存在但未实际使用，docker-compose.yml 只配了 postgres/redis/minio，**实际后端本地裸跑**
-- Celery 异步任务未启用（`app/core/celery_config.py` 已存在但未跑 worker）
+- Celery 异步任务**已配置**（`app/core/celery_config.py` + `app/tasks/evaluation_tasks.py`），daily 4 点跑 `generate_daily_reports`；当前**未启动 worker**，评估 API 仍走实时生成
 - PowerShell `$2b$` 变量插值：bcrypt 哈希不能直接在 PowerShell 命令行传，**用 `scripts/init_admin.py` 绕开**
 - `LearningRecord` 已在 `models/__init__.py` 导出（2026-06-13 修复）
 - 后端端口**必须 8001**（不要 8000：Windows 端口僵尸 socket 坑）。改端口要同步改 `frontend/src/lib/api.ts:5` 的 `BASE_URL`
