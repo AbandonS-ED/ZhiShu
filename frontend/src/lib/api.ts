@@ -4,6 +4,9 @@ const BASE_URL = 'http://localhost:8001/api/v1'
 
 import type { Resource, ResourceContent, Exercise } from '@/types'
 export type { Resource, ResourceContent, Exercise }
+import { createEventStream, type ChatEvent } from './sse'
+
+export type { ChatEvent }
 
 // 通用 fetch 封装（自动带 token）
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -24,7 +27,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     } catch {
       msg = await res.text().catch(() => res.statusText)
     }
-    // token 过期/无效 → 清 localStorage，跳登录页（白名单：login/register 不触发）
     if (res.status === 401 && typeof window !== 'undefined'
         && !path.startsWith('/auth/login') && !path.startsWith('/auth/register')) {
       localStorage.removeItem('zhishu_token')
@@ -100,61 +102,14 @@ export const profileApi = {
 
 // ===== Chat (SSE 流式) =====
 
-// ===== Chat (SSE 流式) =====
-export interface ChatEvent {
-  type: 'session' | 'progress' | 'result' | 'done' | 'error' | 'token'
-  session_id?: string
-  progress?: number
-  message?: string
-  content?: string
-  data?: any
-}
-
 export const chatApi = {
-  // SSE 流式对话
   stream(
     student_id: string,
     message: string,
     onEvent: (e: ChatEvent) => void,
     opts?: { session_id?: string; course_topics?: string[] }
   ): () => void {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 120_000)
-    const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
-    fetch(`${BASE_URL}/chat/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ student_id, message, ...opts }),
-      signal: controller.signal,
-    })
-      .then(async (res) => {
-        if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`)
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                onEvent(JSON.parse(line.slice(6)))
-              } catch {}
-            }
-          }
-        }
-      })
-      .catch((err) => {
-        if (err.name !== 'AbortError') onEvent({ type: 'error', message: err.message })
-      })
-      .finally(() => clearTimeout(timeout))
-    return () => { clearTimeout(timeout); controller.abort() }
+    return createEventStream(`${BASE_URL}/chat/stream`, { student_id, message, ...opts }, onEvent)
   },
 
   getSessions: (student_id: string) =>
@@ -174,48 +129,13 @@ export const chatApi = {
 // ===== Resource =====
 
 export const resourceApi = {
-  // SSE 流式生成学习资源
   generateStream(
     student_id: string,
     knowledge_point: string,
     onEvent: (e: ChatEvent) => void,
     resource_type = 'all'
   ): () => void {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 120_000)
-    const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
-    fetch(`${BASE_URL}/resource/generate/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ student_id, knowledge_point, resource_type }),
-      signal: controller.signal,
-    })
-      .then(async (res) => {
-        if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`)
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try { onEvent(JSON.parse(line.slice(6))) } catch {}
-            }
-          }
-        }
-      })
-      .catch((err) => {
-        if (err.name !== 'AbortError') onEvent({ type: 'error', message: err.message })
-      })
-      .finally(() => clearTimeout(timeout))
-    return () => { clearTimeout(timeout); controller.abort() }
+    return createEventStream(`${BASE_URL}/resource/generate/stream`, { student_id, knowledge_point, resource_type }, onEvent)
   },
   generate: (student_id: string, knowledge_point: string, resource_type = 'all') =>
     request<Resource>('/resource/generate', {
@@ -257,7 +177,6 @@ export const resourceApi = {
 // ===== Exercise =====
 
 export const exerciseApi = {
-  // SSE 流式生成练习题
   generateStream(
     student_id: string,
     knowledge_point: string,
@@ -265,41 +184,7 @@ export const exerciseApi = {
     count = 5,
     exercise_type = 'all'
   ): () => void {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 120_000)
-    const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
-    fetch(`${BASE_URL}/resource/exercises/generate/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ student_id, knowledge_point, count, exercise_type }),
-      signal: controller.signal,
-    })
-      .then(async (res) => {
-        if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`)
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try { onEvent(JSON.parse(line.slice(6))) } catch {}
-            }
-          }
-        }
-      })
-      .catch((err) => {
-        if (err.name !== 'AbortError') onEvent({ type: 'error', message: err.message })
-      })
-      .finally(() => clearTimeout(timeout))
-    return () => { clearTimeout(timeout); controller.abort() }
+    return createEventStream(`${BASE_URL}/resource/exercises/generate/stream`, { student_id, knowledge_point, count, exercise_type }, onEvent)
   },
   generate: (
     student_id: string,
@@ -346,7 +231,6 @@ export interface LearningPathData {
 }
 
 export const pathApi = {
-  // SSE 流式生成学习计划
   generateStream(
     student_id: string,
     course_topics: string[],
@@ -354,41 +238,7 @@ export const pathApi = {
     total_days = 30,
     daily_topics = 3
   ): () => void {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 120_000)
-    const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
-    fetch(`${BASE_URL}/path/generate/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ student_id, course_topics, total_days, daily_topics }),
-      signal: controller.signal,
-    })
-      .then(async (res) => {
-        if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`)
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try { onEvent(JSON.parse(line.slice(6))) } catch {}
-            }
-          }
-        }
-      })
-      .catch((err) => {
-        if (err.name !== 'AbortError') onEvent({ type: 'error', message: err.message })
-      })
-      .finally(() => clearTimeout(timeout))
-    return () => { clearTimeout(timeout); controller.abort() }
+    return createEventStream(`${BASE_URL}/path/generate/stream`, { student_id, course_topics, total_days, daily_topics }, onEvent)
   },
   generate: (student_id: string, course_topics: string[], total_days = 30) =>
     request<LearningPathData>('/path/generate', {
@@ -472,6 +322,7 @@ export interface EvaluationStats {
 
 export interface EvaluationReport {
   student_id: string
+  generated_at: string
   summary: {
     total_resources: number
     total_exercises: number
@@ -511,6 +362,8 @@ export const evaluationApi = {
     request<EvaluationStats>(`/evaluation/stats/${student_id}`),
   getReport: (student_id: string) =>
     request<EvaluationReport>(`/evaluation/report/${student_id}`),
+  regenerateReport: (student_id: string) =>
+    request<EvaluationReport>(`/evaluation/report/${student_id}/regenerate`, { method: 'POST' }),
   recordAction: (data: {
     student_id: string
     action: string
