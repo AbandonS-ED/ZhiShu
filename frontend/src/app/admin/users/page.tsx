@@ -1,327 +1,163 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAdmin } from '@/lib/admin/context'
 import { AdminCheckbox, BatchDeleteBar, useSelection } from '@/lib/admin/components'
-
-interface User {
-  id: string
-  no: string
-  n: string
-  m: string
-  r: number
-  e: number
-  s: 0 | 1
-  la: string
-}
-
-const AVATAR_COLORS = [
-  { b: 'var(--warm-soft)', c: 'var(--warm)' },
-  { b: 'var(--info-soft)', c: 'var(--info)' },
-  { b: 'var(--accent-soft)', c: 'var(--ink-2)' },
-  { b: 'var(--purple-soft)', c: 'var(--purple)' },
-  { b: 'var(--success-soft)', c: 'var(--success)' },
-  { b: 'var(--danger-soft)', c: 'var(--danger)' },
-]
-
-const INIT_USERS: User[] = [
-  { id: 'u1', no: '2024001', n: '张三', m: '计算机科学', r: 12, e: 48, s: 1, la: '2小时前' },
-  { id: 'u2', no: '2024002', n: '李四', m: '人工智能', r: 8, e: 32, s: 1, la: '5小时前' },
-  { id: 'u3', no: '2024003', n: '王五', m: '软件工程', r: 0, e: 0, s: 0, la: '2天前' },
-  { id: 'u4', no: '2024004', n: '赵六', m: '数据科学', r: 15, e: 56, s: 1, la: '1小时前' },
-  { id: 'u5', no: '2024005', n: '孙七', m: '计算机科学', r: 3, e: 12, s: 1, la: '30分钟前' },
-  { id: 'u6', no: '2024006', n: '周八', m: '人工智能', r: 0, e: 0, s: 0, la: '5天前' },
-]
+import { adminApi, type AdminUser } from '@/lib/api'
 
 export default function UsersPage() {
   const { showToast } = useAdmin()
-  const [users, setUsers] = useState<User[]>(INIT_USERS)
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [modal, setModal] = useState<{ open: boolean; user: User | null }>({ open: false, user: null })
+  const [roleFilter, setRoleFilter] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal] = useState<{ open: boolean; user: AdminUser | null }>({ open: false, user: null })
+  const { selected, toggleAll, toggleOne, clear } = useSelection(users)
 
-  const filtered = useMemo(() => {
-    let r = users
-    if (search) {
-      const q = search.toLowerCase()
-      r = r.filter((u) => u.n.toLowerCase().includes(q) || u.no.toLowerCase().includes(q))
-    }
-    if (statusFilter === 'active') r = r.filter((u) => u.s === 1)
-    if (statusFilter === 'disabled') r = r.filter((u) => u.s === 0)
-    return r
-  }, [users, search, statusFilter])
+  const loadUsers = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await adminApi.getUsers(page, 20, search || undefined, roleFilter || undefined)
+      setUsers(data.items)
+      setTotal(data.total)
+    } catch { showToast('加载用户失败') }
+    setLoading(false)
+  }, [page, search, roleFilter])
 
-  const sel = useSelection(filtered)
+  useEffect(() => { loadUsers() }, [loadUsers])
 
-  function togU(u: User) {
-    setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, s: x.s === 1 ? 0 : 1 } : x)))
-    showToast(u.s === 1 ? `已禁用: ${u.n}` : `已启用: ${u.n}`)
+  async function toggleActive(user: AdminUser) {
+    try {
+      await adminApi.updateUser(user.id, { is_active: !user.is_active })
+      showToast(`已${user.is_active ? '禁用' : '启用'} ${user.name}`)
+      loadUsers()
+    } catch { showToast('操作失败') }
   }
 
-  function delU(u: User) {
-    if (typeof window !== 'undefined' && !window.confirm(`确认删除 ${u.n}？`)) return
-    setUsers((prev) => prev.filter((x) => x.id !== u.id))
-    sel.removeMany([u.id])
-    showToast(`已删除: ${u.n}`)
+  async function batchDelete() {
+    if (!selected.size) return
+    if (!confirm(`确认禁用选中的 ${selected.size} 个用户？`)) return
+    try {
+      selected.forEach(async (id) => {
+        await adminApi.updateUser(id, { is_active: false })
+      })
+      showToast(`已禁用 ${selected.size} 个用户`)
+      clear()
+      loadUsers()
+    } catch { showToast('批量操作失败') }
   }
 
-  function batchDelete() {
-    if (sel.selectedCount === 0) return
-    if (typeof window !== 'undefined' && !window.confirm(`确认删除选中的 ${sel.selectedCount} 个用户？`)) return
-    const ids = Array.from(sel.selected)
-    setUsers((prev) => prev.filter((x) => !ids.includes(x.id)))
-    sel.clear()
-    showToast(`已批量删除 ${ids.length} 个用户`)
-  }
-
-  function openDetail(u: User) {
-    setModal({ open: true, user: u })
-  }
-
-  function closeModal() {
-    setModal({ open: false, user: null })
-  }
+  const totalPages = Math.ceil(total / 20)
 
   return (
     <div className="admin-pnl vis">
-      <div className="admin-tb">
-        <input
-          className="admin-si"
-          placeholder="搜索姓名 / 学号..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select
-          className="admin-sf"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          <option value="">全部状态</option>
-          <option value="active">活跃</option>
-          <option value="disabled">已禁用</option>
-        </select>
-        <div style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>
-          共 <b style={{ color: 'var(--ink)' }}>{filtered.length}</b> 条
-        </div>
-      </div>
-      <BatchDeleteBar
-        selectedCount={sel.selectedCount}
-        totalCount={filtered.length}
-        onClear={sel.clear}
-        onDelete={batchDelete}
-        itemLabel="个用户"
-      />
       <div className="admin-cd">
+        <div className="admin-cd-h">
+          <h3>用户管理</h3>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              className="admin-input"
+              placeholder="搜索学号/姓名..."
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+              style={{ width: 180 }}
+            />
+            <select
+              className="admin-input"
+              value={roleFilter}
+              onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}
+              style={{ width: 100 }}
+            >
+              <option value="">全部角色</option>
+              <option value="student">学生</option>
+              <option value="admin">管理员</option>
+            </select>
+          </div>
+        </div>
         <div className="admin-cd-b" style={{ padding: 0 }}>
           <div className="admin-tw">
             <table>
               <thead>
                 <tr>
-                  <th className="admin-cb-th">
+                  <th style={{ width: 40 }}>
                     <AdminCheckbox
-                      checked={sel.allSelected}
-                      indeterminate={sel.indeterminate}
-                      onChange={sel.toggleAll}
-                      ariaLabel="全选"
+                      checked={selected.size === users.length && users.length > 0}
+                      indeterminate={selected.size > 0 && selected.size < users.length}
+                      onChange={() => toggleAll(selected.size < users.length)}
                     />
                   </th>
                   <th>学号</th>
-                  <th>用户</th>
-                  <th>专业</th>
+                  <th>姓名</th>
+                  <th>角色</th>
                   <th>资源数</th>
                   <th>题数</th>
                   <th>状态</th>
-                  <th>最后登录</th>
+                  <th>最近登录</th>
                   <th>操作</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((u) => {
-                  const a = AVATAR_COLORS[u.n.charCodeAt(0) % AVATAR_COLORS.length]
-                  const isSel = sel.selected.has(u.id)
-                  return (
-                    <tr key={u.id} className={isSel ? 'is-selected' : ''}>
-                      <td className="admin-cb-td">
-                        <AdminCheckbox
-                          checked={isSel}
-                          onChange={() => sel.toggleOne(u.id)}
-                          ariaLabel={`选择 ${u.n}`}
-                        />
-                      </td>
-                      <td>
-                        <code style={{ fontSize: 11 }}>{u.no}</code>
-                      </td>
-                      <td>
-                        <div className="admin-td-u">
-                          <div
-                            className="admin-td-a"
-                            style={{ background: a.b, color: a.c }}
-                          >
-                            {u.n[0]}
-                          </div>
-                          <div>
-                            <div className="admin-td-n">{u.n}</div>
-                            <div className="admin-td-d">{u.m}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>{u.m}</td>
-                      <td style={{ fontWeight: 500 }}>{u.r}</td>
-                      <td style={{ fontWeight: 500 }}>{u.e}</td>
-                      <td>
-                        <span className={`admin-sd ${u.s ? 'on' : 'off'}`}></span>
-                        {u.s ? '活跃' : '已禁用'}
-                      </td>
-                      <td style={{ fontSize: 11, color: 'var(--ink-3)' }}>{u.la}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button
-                            className="admin-btn admin-btn-sm"
-                            onClick={() => openDetail(u)}
-                          >
-                            详情
-                          </button>
-                          <button
-                            className={`admin-btn admin-btn-sm ${u.s ? 'admin-btn-danger' : ''}`}
-                            onClick={() => togU(u)}
-                          >
-                            {u.s ? '禁用' : '启用'}
-                          </button>
-                          <button
-                            className="admin-btn admin-btn-sm"
-                            onClick={() => delU(u)}
-                          >
-                            删除
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
+                {users.map((u) => (
+                  <tr key={u.id}>
+                    <td><AdminCheckbox checked={selected.has(u.id)} onChange={() => toggleOne(u.id)} /></td>
+                    <td><code style={{ fontSize: 11 }}>{u.student_no}</code></td>
+                    <td style={{ fontWeight: 500 }}>{u.name}</td>
+                    <td style={{ fontSize: 11.5, color: u.role === 'admin' ? 'var(--warm)' : 'var(--ink-2)' }}>{u.role}</td>
+                    <td style={{ fontWeight: 500 }}>{u.resource_count}</td>
+                    <td style={{ fontWeight: 500 }}>{u.exercise_count}</td>
+                    <td>
+                      <span className={`admin-tag ${u.is_active ? 'admin-tag-green' : 'admin-tag-red'}`}>
+                        {u.is_active ? '活跃' : '禁用'}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: 11.5 }}>{u.last_login ? new Date(u.last_login).toLocaleDateString() : '-'}</td>
+                    <td>
+                      <button className="admin-btn-s" onClick={() => setModal({ open: true, user: u })}>详情</button>
+                      <button className="admin-btn-s" onClick={() => toggleActive(u)} style={{ marginLeft: 4 }}>
+                        {u.is_active ? '禁用' : '启用'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {users.length === 0 && !loading && (
+                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: 20, color: 'var(--ink-2)' }}>暂无用户</td></tr>
+                )}
               </tbody>
             </table>
-          </div>
-          <div className="admin-pg">
-            <span>共 {filtered.length} 条，第 1/1 页</span>
-            <div className="admin-pg-b">
-              <button className="admin-pg-btn">&lt;</button>
-              <button className="admin-pg-btn ac">1</button>
-              <button className="admin-pg-btn">&gt;</button>
-            </div>
           </div>
         </div>
       </div>
 
+      {selected.size > 0 && (
+        <BatchDeleteBar selectedCount={selected.size} totalCount={users.length} onClear={clear} onDelete={batchDelete} itemLabel="个用户" />
+      )}
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 12 }}>
+          <button className="admin-btn-s" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</button>
+          <span style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: '28px' }}>第 {page}/{totalPages} 页</span>
+          <button className="admin-btn-s" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>下一页</button>
+        </div>
+      )}
+
       {modal.open && modal.user && (
-        <div className="admin-mo vis" onClick={(e) => { if (e.target === e.currentTarget) closeModal() }}>
-          <div className="admin-md">
-            <div className="admin-md-h">
+        <div className="admin-modal-mask" onClick={() => setModal({ open: false, user: null })}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-h">
               <h3>用户详情</h3>
-              <button className="admin-md-x" onClick={closeModal}>
-                &times;
-              </button>
+              <button onClick={() => setModal({ open: false, user: null })}>×</button>
             </div>
-            <div className="admin-md-body">
-              <h4 style={{ fontSize: 13, marginBottom: 10, fontFamily: 'Newsreader, serif' }}>
-                基本信息
-              </h4>
-              <div className="admin-md-r">
-                <span className="ml">姓名</span>
-                <span className="mv">{modal.user.n}</span>
-              </div>
-              <div className="admin-md-r">
-                <span className="ml">学号</span>
-                <span className="mv">{modal.user.no}</span>
-              </div>
-              <div className="admin-md-r">
-                <span className="ml">专业</span>
-                <span className="mv">{modal.user.m}</span>
-              </div>
-              <div className="admin-md-r">
-                <span className="ml">状态</span>
-                <span className="mv">{modal.user.s ? '活跃' : '已禁用'}</span>
-              </div>
-              <div className="admin-md-r">
-                <span className="ml">最后登录</span>
-                <span className="mv">{modal.user.la}</span>
-              </div>
-              <div className="admin-md-sec">
-                <h4>学习画像</h4>
-                <div className="admin-md-r">
-                  <span className="ml">知识掌握</span>
-                  <span className="mv">Python: 0.8 · ML: 0.6 · DL: 0.3</span>
-                </div>
-                <div className="admin-md-r">
-                  <span className="ml">学习风格</span>
-                  <span className="mv">视觉型 70% / 文本型 30%</span>
-                </div>
-                <div className="admin-md-r">
-                  <span className="ml">认知水平</span>
-                  <span className="mv">记忆 80 · 理解 70 · 应用 60</span>
-                </div>
-                <div className="admin-md-r">
-                  <span className="ml">薄弱环节</span>
-                  <span className="mv">深度学习 · 自然语言处理</span>
-                </div>
-              </div>
-              <div className="admin-md-sec">
-                <h4>学习统计</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-                  <div
-                    style={{
-                      textAlign: 'center',
-                      padding: 12,
-                      background: 'var(--bg)',
-                      borderRadius: 7,
-                    }}
-                  >
-                    <div style={{ fontFamily: 'Newsreader,serif', fontSize: 22, color: 'var(--warm)' }}>
-                      {modal.user.r}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>资源数</div>
-                  </div>
-                  <div
-                    style={{
-                      textAlign: 'center',
-                      padding: 12,
-                      background: 'var(--bg)',
-                      borderRadius: 7,
-                    }}
-                  >
-                    <div style={{ fontFamily: 'Newsreader,serif', fontSize: 22, color: 'var(--info)' }}>
-                      {modal.user.e}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>练习题</div>
-                  </div>
-                  <div
-                    style={{
-                      textAlign: 'center',
-                      padding: 12,
-                      background: 'var(--bg)',
-                      borderRadius: 7,
-                    }}
-                  >
-                    <div style={{ fontFamily: 'Newsreader,serif', fontSize: 22, color: 'var(--success)' }}>
-                      3
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>学习路径</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="admin-md-ft">
-              <button
-                className="admin-btn admin-btn-danger"
-                onClick={() => {
-                  togU(modal.user!)
-                  closeModal()
-                }}
-              >
-                {modal.user.s ? '禁用账号' : '启用账号'}
-              </button>
-              <button className="admin-btn" onClick={closeModal}>
-                关闭
-              </button>
+            <div className="admin-modal-b">
+              <p>学号: {modal.user.student_no}</p>
+              <p>姓名: {modal.user.name}</p>
+              <p>邮箱: {modal.user.email || '-'}</p>
+              <p>角色: {modal.user.role}</p>
+              <p>状态: {modal.user.is_active ? '活跃' : '禁用'}</p>
+              <p>资源数: {modal.user.resource_count}</p>
+              <p>题数: {modal.user.exercise_count}</p>
+              <p>最近登录: {modal.user.last_login ? new Date(modal.user.last_login).toLocaleString() : '-'}</p>
             </div>
           </div>
         </div>

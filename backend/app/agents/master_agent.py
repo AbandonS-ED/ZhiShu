@@ -9,6 +9,7 @@
 import re
 import uuid
 import json
+import time
 from typing import Any
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
@@ -17,6 +18,7 @@ from app.agents.state import AgentState, default_state, IntentType
 from app.agents.communicator import message_bus, MessageType
 from app.services import minimax_client as mc_module
 from app.services.json_parser import parse_json_response
+from app.core.agent_metrics import agent_metrics
 
 # 子 Agent 导入
 from app.agents.document_agent import document_agent
@@ -383,31 +385,38 @@ class MasterAgent:
     async def _run_document_agent(self, state: AgentState) -> dict:
         """执行 Document Agent"""
         kp = state.get("intent_params", {}).get("knowledge_point", "通用知识")
+        t0 = time.time()
         try:
             result = await document_agent.generate(
                 knowledge_point=kp,
                 student_profile=state.get("student_profile"),
                 resource_type=state.get("intent_params", {}).get("resource_type", "all"),
             )
+            agent_metrics.record("document", True, (time.time() - t0) * 1000)
             return self._complete_task(state, "document_result", result, f"文档生成完成: {kp}")
         except Exception as e:
+            agent_metrics.record("document", False, (time.time() - t0) * 1000)
             return self._fail_task(state, f"文档生成失败: {e}")
 
     async def _run_mindmap_agent(self, state: AgentState) -> dict:
         """执行 MindMap Agent"""
         kp = state.get("intent_params", {}).get("knowledge_point", "通用知识")
+        t0 = time.time()
         try:
             result = await mindmap_agent.generate(
                 knowledge_point=kp,
                 student_profile=state.get("student_profile"),
             )
+            agent_metrics.record("mindmap", True, (time.time() - t0) * 1000)
             return self._complete_task(state, "mindmap_result", result, f"思维导图生成完成: {kp}")
         except Exception as e:
+            agent_metrics.record("mindmap", False, (time.time() - t0) * 1000)
             return self._fail_task(state, f"思维导图生成失败: {e}")
 
     async def _run_exercise_agent(self, state: AgentState) -> dict:
         """执行 Exercise Agent"""
         kp = state.get("intent_params", {}).get("knowledge_point", "通用知识")
+        t0 = time.time()
         try:
             result = await exercise_agent.generate(
                 knowledge_point=kp,
@@ -415,8 +424,10 @@ class MasterAgent:
                 exercise_type=state.get("intent_params", {}).get("exercise_type", "all"),
                 count=state.get("intent_params", {}).get("exercise_count", 5),
             )
+            agent_metrics.record("exercise", True, (time.time() - t0) * 1000)
             return self._complete_task(state, "exercise_result", result, f"练习题生成完成: {kp}")
         except Exception as e:
+            agent_metrics.record("exercise", False, (time.time() - t0) * 1000)
             return self._fail_task(state, f"练习题生成失败: {e}")
 
     async def _run_path_agent(self, state: AgentState) -> dict:
@@ -427,18 +438,22 @@ class MasterAgent:
         kp = state.get("intent_params", {}).get("knowledge_point", "")
         if kp and kp not in topics:
             topics = [kp] + topics
+        t0 = time.time()
         try:
             result = await path_agent.generate(
                 course_topics=topics,
                 student_profile=state.get("student_profile"),
                 total_days=state.get("intent_params", {}).get("total_days", 14),
             )
+            agent_metrics.record("path", True, (time.time() - t0) * 1000)
             return self._complete_task(state, "path_result", result, "学习路径生成完成")
         except Exception as e:
+            agent_metrics.record("path", False, (time.time() - t0) * 1000)
             return self._fail_task(state, f"学习路径生成失败: {e}")
 
     async def _run_tutor_agent(self, state: AgentState) -> dict:
         """执行 Tutor Agent"""
+        t0 = time.time()
         try:
             result = await tutor_agent.answer(
                 question=state.get("user_message", ""),
@@ -446,20 +461,25 @@ class MasterAgent:
                 context_chunks=state.get("intent_params", {}).get("context_chunks"),
                 student_profile=state.get("student_profile"),
             )
+            agent_metrics.record("tutor", True, (time.time() - t0) * 1000)
             return self._complete_task(state, "tutor_result", result, "问答完成")
         except Exception as e:
+            agent_metrics.record("tutor", False, (time.time() - t0) * 1000)
             return self._fail_task(state, f"问答失败: {e}")
 
     async def _run_audio_agent(self, state: AgentState) -> dict:
         """执行 Audio Agent"""
         kp = state.get("intent_params", {}).get("knowledge_point", "通用知识")
+        t0 = time.time()
         try:
             result = await audio_agent.generate(
                 knowledge_point=kp,
                 student_profile=state.get("student_profile"),
             )
+            agent_metrics.record("audio", True, (time.time() - t0) * 1000)
             return self._complete_task(state, "audio_result", result, f"音频脚本生成完成: {kp}")
         except Exception as e:
+            agent_metrics.record("audio", False, (time.time() - t0) * 1000)
             return self._fail_task(state, f"音频脚本生成失败: {e}")
 
     def _fail_task(self, state: AgentState, error_msg: str) -> dict:

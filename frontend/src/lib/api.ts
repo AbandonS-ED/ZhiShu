@@ -5,6 +5,7 @@ const BASE_URL = 'http://localhost:8001/api/v1'
 import type { Resource, ResourceContent, Exercise } from '@/types'
 export type { Resource, ResourceContent, Exercise }
 import { createEventStream, type ChatEvent } from './sse'
+import { clearStudentIdCache } from './student'
 
 export type { ChatEvent }
 
@@ -50,6 +51,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       localStorage.removeItem('zhishu_token')
       localStorage.removeItem('zhishu_refresh_token')
       localStorage.removeItem('zhishu_student')
+      clearStudentIdCache() // 清除缓存
       window.location.href = '/login'
     }
     throw new Error(msg)
@@ -116,6 +118,26 @@ export const profileApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  analyzeBehavior: (behavior_type: string, behavior_data: Record<string, unknown> = {}) =>
+    request<{ status: string; updates?: Array<{ dimension: string; score_change: number; reason: string }>; summary?: string; updated_count?: number }>(
+      '/profile/analyze-behavior',
+      {
+        method: 'POST',
+        body: JSON.stringify({ behavior_type, behavior_data }),
+      }
+    ),
+
+  forceAnalyze: () =>
+    request<{ status: string; updates?: Array<{ dimension: string; score_change: number; reason: string }>; summary?: string; updated_count?: number }>(
+      '/profile/force-analyze',
+      { method: 'POST' }
+    ),
+
+  getAnalysisStatus: () =>
+    request<{ has_profile: boolean; last_analyzed_at: string | null; assessment_status: string }>(
+      '/profile/analysis-status'
+    ),
 }
 
 // ===== Chat (SSE 流式) =====
@@ -142,6 +164,14 @@ export const chatApi = {
     request<{ status: string }>(`/chat/sessions/${session_id}`, {
       method: 'DELETE',
     }),
+  recommendQuestions: (session_id?: string, count = 4) =>
+    request<{ questions: Array<{ text: string; tag: string; tagClass: string; reason: string }> }>(
+      '/chat/recommend-questions',
+      {
+        method: 'POST',
+        body: JSON.stringify({ session_id, count }),
+      }
+    ),
 }
 
 // ===== Resource =====
@@ -530,4 +560,148 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+}
+
+// ===== Admin (管理后台) =====
+
+// 管理后台专用 request（自动带 admin token）
+async function adminRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_admin_token') : null
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  })
+  if (!res.ok) {
+    let msg = res.statusText
+    try {
+      const body = await res.json()
+      msg = body.detail || body.message || JSON.stringify(body)
+    } catch {
+      msg = await res.text().catch(() => res.statusText)
+    }
+    if (res.status === 401 && typeof window !== 'undefined') {
+      localStorage.removeItem('zhishu_admin_token')
+      localStorage.removeItem('zhishu_admin_user')
+      window.location.href = '/admin/login'
+    }
+    throw new Error(msg)
+  }
+  return res.json()
+}
+
+export interface AdminStats {
+  total_users: number
+  admin_count: number
+  total_resources: number
+  total_exercises: number
+  total_paths: number
+  total_chats: number
+  total_documents: number
+  today_active: number
+  today_new_resources: number
+}
+
+export interface AdminTrends {
+  labels: string[]
+  registrations: number[]
+  resources: number[]
+}
+
+export interface AdminUser {
+  id: string
+  student_no: string
+  name: string
+  email: string
+  role: string
+  is_active: boolean
+  resource_count: number
+  exercise_count: number
+  last_login: string | null
+  created_at: string | null
+}
+
+export interface AdminResource {
+  id: string
+  student_id: string
+  student_name: string
+  title: string
+  knowledge_point: string
+  resource_type: string
+  is_favorited: boolean
+  created_at: string | null
+}
+
+export interface AdminPath {
+  id: string
+  student_id: string
+  student_name: string
+  title: string
+  total_days: number
+  node_count: number
+  edge_count: number
+  nodes: Array<{ id: string; label: string; difficulty: number; estimated_hours: number }>
+  edges: Array<{ source: string; target: string; relation?: string }>
+  created_at: string | null
+}
+
+export interface AdminChat {
+  id: string
+  student_id: string
+  student_name: string
+  title: string
+  message_count: number
+  created_at: string | null
+}
+
+export interface AdminChatMessage {
+  id: string
+  role: string
+  content: string
+  created_at: string | null
+}
+
+export interface AdminAgent {
+  name: string
+  role: string
+  calls: number
+  errors: number
+  error_rate: number
+  avg_ms: number
+}
+
+export const adminApi = {
+  getStats: () => adminRequest<AdminStats>('/admin/stats'),
+  getTrends: (days = 7) => adminRequest<AdminTrends>(`/admin/trends?days=${days}`),
+  getUsers: (page = 1, pageSize = 20, search?: string, role?: string) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (search) params.set('search', search)
+    if (role) params.set('role', role)
+    return adminRequest<{ items: AdminUser[]; total: number; page: number; page_size: number }>(`/admin/users?${params}`)
+  },
+  getUserDetail: (id: string) => adminRequest<AdminUser>(`/admin/users/${id}`),
+  updateUser: (id: string, data: { is_active?: boolean; name?: string }) =>
+    adminRequest<{ message: string }>(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  getResources: (page = 1, pageSize = 20, studentId?: string) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (studentId) params.set('student_id', studentId)
+    return adminRequest<{ items: AdminResource[]; total: number; page: number; page_size: number }>(`/admin/resources?${params}`)
+  },
+  getPaths: (page = 1, pageSize = 20, studentId?: string) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (studentId) params.set('student_id', studentId)
+    return adminRequest<{ items: AdminPath[]; total: number; page: number; page_size: number }>(`/admin/paths?${params}`)
+  },
+  getChats: (page = 1, pageSize = 20, studentId?: string) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (studentId) params.set('student_id', studentId)
+    return adminRequest<{ items: AdminChat[]; total: number; page: number; page_size: number }>(`/admin/chats?${params}`)
+  },
+  getChatMessages: (sessionId: string) =>
+    adminRequest<{ items: AdminChatMessage[] }>(`/admin/chats/${sessionId}/messages`),
+  getAgents: () =>
+    adminRequest<{ agents: AdminAgent[]; system: { cpu_percent: number; memory_mb: number } }>('/admin/agents'),
 }

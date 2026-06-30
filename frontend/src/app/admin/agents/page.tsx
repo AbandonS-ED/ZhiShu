@@ -1,24 +1,8 @@
 'use client'
 
-interface Agent {
-  n: string
-  r: string
-  c: number
-  e: number
-  cpu: number
-  mem: number
-  s: 0 | 1
-}
-
-const AG: Agent[] = [
-  { n: 'MasterAgent', r: '调度中心', c: 342, e: 0.3, cpu: 12, mem: 180, s: 0 },
-  { n: 'ProfileAgent', r: '画像构建', c: 89, e: 0.1, cpu: 8, mem: 120, s: 0 },
-  { n: 'TeachingAgent', r: '知识讲解', c: 456, e: 0.5, cpu: 22, mem: 240, s: 0 },
-  { n: 'MindMapAgent', r: '思维导图', c: 127, e: 0.2, cpu: 15, mem: 160, s: 0 },
-  { n: 'QuizAgent', r: '练习生成', c: 203, e: 0.8, cpu: 18, mem: 190, s: 1 },
-  { n: 'CodingAgent', r: '代码生成', c: 98, e: 1.2, cpu: 28, mem: 310, s: 0 },
-  { n: 'PathAgent', r: '路径规划', c: 67, e: 0.0, cpu: 6, mem: 95, s: 0 },
-]
+import { useEffect, useState } from 'react'
+import { useAdmin } from '@/lib/admin/context'
+import { adminApi, type AdminAgent } from '@/lib/api'
 
 const COLORS = [
   { b: 'var(--accent-soft)', c: 'var(--ink-2)' },
@@ -28,67 +12,95 @@ const COLORS = [
   { b: 'var(--success-soft)', c: 'var(--success)' },
   { b: 'var(--danger-soft)', c: 'var(--danger)' },
   { b: 'var(--info-soft)', c: 'var(--info)' },
+  { b: 'var(--warm-soft)', c: 'var(--warm)' },
+]
+
+const FALLBACK_AGENTS: AdminAgent[] = [
+  { name: 'MasterAgent', role: '调度中心', calls: 0, errors: 0, error_rate: 0, avg_ms: 0 },
+  { name: 'InitialAssessmentAgent', role: '画像构建', calls: 0, errors: 0, error_rate: 0, avg_ms: 0 },
+  { name: 'DocumentAgent', role: '知识讲解', calls: 0, errors: 0, error_rate: 0, avg_ms: 0 },
+  { name: 'ExerciseAgent', role: '练习生成', calls: 0, errors: 0, error_rate: 0, avg_ms: 0 },
+  { name: 'PathAgent', role: '路径规划', calls: 0, errors: 0, error_rate: 0, avg_ms: 0 },
+  { name: 'TutorAgent', role: '智能问答', calls: 0, errors: 0, error_rate: 0, avg_ms: 0 },
+  { name: 'MindMapAgent', role: '思维导图', calls: 0, errors: 0, error_rate: 0, avg_ms: 0 },
+  { name: 'AudioAgent', role: '音频脚本', calls: 0, errors: 0, error_rate: 0, avg_ms: 0 },
 ]
 
 export default function AgentsPage() {
-  const mx = Math.max(...AG.map((a) => a.c))
-  const online = AG.filter((a) => a.s === 0).length
+  const { showToast } = useAdmin()
+  const [agents, setAgents] = useState<AdminAgent[]>(FALLBACK_AGENTS)
+  const [system, setSystem] = useState({ cpu_percent: 0, memory_mb: 0 })
+  const [mounted, setMounted] = useState(false)
+
+  async function loadAgents() {
+    try {
+      const data = await adminApi.getAgents()
+      setAgents(data.agents.length ? data.agents : FALLBACK_AGENTS)
+      setSystem(data.system)
+    } catch {
+      // 静默失败，使用默认数据
+    }
+  }
+
+  useEffect(() => {
+    setMounted(true)
+    loadAgents()
+    const timer = setInterval(loadAgents, 30000) // 30s 刷新
+    return () => clearInterval(timer)
+  }, [])
+
+  const online = agents.filter((a) => a.calls > 0 || a.avg_ms === 0).length
+  const totalCalls = agents.reduce((s, a) => s + a.calls, 0)
+  const totalErrors = agents.reduce((s, a) => s + a.errors, 0)
+  const avgErrorRate = totalCalls > 0 ? (totalErrors / totalCalls * 100).toFixed(1) : '0.0'
+  const maxCalls = Math.max(...agents.map((a) => a.calls), 1)
 
   return (
     <div className="admin-pnl vis">
       <div className="admin-cd" style={{ marginBottom: 12 }}>
         <div className="admin-cd-h">
           <h3>Agent 集群状态</h3>
-          <span className="admin-tag admin-tag-green">全部在线 · {online}/{AG.length}</span>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <span className="admin-tag admin-tag-green">在线 {online}/{agents.length}</span>
+            <span style={{ fontSize: 11, color: 'var(--ink-2)' }}>
+              CPU {system.cpu_percent}% · 内存 {system.memory_mb.toFixed(0)}MB
+            </span>
+          </div>
         </div>
         <div className="admin-cd-b">
           <div className="admin-ag-g">
-            {AG.map((a, i) => {
+            {agents.map((a, i) => {
               const cl = COLORS[i % COLORS.length]
-              const badge = a.s ? (
-                <span
-                  className="admin-ag-bg"
-                  style={{ background: 'var(--warm-soft)', color: 'var(--warm)' }}
-                >
-                  执行中
-                </span>
-              ) : (
-                <span
-                  className="admin-ag-bg"
-                  style={{ background: 'var(--success-soft)', color: 'var(--success)' }}
-                >
-                  就绪
-                </span>
-              )
-              const bc = a.s ? 'var(--warm)' : 'var(--success)'
+              const bc = a.avg_ms > 0 ? 'var(--success)' : 'var(--warm)'
               return (
-                <div key={a.n} className="admin-ag-c">
+                <div key={a.name} className="admin-ag-c">
                   <div className="admin-ag-t">
-                    <div
-                      className="admin-ag-ic"
-                      style={{ background: cl.b, color: cl.c }}
-                    >
-                      {a.n[0]}
+                    <div className="admin-ag-ic" style={{ background: cl.b, color: cl.c }}>
+                      {a.name[0]}
                     </div>
                     <div>
-                      <div className="admin-ag-nm">{a.n}</div>
-                      <div className="admin-ag-rl">{a.r}</div>
+                      <div className="admin-ag-nm">{a.name}</div>
+                      <div className="admin-ag-rl">{a.role}</div>
                     </div>
-                    {badge}
+                    <span className="admin-ag-bg" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}>
+                      {a.calls > 0 ? '活跃' : '就绪'}
+                    </span>
                   </div>
                   <div className="admin-ag-bar">
                     <div
                       className="admin-ag-fill"
                       style={{
-                        width: `${Math.min(a.cpu * 3, 100)}%`,
+                        width: `${Math.min((a.calls / maxCalls) * 100, 100)}%`,
                         background: bc,
                       }}
-                    ></div>
+                    />
                   </div>
                   <div className="admin-ag-mt">
-                    <span>CPU {a.cpu}%</span>
-                    <span>MEM {a.mem}MB</span>
-                    <span>{a.c} 调用</span>
+                    <span>{a.calls} 调用</span>
+                    <span>{a.avg_ms.toFixed(0)}ms</span>
+                    <span style={{ color: a.error_rate > 1 ? 'var(--danger)' : 'var(--ink-2)' }}>
+                      {a.error_rate}%
+                    </span>
                   </div>
                 </div>
               )
@@ -99,106 +111,33 @@ export default function AgentsPage() {
 
       <div className="admin-g2">
         <div className="admin-cd">
-          <div className="admin-cd-h">
-            <h3>调用统计（今日）</h3>
-          </div>
+          <div className="admin-cd-h"><h3>调用统计</h3></div>
           <div className="admin-cd-b">
-            {AG.map((a) => (
-              <div
-                key={a.n}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '6px 0',
-                  borderBottom: '1px solid var(--line-2)',
-                }}
-              >
-                <span style={{ width: 100, fontSize: 11.5, color: 'var(--ink-2)' }}>
-                  {a.n}
-                </span>
-                <div
-                  style={{
-                    flex: 1,
-                    height: 4,
-                    background: 'var(--bg-subtle)',
-                    borderRadius: 2,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <div
-                    style={{
-                      height: '100%',
-                      width: `${Math.round((a.c / mx) * 100)}%`,
-                      background: 'var(--info)',
-                      borderRadius: 2,
-                    }}
-                  ></div>
+            {agents.map((a) => (
+              <div key={a.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--line-2)' }}>
+                <span style={{ width: 110, fontSize: 11.5, color: 'var(--ink-2)' }}>{a.name}</span>
+                <div style={{ flex: 1, height: 4, background: 'var(--bg-subtle)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${(a.calls / maxCalls) * 100}%`, background: 'var(--info)', borderRadius: 2 }} />
                 </div>
-                <span
-                  style={{
-                    fontSize: 10.5,
-                    fontWeight: 600,
-                    minWidth: 36,
-                    textAlign: 'right',
-                  }}
-                >
-                  {a.c}
-                </span>
+                <span style={{ fontSize: 10.5, fontWeight: 600, minWidth: 36, textAlign: 'right' }}>{a.calls}</span>
               </div>
             ))}
           </div>
         </div>
 
         <div className="admin-cd">
-          <div className="admin-cd-h">
-            <h3>错误率</h3>
-          </div>
+          <div className="admin-cd-h"><h3>错误率</h3></div>
           <div className="admin-cd-b">
-            {AG.map((a) => {
-              const ec = a.e >= 1 ? 'var(--danger)' : a.e >= 0.5 ? 'var(--warm)' : 'var(--success)'
+            {agents.map((a) => {
+              const ec = a.error_rate >= 1 ? 'var(--danger)' : a.error_rate >= 0.5 ? 'var(--warm)' : 'var(--success)'
               return (
-                <div
-                  key={a.n}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '6px 0',
-                    borderBottom: '1px solid var(--line-2)',
-                  }}
-                >
-                  <span style={{ width: 100, fontSize: 11.5, color: 'var(--ink-2)' }}>
-                    {a.n}
-                  </span>
-                  <div
-                    style={{
-                      flex: 1,
-                      height: 4,
-                      background: 'var(--bg-subtle)',
-                      borderRadius: 2,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: '100%',
-                        width: `${Math.min(a.e * 40, 100)}%`,
-                        background: ec,
-                        borderRadius: 2,
-                      }}
-                    ></div>
+                <div key={a.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--line-2)' }}>
+                  <span style={{ width: 110, fontSize: 11.5, color: 'var(--ink-2)' }}>{a.name}</span>
+                  <div style={{ flex: 1, height: 4, background: 'var(--bg-subtle)', borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.min(a.error_rate * 40, 100)}%`, background: ec, borderRadius: 2 }} />
                   </div>
-                  <span
-                    style={{
-                      fontSize: 10.5,
-                      fontWeight: 600,
-                      minWidth: 36,
-                      textAlign: 'right',
-                      color: ec,
-                    }}
-                  >
-                    {a.e}%
+                  <span style={{ fontSize: 10.5, fontWeight: 600, minWidth: 36, textAlign: 'right', color: ec }}>
+                    {a.error_rate}%
                   </span>
                 </div>
               )

@@ -2,11 +2,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import profile, resource, path, tutor, chat, mindmap, dashboard, evaluation, auth
-from app.api import admin_exercises
+from app.api import admin_exercises, admin
 from app.core.config import settings
 from app.core.database import init_db
 from app.services.minimax_client import init_minimax_client
 from app.services.spark_client import spark_client
+from app.services.scheduled_analysis_service import scheduled_analysis_service
 import logging
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,18 @@ async def lifespan(app: FastAPI):
         await init_db()
     except Exception as e:
         logger.warning("数据库初始化失败 %s，使用内存模式运行", e)
+    
+    # 启动定时画像分析服务
+    try:
+        await scheduled_analysis_service.start()
+        logger.info("定时画像分析服务已启动")
+    except Exception as e:
+        logger.warning("定时画像分析服务启动失败: %s", e)
+    
     yield
+    
+    # 停止定时任务
+    await scheduled_analysis_service.stop()
     
     # 关闭客户端
     if settings.LLM_PROVIDER == "spark":
@@ -58,6 +70,7 @@ app.include_router(mindmap.router, prefix="/api/v1/mindmap", tags=["思维导图
 app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["仪表盘"])
 app.include_router(evaluation.router, prefix="/api/v1/evaluation", tags=["效果评估"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["认证"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["管理端"])
 app.include_router(admin_exercises.router, prefix="/api/v1/admin/exercises", tags=["管理端-题库"])
 
 @app.get("/")
