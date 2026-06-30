@@ -88,7 +88,7 @@ cd backend && celery -A app.core.celery_config beat --loglevel=info
 cd backend && python -m pytest tests/ -v          # 114 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
-cd frontend && npm run build                       # 18 页面
+cd frontend && npm run build                       # 19 页面
 ```
 
 ## 架构要点
@@ -97,15 +97,15 @@ cd frontend && npm run build                       # 18 页面
 
 ```
 intent_recognition → task_planning → conditional_route
-  → 5 个 Agent 节点 (document / mindmap / exercise / path / tutor / audio)
+  → 6 个 Agent 节点 (document / mindmap / exercise / path / tutor / audio)
   → result_aggregation → response_generation
 ```
 
-`master_agent.py` 实际节点: `intent_recognition` + `task_planning` + 5 个 `run_*_agent` (document / mindmap / exercise / path / tutor / audio) + `result_aggregation` + `response_generation` = **10 个节点**。
+`master_agent.py` 实际节点: `intent_recognition` + `task_planning` + 6 个 `run_*_agent` (document / mindmap / exercise / path / tutor / audio) + `result_aggregation` + `response_generation` = **10 个节点**。
 
-### 5 维学生画像
+### 7 维学生画像
 
-`student_profiles.dimensions` JSONB: `comprehension / memory / application / imagination / focus`（理解力/记忆力/应用转化/想象力/专注力），每个维度含 `score` (0-100) 和 `confidence` (0-1)，由 `initial_assessment_agent.py` 通过对话评估生成。
+`student_profiles.dimensions` JSONB: `comprehension / memory / application / imagination / focus / learning_speed / knowledge_breadth`（理解力/记忆力/应用转化/想象力/专注力/学习节奏/知识广度），每个维度含 `score` (0-100) 和 `confidence` (0-1)，由 `initial_assessment_agent.py` 通过对话评估生成。
 
 ### 防幻觉 (N3 评分项)
 
@@ -119,20 +119,25 @@ intent_recognition → task_planning → conditional_route
 | `/api/v1/chat/stream` (exercise) | ✅ 真流式 | dual-format 协议 |
 | `/api/v1/resource/generate/stream` | ✅ 真流式 | `type=token` 逐 token |
 | `/api/v1/resource/exercises/generate/stream` | ✅ 真流式 | dual-format |
+| `/api/v1/path/generate/stream` | ✅ 真流式 | `type=token` 逐 token |
+| `/api/v1/profile/assess/stream` | ✅ 真流式 | `type=token` 逐 token |
+| `/api/v1/resource/learning-package/generate/stream` | ✅ 真流式 | `type=token` 逐 token |
 
 ### 数据库表关系 (12 张表)
 
 `students` 1:N `student_profiles` / `chat_sessions` / `resources` / `learning_paths` / `exercises` / `learning_records` / `evaluation_reports`
 
 `exercise_bank`: 公共题库 (admin 创建，独立于学生)
+`document_chunks`: RAG 知识库文档分块
 
 ### 登录注册系统
 
 ```
-注册: POST /auth/register → bcrypt 哈希密码 → 存入 students.password_hash → 返回 JWT
+注册: POST /auth/send-code → 生成 6 位验证码 → 控制台打印 → 内存存储 (5 分钟有效)
+     POST /auth/register → 校验验证码 + bcrypt 哈希密码 + 手机号唯一 → 存入 students → 返回 JWT
 登录: POST /auth/login → bcrypt 校验密码 → 检查 is_active → 记录 last_login → 返回 JWT
 验证: Authorization: Bearer <token> → decode_token() → get_current_user() 依赖
-门禁: 41 个业务端点全部加 Depends(get_current_user) + student_id 所有权校验
+门禁: 68 个业务端点全部加 Depends(get_current_user) + student_id 所有权校验
 ```
 
 ### 管理后台系统
@@ -143,7 +148,7 @@ intent_recognition → task_planning → conditional_route
 Token: zhishu_admin_token (与学生端 zhishu_token 隔离)
 登录: /admin/login → 调用 /auth/login → 校验 role === 'admin' → 存 zhishu_admin_user
 题库 CRUD: admin_exercises.py 6 个端点 (列表/创建/批量导入/编辑/删除/知识点列表)
-管理端点: admin.py 10 个端点 (统计/趋势/用户管理/资源管理/路径管理/对话管理/Agent 监控)
+管理端点: admin.py 18 个端点 (统计/趋势/用户/资源/路径/对话/文档/Agent 监控)
 Agent 监控: agent_metrics.py 内存计数器 (threading.Lock 线程安全)
 并行查询: get_stats 用 asyncio.gather() 并行 10 个计数查询
 N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
@@ -168,7 +173,9 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 对话页刷新修复 (sessionId 持久化 + loadSession 渲染)
 - ✅ 骨架屏 loading (4 页面 shimmer 动画)
 - ✅ 评估报告 AI 化 + 预生成缓存 + 定时生成
-- ✅ 管理后台 API 增强 (10 端点 + Agent 监控 + 并行查询 + N+1 优化)
+- ✅ 管理后台 API 增强 (18 端点 + Agent 监控 + 并行查询 + N+1 优化)
+- ✅ 手机验证码注册 (控制台输出 + 5 分钟有效期 + 手机号唯一)
+- ✅ 三页面接入真实 API (paths/chats/documents)
 - ✅ forEach async 批量操作修复 (users/page.tsx)
 - ✅ SQL 注入风险修复 (admin.py 改用 ORM 模型)
 - ✅ 图表 innerHTML 改为 React BarChart 组件

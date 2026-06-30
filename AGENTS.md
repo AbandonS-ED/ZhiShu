@@ -69,8 +69,9 @@ cd frontend && npm run build                       # 18 页面
 - **题库出题**: StateGraph exercise 意图 → 保存到 `exercises` 表（去重 + 限容 20 道/知识点）→ 回复追加 `[👉 点击前往题库作答](/tiku?kp=xxx)`
 - **防幻觉**: 6 Agent 接 `validate()`（Document/Exercise 走三层，其他走 `skip_llm=True` 快速模式）
 - **RAG**: `document_parser → text_chunker → embedding → vector_store.search → reranker`
-- **认证**: bcrypt + JWT（HS256，7 天），全 **43** 端点 `Depends(get_current_user)` 门禁
-- **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，题库 CRUD 6 端点 + 管理端点 10 个
+- **认证**: bcrypt + JWT（HS256，7 天），全 **68** 端点 `Depends(get_current_user)` 门禁
+- **手机验证码**: 内存存储 + 5 分钟有效期，控制台 print 模拟短信，注册时校验
+- **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，18 管理端点（含 Agent 监控 + 文档管理）
 - **Agent 监控**: `agent_metrics.py` 内存计数器 + `threading.Lock` 线程安全，30s 自动刷新
 - **并行查询**: `get_stats` 用 `asyncio.gather()` 并行 10 个计数查询，响应速度提升约 50%
 - **N+1 优化**: users/resources/paths/chats 列表全部改用 JOIN 子查询
