@@ -5,8 +5,7 @@ from app.api import profile, resource, path, tutor, chat, mindmap, dashboard, ev
 from app.api import admin_exercises, admin
 from app.core.config import settings
 from app.core.database import init_db
-from app.services.minimax_client import init_minimax_client
-from app.services.spark_client import spark_client
+from app.services.llm_factory import get_llm_client
 from app.services.scheduled_analysis_service import scheduled_analysis_service
 import logging
 
@@ -14,15 +13,8 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 根据配置选择 LLM 客户端
-    if settings.LLM_PROVIDER == "spark" and settings.SPARK_API_KEY:
-        spark_client.api_key = settings.SPARK_API_KEY
-        spark_client.base_url = settings.SPARK_BASE_URL
-    else:
-        init_minimax_client(
-            api_key=settings.MINIMAX_API_KEY,
-            base_url=settings.MINIMAX_BASE_URL,
-        )
+    # 初始化 LLM 客户端（根据 LLM_PROVIDER 自动选择）
+    get_llm_client()
     
     # 初始化数据库（数据库不可用时优雅降级）
     try:
@@ -41,10 +33,6 @@ async def lifespan(app: FastAPI):
     
     # 停止定时任务
     await scheduled_analysis_service.stop()
-    
-    # 关闭客户端
-    if settings.LLM_PROVIDER == "spark":
-        await spark_client.close()
 
 app = FastAPI(
     title="智枢(SmartHub) API",

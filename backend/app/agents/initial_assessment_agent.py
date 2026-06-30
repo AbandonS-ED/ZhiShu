@@ -4,7 +4,7 @@ import uuid
 import logging
 import re
 
-from app.services import minimax_client as mc_module
+from app.services.llm_factory import get_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -287,7 +287,7 @@ class InitialAssessmentAgent:
         token_count = 0
         first_token = True
         try:
-            async for token in mc_module.minimax_client.chat_stream(
+            async for token in get_llm_client().chat_stream(
                 messages=messages,
                 system=system_prompt,
                 temperature=0.7,

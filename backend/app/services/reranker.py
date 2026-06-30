@@ -4,7 +4,7 @@
 """
 
 import json
-from app.services import minimax_client as mc_module
+from app.services.llm_factory import get_llm_client
 from app.services.json_parser import parse_json_response
 
 
@@ -61,7 +61,7 @@ class Reranker:
         prompt = self.RERANK_PROMPT.format(query=query, results=results_text)
 
         try:
-            response = await mc_module.minimax_client.chat(
+            response = await get_llm_client().chat(
                 messages=[{"role": "user", "content": prompt}],
                 system="你是文档检索专家。只返回 JSON。",
                 max_tokens=1024,

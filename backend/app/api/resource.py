@@ -21,7 +21,7 @@ from app.models.exercise_bank import ExerciseBank
 from app.models.learning_path import LearningPath
 from app.agents.document_agent import document_agent
 from app.agents.exercise_agent import exercise_agent
-from app.services import minimax_client as mc_module
+from app.services.llm_factory import get_llm_client
 from app.services.anti_hallucination import anti_hallucination
 from app.services.json_parser import parse_json_response
 from app.services.recommendation_service import recommendation_service
@@ -301,7 +301,7 @@ async def generate_resource_stream(req: ResourceGenRequest, db: AsyncSession = D
                 yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在生成学习内容...'}, ensure_ascii=False)}\n\n"
 
                 stream_text = ""
-                async for token in mc_module.minimax_client.chat_stream(
+                async for token in get_llm_client().chat_stream(
                     messages=[{"role": "user", "content": prompt}],
                     system=document_agent.SYSTEM_PROMPT,
                     max_tokens=4096,
@@ -499,7 +499,7 @@ async def generate_exercises_stream(req: ExerciseGenRequest, db: AsyncSession = 
                 sep_found = False
                 prev_display_len = 0
                 stream_token_count = 0
-                async for token in mc_module.minimax_client.chat_stream(
+                async for token in get_llm_client().chat_stream(
                     messages=[{"role": "user", "content": prompt}],
                     system=STREAM_EXERCISE_SYSTEM,
                     max_tokens=4096,

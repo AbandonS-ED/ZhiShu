@@ -11,7 +11,7 @@ from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
 from app.models.exercise import Exercise
 from app.models.learning_record import LearningRecord
-from app.services import minimax_client as mc_module
+from app.services.llm_factory import get_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -216,11 +216,11 @@ class BehaviorAnalysisAgent:
 
         try:
             # 调用 LLM
-            if mc_module.minimax_client is None:
+            if get_llm_client() is None:
                 logger.warning("minimax_client not initialized, skipping analysis")
                 return {"updates": [], "summary": "LLM未初始化，跳过分析"}
             
-            response = await mc_module.minimax_client.chat(
+            response = await get_llm_client().chat(
                 messages=[
                     {"role": "user", "content": user_prompt},
                 ],

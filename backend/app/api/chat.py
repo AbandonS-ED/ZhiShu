@@ -18,7 +18,7 @@ from app.models.student_profile import StudentProfile
 from app.models.exercise import Exercise
 from app.agents.master_agent import master_agent
 from app.agents.exercise_agent import exercise_agent
-from app.services import minimax_client as mc_module
+from app.services.llm_factory import get_llm_client
 from app.services.json_parser import parse_json_response
 from app.core.dependencies import valid_student_id, valid_session_id
 from app.services.chat_recommendation_service import chat_recommendation_service
@@ -77,7 +77,7 @@ AI回复摘要: {assistant_response[:200]}
 
     try:
         # 3. 调用 LLM 分析
-        response = await mc_module.chat_completion(
+        response = await get_llm_client().chat(
             messages=[{"role": "user", "content": analysis_prompt}],
             temperature=0.2,
             max_tokens=300,
@@ -256,7 +256,7 @@ async def _handle_tutor_chat_stream(
     think_close = "</think>"
     tail = ""
     stream_text = ""
-    async for token in mc_module.minimax_client.chat_stream(
+    async for token in get_llm_client().chat_stream(
         messages=messages,
         system=system_prompt,
         max_tokens=4096,
@@ -325,7 +325,7 @@ async def _handle_single_agent_stream(
     from app.agents.mindmap_agent import mindmap_agent
     from app.agents.exercise_agent import exercise_agent
     from app.agents.path_agent import path_agent
-    from app.services import minimax_client as mc_module
+from app.services.llm_factory import get_llm_client
     from app.services.anti_hallucination import anti_hallucination
 
     # 提取知识点
@@ -346,7 +346,7 @@ async def _handle_single_agent_stream(
         prompt = document_agent._build_prompt(kp, student_profile, "all")
         stream_text = ""
         prev_display_len = 0
-        async for token in mc_module.minimax_client.chat_stream(
+        async for token in get_llm_client().chat_stream(
             messages=[{"role": "user", "content": prompt}],
             system=document_agent.SYSTEM_PROMPT,
             max_tokens=4096,
@@ -396,7 +396,7 @@ async def _handle_single_agent_stream(
         prompt = mindmap_agent._build_prompt(kp, student_profile)
         stream_text = ""
         prev_display_len = 0
-        async for token in mc_module.minimax_client.chat_stream(
+        async for token in get_llm_client().chat_stream(
             messages=[{"role": "user", "content": prompt}],
             system=mindmap_agent.SYSTEM_PROMPT,
             max_tokens=4096,
@@ -456,7 +456,7 @@ async def _handle_single_agent_stream(
         stream_text = ""
         sep = "---JSON_DATA---"
         sep_found = False
-        async for token in mc_module.minimax_client.chat_stream(
+        async for token in get_llm_client().chat_stream(
             messages=[{"role": "user", "content": prompt}],
             system=STREAM_EXERCISE_SYSTEM,
             max_tokens=4096,
@@ -806,7 +806,7 @@ async def stream_chat(req: ChatRequest, db: AsyncSession = Depends(get_db), user
         title = req.message[:50]
         try:
             title_prompt = f"用10个字以内概括这个请求的核心内容，只输出标题，不要其他文字：{req.message[:100]}"
-            title_response = await mc_module.minimax_client.chat(
+            title_response = await get_llm_client().chat(
                 messages=[{"role": "user", "content": title_prompt}],
                 system="你是一个标题生成器。用简短的中文概括用户请求的核心内容。",
                 max_tokens=30,

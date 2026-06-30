@@ -4,7 +4,7 @@
 """
 
 import json
-from app.services import minimax_client as mc_module
+from app.services.llm_factory import get_llm_client
 from app.services.anti_hallucination import anti_hallucination
 
 
@@ -71,7 +71,7 @@ class PathAgent:
         """
         user_prompt = self._build_prompt(course_topics, student_profile, total_days, daily_topics)
 
-        response = await mc_module.minimax_client.chat(
+        response = await get_llm_client().chat(
             messages=[{"role": "user", "content": user_prompt}],
             system=self.SYSTEM_PROMPT,
             max_tokens=8192,

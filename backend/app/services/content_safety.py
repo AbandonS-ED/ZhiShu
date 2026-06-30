@@ -5,7 +5,7 @@
 
 import re
 from dataclasses import dataclass, field
-from app.services import minimax_client as mc_module
+from app.services.llm_factory import get_llm_client
 from app.services.json_parser import parse_json_response
 
 
@@ -63,7 +63,7 @@ class ContentSafety:
 只返回 JSON。"""
 
         try:
-            response = await mc_module.minimax_client.chat(
+            response = await get_llm_client().chat(
                 messages=[{"role": "user", "content": prompt}],
                 system="你是内容安全审核专家。只返回 JSON。",
                 max_tokens=1024,

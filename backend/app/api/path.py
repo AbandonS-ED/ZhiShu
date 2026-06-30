@@ -15,7 +15,7 @@ from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.models.learning_path import LearningPath
 from app.agents.path_agent import path_agent
-from app.services import minimax_client as mc_module
+from app.services.llm_factory import get_llm_client
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

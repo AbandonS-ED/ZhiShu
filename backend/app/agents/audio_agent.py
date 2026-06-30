@@ -6,7 +6,7 @@
 """
 
 import json
-from app.services import minimax_client as mc_module
+from app.services.llm_factory import get_llm_client
 from app.services.json_parser import parse_json_response
 
 
@@ -47,7 +47,7 @@ class AudioAgent:
         """
         user_prompt = self._build_prompt(knowledge_point, student_profile)
 
-        response = await mc_module.minimax_client.chat(
+        response = await get_llm_client().chat(
             messages=[{"role": "user", "content": user_prompt}],
             system=self.SYSTEM_PROMPT,
             max_tokens=4096,

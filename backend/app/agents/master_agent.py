@@ -16,7 +16,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from app.agents.state import AgentState, default_state, IntentType
 from app.agents.communicator import message_bus, MessageType
-from app.services import minimax_client as mc_module
+from app.services.llm_factory import get_llm_client
 from app.services.json_parser import parse_json_response
 from app.core.agent_metrics import agent_metrics
 
@@ -274,7 +274,7 @@ class MasterAgent:
 
         # LLM 路由
         try:
-            response = await mc_module.minimax_client.chat(
+            response = await get_llm_client().chat(
                 messages=[{"role": "user", "content": f"用户消息: {msg}"}],
                 system=INTENT_PROMPT,
                 max_tokens=256,
@@ -641,7 +641,7 @@ class MasterAgent:
             return state
 
         try:
-            response = await mc_module.minimax_client.chat(
+            response = await get_llm_client().chat(
                 messages=[{"role": "user", "content": f"用户消息: {last_msg}"}],
                 system=INTENT_PROMPT,
                 max_tokens=256,
@@ -693,7 +693,7 @@ class MasterAgent:
                 )
                 state["result"] = {"type": "mindmap", "data": result}
             else:
-                response = await mc_module.minimax_client.chat(
+                response = await get_llm_client().chat(
                     messages=state.get("messages", []),
                     system="你是一个友好的 AI 学习助手。用简洁清晰的中文回答。",
                     max_tokens=1024, temperature=0.7,

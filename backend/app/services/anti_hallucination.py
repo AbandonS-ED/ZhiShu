@@ -8,7 +8,7 @@ N3 评分项：防止 LLM 生成虚假信息。
 
 import re
 from dataclasses import dataclass, field
-from app.services import minimax_client as mc_module
+from app.services.llm_factory import get_llm_client
 from app.services.json_parser import parse_json_response
 
 
@@ -164,7 +164,7 @@ class LLMValidator:
         prompt = self.VALIDATION_PROMPT.format(context=context, content=content[:2000])
 
         try:
-            response = await mc_module.minimax_client.chat(
+            response = await get_llm_client().chat(
                 messages=[{"role": "user", "content": prompt}],
                 system="你是事实核查专家。只返回 JSON。",
                 max_tokens=1024,
@@ -325,7 +325,7 @@ class AntiHallucinationService:
 只返回安全版本的文本。"""
 
         try:
-            response = await mc_module.minimax_client.chat(
+            response = await get_llm_client().chat(
                 messages=[{"role": "user", "content": prompt}],
                 system="你是内容安全助手。",
                 max_tokens=2000,

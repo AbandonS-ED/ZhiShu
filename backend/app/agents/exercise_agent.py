@@ -9,7 +9,7 @@
 包含防幻觉验证（N3 评分项）。
 """
 
-from app.services import minimax_client as mc_module
+from app.services.llm_factory import get_llm_client
 from app.services.anti_hallucination import anti_hallucination
 from app.services.json_parser import parse_json_response
 
@@ -68,7 +68,7 @@ type 可选值：choice（选择题）, judge（判断题）, short_answer（简
         """
         user_prompt = self._build_prompt(knowledge_point, student_profile, exercise_type, count)
 
-        response = await mc_module.minimax_client.chat(
+        response = await get_llm_client().chat(
             messages=[{"role": "user", "content": user_prompt}],
             system=self.SYSTEM_PROMPT,
             max_tokens=4096,
