@@ -1,151 +1,219 @@
-# 智枢(SmartHub) - 多智能体个性化学习资源生成系统
+# 智枢 (SmartHub) - 多智能体个性化学习资源生成系统
 
 > 第十五届中国软件杯 A3 赛题。基于大模型的个性化资源生成与学习多智能体系统。
-> **最新状态（2026-06-29）**：资源中心重构（推荐 Feed + Learn/Practice/Review 三阶段学习包）+ 全量 UI emoji 替换为 SVG Icon 组件（30 个图标）+ 评估报告缓存 + 定时生成 + 重新生成按钮 + 加载动画消息队列轮播 + 一键启停脚本。114 pytest 全过，**7 次**冒烟验证 9/9 PASS，管理员账号 `admin/admin123` 已就绪。
+
+## 项目简介
+
+智枢 (SmartHub) 是一个面向《人工智能导论》课程的多智能体个性化学习系统。通过 8 个 AI Agent 协同工作，为学生提供对话式学习画像评估、个性化学习资源生成、智能学习路径规划、RAG 智能辅导和效果评估等服务。
+
+### 核心功能
+
+- **F1 对话式画像 (35%)** — 5 维学生画像评估（理解力/记忆力/应用转化/想象力/专注力）
+- **F2 多智能体资源生成 (45%)** — 8 Agent 协同生成学习资源
+- **F3 学习路径规划** — DAG 可视化路径 + 每日学习计划
+- **F4 智能辅导** — RAG 问答 + 多轮对话上下文
+- **F5 效果评估** — LLM 生成评估报告 + 趋势分析
 
 ## 技术栈
 
-- **前端**: Next.js 14.2.5 + Tailwind 3.4 + TypeScript（纯自定义 CSS，无 UI 组件库）
-- **后端**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg + 8 Agent + 10 Router + **12 Service + MessageBus**
-- **Agent**: LangGraph StateGraph **10 节点** 编排 + 7 子 Agent（Initial Assessment / Document / Exercise / Path / Tutor / MindMap / Audio + Master 调度）
-- **LLM**: MiniMax-M3（开发）→ 讯飞星火 V4（上线前切换，改 1 个环境变量 `LLM_PROVIDER=spark`）
-- **数据库**: PostgreSQL 18 + **12 张表** + 14 索引 + JSONB（向量用 JSONB 占位，pgvector 扩展未安装）
-- **认证**: bcrypt 密码哈希 + JWT（HS256，7 天过期）+ 全 **41** 个业务端点门禁
-- **学生画像**: 5 维（理解力/记忆力/应用转化/想象力/专注力 + confidence），由 `initial_assessment_agent` 对话式评估
-- **防幻觉（N3 必做项）**: PatternDetector + SourceValidator + LLMValidator 三层验证（严重度分级 + 引用匹配修复）
-- **RAG**: 文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排（5 个 Service）
-- **SSE**: 4 个真流式端点（含 dual-format 协议，markdown + JSON 同传）+ 统一 SSE 工具 `frontend/src/lib/sse.ts` + `backend/app/core/sse_utils.py`
-- **异步任务**: Celery（已配 beat：daily 4 点跑 `evaluation_tasks.generate_daily_reports`，Redis broker；当前未起 worker）
-- **管理后台**: `/admin` 路由前缀，独立布局、独立 token（`zhishu_admin_token`），与学生端完全隔离；题库 CRUD 6 个端点
+| 层 | 技术选型 | 版本 |
+|---|---|---|
+| 前端 | Next.js (App Router) + Tailwind CSS + TypeScript | 14.2.5 |
+| 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 |
+| Agent | LangGraph StateGraph (10 节点编排 + MessageBus 通信) | - |
+| LLM | 双客户端：MiniMax-M3 (开发) / 讯飞星火 V4 (上线) | - |
+| 数据库 | PostgreSQL 18 (12 张表) + Redis | - |
+| 向量库 | pgvector (JSONB 降级方案) | - |
+| 异步任务 | Celery (Redis broker) | - |
 
 ## 项目结构
 
 ```
 ZhiShu/
-├── frontend/                      # Next.js 前端（9 学生页 + 9 管理页 + 2 布局 + 4 lib + 1 store + 2 hooks/components）
+├── frontend/                      # Next.js 前端
 │   └── src/
-│       ├── app/
-│       │   ├── layout.tsx           # 全局布局（Sidebar + Header，/admin /login 跳过）
-│       │   ├── globals.css          # 设计系统（米色/墨黑/琥珀，含 admin + set- 样式）
-│       │   ├── page.tsx             # / 仪表盘
-│       │   ├── login/               # 登录注册页（独立布局）
-│       │   ├── duihua/ profile/ resources/ path/ tiku/ pinggu/ setting/  # 7 个学生页面
-│       │   └── admin/               # ⭐ 管理后台（独立布局 + 权限拦截）
-│       │       ├── layout.tsx       # 管理后台布局（侧边栏 + Header + 登出）
-│       │       ├── page.tsx         # 仪表盘
-│       │       ├── login/           # 管理员登录
-│       │       ├── users/  resources/  exercises/  paths/  chats/  documents/  agents/
-│       ├── components/
-│       │   ├── layout/              # 学生端 Sidebar + Header
-│       │   └── RobotIcon.tsx        # ⭐ 极简机器人 SVG（替换 🤖 emoji）
-│       ├── hooks/usePageTimer.ts    # ⭐ 页面停留计时器（自动上报 learning_records）
-│       ├── lib/                     # api.ts（自动带 token，SSE 委托 sse.ts）/ sse.ts（统一 SSE 工具）/ student.ts / utils.ts
-│       │                            # admin/context.tsx + admin/components.tsx
-│       ├── stores/appStore.ts       # Zustand（已接入 Sidebar 实时刷新）
-│       └── types/index.ts           # TS 13 接口定义
-├── backend/                       # FastAPI 完整后端
+│       ├── app/                   # 页面路由
+│       │   ├── layout.tsx         # 根布局 (本地字体 + ClientShell)
+│       │   ├── page.tsx           # 仪表盘
+│       │   ├── login/             # 登录/注册页
+│       │   ├── duihua/            # 智能对话页 (SSE 流式)
+│       │   ├── profile/           # 学习画像页 (7 维雷达图)
+│       │   ├── resources/         # 资源中心 (推荐 Feed + 三阶段学习包)
+│       │   ├── path/              # 学习路径页 (DAG 可视化)
+│       │   ├── tiku/              # 练习题库页
+│       │   ├── pinggu/            # 学习评估页
+│       │   ├── setting/           # 用户设置页
+│       │   └── admin/             # 管理后台 (独立 Shell)
+│       ├── components/            # 共享组件
+│       │   ├── Icon.tsx           # 40+ SVG 图标集
+│       │   ├── RobotIcon.tsx      # 机器人图标
+│       │   └── layout/            # Sidebar + Header + ClientShell
+│       ├── lib/                   # 工具库
+│       │   ├── api.ts             # API 客户端 (全部后端接口封装)
+│       │   ├── sse.ts             # 统一 SSE 流式工具
+│       │   ├── student.ts         # 学生 ID 获取工具
+│       │   ├── utils.ts           # 工具函数
+│       │   └── admin/             # 管理后台共享组件
+│       ├── stores/appStore.ts     # Zustand 全局状态
+│       ├── types/index.ts         # TypeScript 类型定义
+│       └── hooks/usePageTimer.ts  # 页面停留计时器
+├── backend/                       # FastAPI 后端
 │   └── app/
-│       ├── main.py                 # 10 router + lifespan
-│       ├── api/                    # 10 router（auth / profile / resource / path / tutor / chat / mindmap / dashboard / evaluation / admin_exercises）= 41 唯一端点
-│       ├── agents/                 # 8 Agent + StateGraph 10 节点 + MessageBus
-│       ├── tasks/                  # ⭐ Celery 异步任务（evaluation_tasks.generate_daily_reports）
-│       ├── models/                 # 12 Model（含 evaluation_reports + exercise_bank + learning_record + learning_activity_log）
-│       ├── services/               # 12 Service
-│       └── core/                   # config / database / dependencies / security / celery_config / sse_utils
-├── tests/                         # smoke_test.py + 7 个 pytest（114 测试）+ 6 个 debug
-├── docs/                          # 设计文档 / 开发流程 / 运维测试 / 交付物 / 赛题需求
-├── scripts/                       # init_db.sql + init_admin.py + migrate_schema_drift.py（⭐ 通用 schema 迁移）+ run_migration.py
-├── 开发进度.md                      # 实时进度跟踪
-├── AGENTS.md                      # 团队协作文档
-├── CLAUDE.md                      # 项目技术文档
-├── SMOKE_TEST_REPORT.md           # 冒烟测试记录（7 次）
-├── docker-compose.yml             # postgres+pgvector / redis / minio
-└── .env.example                   # 环境变量模板
+│       ├── main.py                # 应用入口 + 路由注册
+│       ├── api/                   # 10 个路由模块 (41+ 端点)
+│       ├── agents/                # 8 个 Agent + StateGraph 编排
+│       │   ├── master_agent.py    # LangGraph StateGraph 10 节点
+│       │   ├── state.py           # AgentState + IntentType
+│       │   └── communicator.py    # MessageBus pub/sub
+│       ├── services/              # 14 个服务模块
+│       ├── models/                # 12 个数据模型
+│       ├── tasks/                 # Celery 异步任务
+│       └── core/                  # 核心模块 (配置/数据库/安全)
+├── tests/                         # 114 pytest + 冒烟测试
+├── docs/                          # 设计文档
+├── scripts/                       # 数据库初始化脚本
+├── docker-compose.yml             # Docker 编排
+├── start.ps1                      # Windows 一键启动
+└── stop.ps1                       # Windows 一键停止
 ```
 
 ## 快速开始
 
+### 环境要求
+
+- Python 3.11+
+- Node.js 18+
+- PostgreSQL 16+
+- Redis 7+
+
+### 1. 克隆项目
+
 ```bash
-# 1. 初始化数据库 + 管理员账号（只需一次）
+git clone https://github.com/AbandonS-ED/ZhiShu.git
+cd ZhiShu
+```
+
+### 2. 初始化数据库
+
+```bash
+# 建库 (只需一次)
 psql -U postgres -f backend/scripts/init_db.sql
-cd backend && venv\Scripts\python scripts\init_admin.py
 
-# 2. 后端（默认 8001）
+# 初始化管理员账号 (admin / admin123)
 cd backend
-python -m venv venv; venv\Scripts\activate
+python -m venv venv
+venv\Scripts\activate
 pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8001
+python scripts/init_admin.py
+```
 
-# 3. 前端
+### 3. 配置环境变量
+
+```bash
+# 复制环境变量模板
+cp .env.example .env
+
+# 编辑 .env 填入你的 API Key
+# MINIMAX_API_KEY=your_key_here
+# 或切换到讯飞星火: LLM_PROVIDER=spark + SPARK_API_KEY=your_key_here
+```
+
+### 4. 启动服务
+
+```bash
+# 方式一：一键启停 (推荐)
+.\start.ps1    # 同时启动后端 8001 + 前端 3000
+.\stop.ps1     # 停止所有服务
+
+# 方式二：手动启动
+# 后端 (端口 8001)
+cd backend
+venv\Scripts\activate
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
+
+# 前端 (端口 3000)
 cd frontend
 npm install
-npm run dev     # http://localhost:3000
-
-# 4. 一键启停（替代 2+3 的手动步骤）
-.\start.ps1     # 同时启动后端+前端
-.\stop.ps1      # 杀所有 python/node 进程
-
-# 5. 单元测试（119 pytest）
-cd backend && python -m pytest tests/ -v
-
-# 6. 端到端冒烟测试（7 次 9/9 PASS）
-cd backend && python -m tests.smoke_test
+npm run dev
 ```
 
-> 老 DB 缺 `evaluation_reports` 表或新字段时，先跑：`venv\Scripts\python scripts/migrate_schema_drift.py`
+### 5. 访问系统
 
-## 演示入口
+| 入口 | 地址 | 账号 |
+|---|---|---|
+| 学生端 | http://localhost:3000 | 注册新账号 |
+| 管理端 | http://localhost:3000/admin/login | admin / admin123 |
+| API 文档 | http://localhost:8001/docs | - |
+
+## 演示流程
+
+### 学生端
+
+1. `/login` → 注册 → 登录
+2. `/profile` → 开始评估 → 回答 3-5 个问题 → 查看 5 维画像
+3. `/duihua` → 发送消息 → SSE 流式对话 + 多轮上下文
+4. `/resources` → 查看推荐资源 → 输入知识点生成新资源
+5. `/tiku` → 查看题库 → AI 生成练习题
+6. `/path` → 输入知识点 → 生成学习路径
+7. `/pinggu` → 查看 LLM 评估报告
+8. `/setting` → 修改个人信息
+
+### 管理后台
+
+1. `/admin/login` → admin/admin123 登录
+2. `/admin` → 查看统计仪表盘
+3. `/admin/exercises` → 题库管理 (CRUD + 批量导入)
+4. `/admin/users` → 用户管理 (批量删除)
+5. `/admin/agents` → Agent 监控面板
+
+## 测试
 
 ```bash
-学生端:  http://localhost:3000            （注册 → 登录 → 使用全部功能）
-管理端:  http://localhost:3000/admin/login  （admin / admin123 登录）
-API 文档: http://localhost:8001/docs
+# 单元测试 (114 pytest)
+cd backend
+python -m pytest tests/ -v
+
+# 端到端冒烟测试
+cd backend
+python -m tests.smoke_test
+
+# 前端 lint
+cd frontend
+npm run lint
+
+# 前端构建
+cd frontend
+npm run build
 ```
 
-## 进度总览
+## 技术亮点
 
-| 模块 | 状态 |
-|------|------|
-| **前端 9 学生页** | ✅ 已完成（模板 1:1 复刻 + 全部联调后端，含设置页） |
-| **前端 9 管理页** | ✅ 已完成（含批量删除、搜索筛选、详情弹窗、题库 CRUD、DAG 可视化） |
-| **后端 12 表 + 8 Agent + 10 Router + 12 Service + Celery + MessageBus** | ✅ 已完成 |
-| **登录注册系统** | ✅ 已完成（bcrypt + JWT + 全 **41** 业务端点门禁） |
-| **管理后台权限** | ✅ 已完成（role 字段 + is_active + last_login + bcrypt） |
-| **P0 全部 10 个问题** | ✅ 已修复 |
-| **P1 全量 10 个修复** | ✅ 已修复（防幻觉正则 / 引用匹配 / XSS / 类型对齐 / **SSE 工具统一** / Spark base_url / DB schema 漂移迁移 / SQLAlchemy 2.0 兼容） |
-| **单元测试** | ✅ **114** 个 pytest 全 PASS |
-| **端到端冒烟测试** | ✅ **7** 次验证 9/9 API 200 |
-| F1 对话式画像 | ✅ 后端+前端完成（**5 维**，35% 评分项） |
-| F2 多智能体资源生成 | ✅ StateGraph **10 节点** + 7 子 Agent（45% 评分项） |
-| F3 学习路径 | ✅ 后端+前端完成（7/14/30 天可配，DAG 可视化） |
-| N3 防幻觉 + 流式 | ✅ 三层防幻觉 + 4 个 SSE 流式端点 + 统一 SSE 工具 |
-| F4 智能辅导 | ✅ Tutor Agent RAG 接入（embedding + vector_store + reranker） |
-| F5 效果评估 | ✅ **LLM 评估报告 + 7 天趋势 + 知识点掌握度 + 易错点 + 规则引擎降级 + 预生成缓存** |
-| **对话→题库联动** | ✅ StateGraph exercise 保存 DB + 跳转链接 + ?kp= 自动聚焦 |
-| **题库页增强** | ✅ 隐藏/清空 + AI 出题数量可选 + 答案格式三层防护 + 去重限容 |
-| **对话页刷新修复** | ✅ sessionId 持久化 + loadSession 渲染修复 + DB content 列改 TEXT |
-| **骨架屏 loading** | ✅ resources/path/tiku/profile 4 页面 shimmer 动画骨架屏 |
-| **Robot 图标** | ✅ `components/RobotIcon.tsx` 极简机器人 SVG |
-| **SVG 图标集** | ✅ `components/Icon.tsx` 30 个图标，统一替换全部 UI emoji |
-| **资源中心重构（二期）** | ✅ 推荐 Feed + 推荐服务 `recommendation_service.py` + Learn/Practice/Review 三阶段学习包 + 应用内加载 |
-| **学习时长追踪** | ✅ usePageTimer hook + 5 页面自动上报 + 评估报告 daily_activity |
-| **评估报告 AI 化** | ✅ LLM 生成评估报告 + 7 天趋势对比 + 知识点掌握度统计 + 易错点分析 + 规则引擎降级 |
-| **评估报告缓存 + 定时生成** | ✅ `evaluation_reports` 表 + Celery 每天 4 点定时 + 实时生成兜底 |
-| **评估报告重新生成** | ✅ POST `/report/{student_id}/regenerate` 端点 + 前端按钮 + 先删旧缓存再生成 |
-| **评估报告加载动画** | ✅ 消息队列轮播 + spinner + 文字脉冲，4 条进度消息各 3s |
-| **一键启停脚本** | ✅ `start.ps1` + `stop.ps1`，杀所有 python/node 进程解决孤儿 socket |
-| **预生成评估报告** | ✅ evaluation_reports 表 + Celery daily 4 点任务，API 优先读缓存 |
-| 部署与交付 | ⚠️ Docker 配置完成但本地裸跑，LLM 比赛前需切讯飞星火 V4 |
+- **多智能体编排**: LangGraph StateGraph 10 节点 + 7 子 Agent 协同
+- **防幻觉机制**: PatternDetector + SourceValidator + LLMValidator 三层验证
+- **流式输出**: 4 个 SSE 端点 (真逐 token 流式)
+- **RAG 管道**: 文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排
+- **统一 SSE 工具**: 前后端统一流式处理，支持重试 + 指数退避
+- **评估报告 AI 化**: LLM 生成自然语言报告 + 趋势分析 + 知识点掌握度统计
+- **推荐系统**: 基于画像/评估/对话/题库/路径的多维度打分推荐
 
-## 评分项状态
+## 环境变量
 
-| 优先级 | 模块 | 占比 | 状态 |
-|--------|------|------|------|
-| P0 | F1 对话式画像 | 35% | ✅ |
-| P0 | F2 多智能体资源生成 | 45% | ✅ |
-| P1 | F3 路径 / N3 防幻觉+流式 | 必做 | ✅ |
-| P2 | F4 智能辅导 / F5 效果评估 | 加分 | ✅ |
-| 加分 | 管理后台 | 加分 | ✅ |
-| 硬约束 | LLM 必须用讯飞星火 V4 | — | ⚠️ 当前 MiniMax-M3，**比赛前 1 个环境变量切换** |
+| 变量 | 说明 | 默认值 |
+|---|---|---|
+| `MINIMAX_API_KEY` | MiniMax API Key | - |
+| `SPARK_API_KEY` | 讯飞星火 API Key | - |
+| `LLM_PROVIDER` | LLM 选择 (minimax/spark) | minimax |
+| `DATABASE_URL` | PostgreSQL 连接串 | postgresql+asyncpg://postgres:123456@localhost:5432/zhishu |
+| `REDIS_URL` | Redis 连接串 | redis://localhost:6379/0 |
+| `JWT_SECRET` | JWT 密钥 | your_jwt_secret_here |
 
-详情见 [`开发进度.md`](开发进度.md)、[`AGENTS.md`](AGENTS.md)、[`CLAUDE.md`](CLAUDE.md)、[`SMOKE_TEST_REPORT.md`](SMOKE_TEST_REPORT.md)、[`docs/设计文档/管理后台设计文档.md`](docs/设计文档/管理后台设计文档.md)。
+## 相关文档
+
+- [CLAUDE.md](CLAUDE.md) — 项目技术文档 (架构 + 已修复 + 技术栈)
+- [AGENTS.md](AGENTS.md) — 团队协作文档
+- [开发进度.md](开发进度.md) — 实时进度跟踪
+- [SMOKE_TEST_REPORT.md](SMOKE_TEST_REPORT.md) — 冒烟测试记录
+
+## 许可证
+
+本项目为第十五届中国软件杯参赛作品。
