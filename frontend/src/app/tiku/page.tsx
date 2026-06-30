@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { exerciseApi, evaluationApi } from '@/lib/api'
+import { exerciseApi, evaluationApi, profileApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { markdownToHtml } from '@/lib/utils'
 import RobotIcon from '@/components/RobotIcon'
@@ -290,6 +290,12 @@ export default function TikuPage() {
       knowledge_point: ex.knowledge_point,
       score: correct ? 100 : 0,
     }).catch(() => {})
+    // 使用 AI Agent 分析练习行为并更新画像
+    profileApi.analyzeBehavior('exercise', {
+      knowledge_point: ex.knowledge_point,
+      correct: correct,
+      question_type: ex.type,
+    }).catch(() => {})
   }, [answers, exercises, addRecent])
 
   const answerJudge = useCallback((id: string, selected: boolean) => {
@@ -305,6 +311,12 @@ export default function TikuPage() {
       resource_type: 'exercise',
       knowledge_point: ex.knowledge_point,
       score: correct ? 100 : 0,
+    }).catch(() => {})
+    // 使用 AI Agent 分析练习行为并更新画像
+    profileApi.analyzeBehavior('exercise', {
+      knowledge_point: ex.knowledge_point,
+      correct: correct,
+      question_type: ex.type,
     }).catch(() => {})
   }, [answers, exercises, addRecent])
 

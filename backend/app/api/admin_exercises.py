@@ -9,16 +9,11 @@ from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_admin
 from app.models.student import Student
 from app.models.exercise_bank import ExerciseBank
 
 router = APIRouter()
-
-
-def _require_admin(user: Student):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="仅管理员可操作")
 
 
 class ExerciseBankCreate(BaseModel):
@@ -77,7 +72,7 @@ async def list_exercises(
     db: AsyncSession = Depends(get_db),
     user: Student = Depends(get_current_user),
 ):
-    _require_admin(user)
+    require_admin(user)
 
     q = select(ExerciseBank)
     count_q = select(sa_func.count()).select_from(ExerciseBank)
@@ -123,7 +118,7 @@ async def create_exercise(
     db: AsyncSession = Depends(get_db),
     user: Student = Depends(get_current_user),
 ):
-    _require_admin(user)
+    require_admin(user)
 
     if req.exercise_type == "choice" and (not req.options or len(req.options) < 2):
         raise HTTPException(status_code=400, detail="选择题至少需要 2 个选项")
@@ -152,7 +147,7 @@ async def batch_create_exercises(
     db: AsyncSession = Depends(get_db),
     user: Student = Depends(get_current_user),
 ):
-    _require_admin(user)
+    require_admin(user)
 
     if not req.exercises:
         raise HTTPException(status_code=400, detail="题目列表不能为空")
@@ -188,7 +183,7 @@ async def update_exercise(
     db: AsyncSession = Depends(get_db),
     user: Student = Depends(get_current_user),
 ):
-    _require_admin(user)
+    require_admin(user)
 
     result = await db.execute(select(ExerciseBank).where(ExerciseBank.id == exercise_id))
     ex = result.scalar_one_or_none()
@@ -210,7 +205,7 @@ async def delete_exercise(
     db: AsyncSession = Depends(get_db),
     user: Student = Depends(get_current_user),
 ):
-    _require_admin(user)
+    require_admin(user)
 
     result = await db.execute(select(ExerciseBank).where(ExerciseBank.id == exercise_id))
     ex = result.scalar_one_or_none()
@@ -228,7 +223,7 @@ async def list_knowledge_points(
     user: Student = Depends(get_current_user),
 ):
     """获取题库中所有知识点列表（用于前端筛选下拉）"""
-    _require_admin(user)
+    require_admin(user)
 
     result = await db.execute(
         select(ExerciseBank.knowledge_point, sa_func.count())

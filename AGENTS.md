@@ -69,8 +69,11 @@ cd frontend && npm run build                       # 18 页面
 - **题库出题**: StateGraph exercise 意图 → 保存到 `exercises` 表（去重 + 限容 20 道/知识点）→ 回复追加 `[👉 点击前往题库作答](/tiku?kp=xxx)`
 - **防幻觉**: 6 Agent 接 `validate()`（Document/Exercise 走三层，其他走 `skip_llm=True` 快速模式）
 - **RAG**: `document_parser → text_chunker → embedding → vector_store.search → reranker`
-- **认证**: bcrypt + JWT（HS256，7 天），全 **41** 端点 `Depends(get_current_user)` 门禁
-- **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，题库 CRUD 6 端点
+- **认证**: bcrypt + JWT（HS256，7 天），全 **43** 端点 `Depends(get_current_user)` 门禁
+- **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，题库 CRUD 6 端点 + 管理端点 10 个
+- **Agent 监控**: `agent_metrics.py` 内存计数器 + `threading.Lock` 线程安全，30s 自动刷新
+- **并行查询**: `get_stats` 用 `asyncio.gather()` 并行 10 个计数查询，响应速度提升约 50%
+- **N+1 优化**: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - **页面停留计时**: `hooks/usePageTimer.ts` 自动记录页面停留时长（<3s 不记录），上报到 `learning_records` 表
 - **SVG 图标集**: `components/Icon.tsx` 40+ 个图标，统一 `stroke="currentColor"` 风格
 - **统一 SSE 工具**: `frontend/src/lib/sse.ts` + `backend/app/core/sse_utils.py`，含 3 次重试 + 指数退避 + 120s 超时

@@ -13,6 +13,7 @@
 - **F3 学习路径规划** — DAG 可视化路径 + 每日学习计划
 - **F4 智能辅导** — RAG 问答 + 多轮对话上下文
 - **F5 效果评估** — LLM 生成评估报告 + 趋势分析
+- **管理后台** — 仪表盘 + 用户/资源/题库管理 + Agent 监控
 
 ## 技术栈
 
@@ -30,7 +31,7 @@
 
 ```
 ZhiShu/
-├── frontend/                      # Next.js 前端
+├── frontend/                      # Next.js 前端 (19 页面)
 │   └── src/
 │       ├── app/                   # 页面路由
 │       │   ├── layout.tsx         # 根布局 (本地字体 + ClientShell)
@@ -43,7 +44,7 @@ ZhiShu/
 │       │   ├── tiku/              # 练习题库页
 │       │   ├── pinggu/            # 学习评估页
 │       │   ├── setting/           # 用户设置页
-│       │   └── admin/             # 管理后台 (独立 Shell)
+│       │   └── admin/             # 管理后台 (独立 Shell + 9 页面)
 │       ├── components/            # 共享组件
 │       │   ├── Icon.tsx           # 40+ SVG 图标集
 │       │   ├── RobotIcon.tsx      # 机器人图标
@@ -53,22 +54,22 @@ ZhiShu/
 │       │   ├── sse.ts             # 统一 SSE 流式工具
 │       │   ├── student.ts         # 学生 ID 获取工具
 │       │   ├── utils.ts           # 工具函数
-│       │   └── admin/             # 管理后台共享组件
+│       │   └── admin/             # 管理后台 Context + 共享组件
 │       ├── stores/appStore.ts     # Zustand 全局状态
 │       ├── types/index.ts         # TypeScript 类型定义
 │       └── hooks/usePageTimer.ts  # 页面停留计时器
 ├── backend/                       # FastAPI 后端
 │   └── app/
 │       ├── main.py                # 应用入口 + 路由注册
-│       ├── api/                   # 10 个路由模块 (41+ 端点)
+│       ├── api/                   # 10 个路由模块 (43+ 端点)
 │       ├── agents/                # 8 个 Agent + StateGraph 编排
 │       │   ├── master_agent.py    # LangGraph StateGraph 10 节点
 │       │   ├── state.py           # AgentState + IntentType
 │       │   └── communicator.py    # MessageBus pub/sub
-│       ├── services/              # 14 个服务模块
+│       ├── services/              # 16 个服务模块
 │       ├── models/                # 12 个数据模型
 │       ├── tasks/                 # Celery 异步任务
-│       └── core/                  # 核心模块 (配置/数据库/安全)
+│       └── core/                  # 核心模块 (配置/数据库/安全/Agent 指标)
 ├── tests/                         # 114 pytest + 冒烟测试
 ├── docs/                          # 设计文档
 ├── scripts/                       # 数据库初始化脚本
@@ -161,10 +162,11 @@ npm run dev
 ### 管理后台
 
 1. `/admin/login` → admin/admin123 登录
-2. `/admin` → 查看统计仪表盘
-3. `/admin/exercises` → 题库管理 (CRUD + 批量导入)
-4. `/admin/users` → 用户管理 (批量删除)
-5. `/admin/agents` → Agent 监控面板
+2. `/admin` → 查看统计仪表盘（并行查询 + 骨架屏加载）
+3. `/admin/users` → 用户管理（搜索/筛选/禁用/批量禁用）
+4. `/admin/resources` → 资源管理（后端搜索 + 分页）
+5. `/admin/exercises` → 题库管理（CRUD + 批量导入）
+6. `/admin/agents` → Agent 监控面板（实时调用统计 + 30s 自动刷新）
 
 ## 测试
 
@@ -188,13 +190,14 @@ npm run build
 
 ## 技术亮点
 
-- **多智能体编排**: LangGraph StateGraph 10 节点 + 7 子 Agent 协同
+- **多智能体编排**: LangGraph StateGraph 10 节点 + 8 子 Agent 协同
 - **防幻觉机制**: PatternDetector + SourceValidator + LLMValidator 三层验证
 - **流式输出**: 4 个 SSE 端点 (真逐 token 流式)
 - **RAG 管道**: 文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排
 - **统一 SSE 工具**: 前后端统一流式处理，支持重试 + 指数退避
 - **评估报告 AI 化**: LLM 生成自然语言报告 + 趋势分析 + 知识点掌握度统计
 - **推荐系统**: 基于画像/评估/对话/题库/路径的多维度打分推荐
+- **管理后台**: 10 个端点 + Agent 监控 + 并行查询 + N+1 优化
 
 ## 环境变量
 

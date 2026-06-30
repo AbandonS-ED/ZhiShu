@@ -78,8 +78,8 @@ export default function AgentsPage() {
                     <div className="admin-ag-ic" style={{ background: cl.b, color: cl.c }}>
                       {a.name[0]}
                     </div>
-                    <div>
-                      <div className="admin-ag-nm">{a.name}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="admin-ag-nm" title={a.name}>{a.name}</div>
                       <div className="admin-ag-rl">{a.role}</div>
                     </div>
                     <span className="admin-ag-bg" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}>
@@ -115,7 +115,7 @@ export default function AgentsPage() {
           <div className="admin-cd-b">
             {agents.map((a) => (
               <div key={a.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--line-2)' }}>
-                <span style={{ width: 110, fontSize: 11.5, color: 'var(--ink-2)' }}>{a.name}</span>
+                <span title={a.name} style={{ width: 130, fontSize: 11.5, color: 'var(--ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</span>
                 <div style={{ flex: 1, height: 4, background: 'var(--bg-subtle)', borderRadius: 2, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${(a.calls / maxCalls) * 100}%`, background: 'var(--info)', borderRadius: 2 }} />
                 </div>
@@ -132,7 +132,7 @@ export default function AgentsPage() {
               const ec = a.error_rate >= 1 ? 'var(--danger)' : a.error_rate >= 0.5 ? 'var(--warm)' : 'var(--success)'
               return (
                 <div key={a.name} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid var(--line-2)' }}>
-                  <span style={{ width: 110, fontSize: 11.5, color: 'var(--ink-2)' }}>{a.name}</span>
+                  <span title={a.name} style={{ width: 130, fontSize: 11.5, color: 'var(--ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</span>
                   <div style={{ flex: 1, height: 4, background: 'var(--bg-subtle)', borderRadius: 2, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${Math.min(a.error_rate * 40, 100)}%`, background: ec, borderRadius: 2 }} />
                   </div>

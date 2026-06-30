@@ -1,29 +1,27 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import {
-  Brain, BookOpen, Wrench, Sparkles, Target,
-  ArrowRight, Send, X, ChevronRight,
-  ChevronDown, Award, RefreshCw, Info, TrendingUp,
-  AlertTriangle, CheckCircle, XCircle
-} from 'lucide-react'
-import { Chart as ChartJS, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js'
-import { Radar } from 'react-chartjs-2'
+import dynamic from 'next/dynamic'
+import Icon from '@/components/Icon'
 import { profileApi, type AssessmentStatus } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 
-ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend)
+// 动态导入 RadarChart 组件
+const RadarChart = dynamic(() => import('./components/RadarChart'), {
+  loading: () => <div className="skeleton" style={{ width: 320, height: 320, borderRadius: '50%', margin: '0 auto' }} />,
+  ssr: false
+})
 
 // ═══ CONSTANTS ═══
 
-const DIMS: { key: string; label: string; icon: typeof Brain; color: string; desc: string }[] = [
-  { key: 'comprehension', label: '理解力', icon: Brain, color: '#6366F1', desc: '快速理解新概念、触类旁通的能力' },
-  { key: 'memory', label: '记忆力', icon: BookOpen, color: '#06B6D4', desc: '学习内容的吸收与长期保持能力' },
-  { key: 'application', label: '应用转化', icon: Wrench, color: '#10B981', desc: '将知识灵活运用到实际问题中的能力' },
-  { key: 'imagination', label: '想象力', icon: Sparkles, color: '#F59E0B', desc: '跳出固定思路、探索创新方案的能力' },
-  { key: 'focus', label: '专注力', icon: Target, color: '#EF4444', desc: '持续集中注意力、深度投入的能力' },
-  { key: 'knowledge_base', label: '知识基础', icon: BookOpen, color: '#8B5CF6', desc: '先修知识掌握程度、当前学习水平' },
-  { key: 'learning_goal', label: '学习目标', icon: Target, color: '#EC4899', desc: '学习目的——考研/工作/竞赛/兴趣爱好' },
+const DIMS: { key: string; label: string; iconName: string; color: string; desc: string }[] = [
+  { key: 'comprehension', label: '理解力', iconName: 'brain', color: '#6366F1', desc: '快速理解新概念、触类旁通的能力' },
+  { key: 'memory', label: '记忆力', iconName: 'book', color: '#06B6D4', desc: '学习内容的吸收与长期保持能力' },
+  { key: 'application', label: '应用转化', iconName: 'wrench', color: '#10B981', desc: '将知识灵活运用到实际问题中的能力' },
+  { key: 'imagination', label: '想象力', iconName: 'sparkles', color: '#F59E0B', desc: '跳出固定思路、探索创新方案的能力' },
+  { key: 'focus', label: '专注力', iconName: 'target', color: '#EF4444', desc: '持续集中注意力、深度投入的能力' },
+  { key: 'knowledge_base', label: '知识基础', iconName: 'book', color: '#8B5CF6', desc: '先修知识掌握程度、当前学习水平' },
+  { key: 'learning_goal', label: '学习目标', iconName: 'target', color: '#EC4899', desc: '学习目的——考研/工作/竞赛/兴趣爱好' },
 ]
 
 const DIM_CN: Record<string, string> = {
@@ -73,9 +71,9 @@ function ConfirmDialog({
   if (!open) return null
 
   const iconMap = {
-    danger: <AlertTriangle size={26} color="#b09191" />,
-    warning: <AlertTriangle size={26} color="#c47a3a" />,
-    info: <Info size={26} color="#8a9ba8" />
+    danger: <Icon name="alertTriangle" size={26} className="text-[#b09191]" />,
+    warning: <Icon name="alertTriangle" size={26} className="text-[#c47a3a]" />,
+    info: <Icon name="info" size={26} className="text-[#8a9ba8]" />
   }
 
   const bgColorMap = {
@@ -190,9 +188,9 @@ function AlertDialog({ open, title, message, type = 'info', onClose }: AlertDial
   if (!open) return null
 
   const iconMap = {
-    success: <CheckCircle size={26} color="#059669" />,
-    error: <XCircle size={26} color="#b09191" />,
-    info: <Info size={26} color="#8a9ba8" />
+    success: <Icon name="checkCircle" size={26} className="text-[#059669]" />,
+    error: <Icon name="xCircle" size={26} className="text-[#b09191]" />,
+    info: <Icon name="info" size={26} className="text-[#8a9ba8]" />
   }
 
   const bgColorMap = {
@@ -296,71 +294,6 @@ function ScoreRing({ score, color, size = 88, strokeW = 6 }: { score: number; co
   )
 }
 
-// ═══ RADAR CHART (Chart.js) ═══
-
-function RadarChart({ scores, size = 340 }: { scores: Record<string, number>; size?: number }) {
-  const labels = DIMS.map(d => d.label)
-  const dataValues = DIMS.map(d => scores[d.key] || 0)
-  const allZero = dataValues.every(v => v === 0)
-
-  const data = {
-    labels,
-    datasets: [{
-      data: allZero ? [10, 10, 10, 10, 10, 10, 10] : dataValues,
-      backgroundColor: 'rgba(99,102,241,0.10)',
-      borderColor: 'rgba(99,102,241,0.75)',
-      borderWidth: 2,
-      pointBackgroundColor: DIMS.map(d => d.color),
-      pointBorderColor: '#fff',
-      pointBorderWidth: 2,
-      pointRadius: 5,
-      pointHoverRadius: 8,
-    }],
-  }
-
-  const options = {
-    responsive: true,
-    maintainAspectRatio: true,
-    scales: {
-      r: {
-        min: 0,
-        max: 100,
-        ticks: {
-          stepSize: 20,
-          font: { size: 10, family: "'Inter', sans-serif" },
-          color: '#A8A29E',
-          backdropColor: 'transparent',
-        },
-        grid: { color: '#E7E5E4' },
-        angleLines: { color: '#E7E5E4' },
-        pointLabels: {
-          font: { size: 13, weight: 500, family: "'Inter', sans-serif" },
-          color: '#57534E',
-        },
-      },
-    },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        backgroundColor: 'rgba(28,25,23,0.92)',
-        titleFont: { size: 12, family: "'Inter', sans-serif" },
-        bodyFont: { size: 13, family: "'Inter', sans-serif" },
-        padding: 10,
-        cornerRadius: 8,
-        callbacks: {
-          label: (ctx: any) => ` ${ctx.raw} 分`,
-        },
-      },
-    },
-  }
-
-  return (
-    <div style={{ width: size, height: size, margin: '0 auto', position: 'relative' }}>
-      <Radar data={data} options={options} />
-    </div>
-  )
-}
-
 // ═══ ANALYSIS REPORT ═══
 
 function AnalysisReport({ scores, confidence }: { scores: Record<string, number>; confidence: Record<string, number> }) {
@@ -381,7 +314,7 @@ function AnalysisReport({ scores, confidence }: { scores: Record<string, number>
       padding: '24px', marginBottom: 20,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <TrendingUp size={18} color="#6366F1" />
+        <Icon name="trendingUp" size={18} className="text-[#6366F1]" />
         <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1C1917', margin: 0 }}>
           能力分析报告
         </h3>
@@ -419,7 +352,7 @@ function AnalysisReport({ scores, confidence }: { scores: Record<string, number>
         </p>
         {lowConfDims.length > 0 && (
           <p style={{ marginBottom: 0, color: '#92400E' }}>
-            <Info size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+            <Icon name="info" size={14} className="inline align-middle mr-1" />
             以下维度评估置信度较低，建议重新评估：{lowConfDims.map(d => dimLabel(d.key)).join('、')}
           </p>
         )}
@@ -441,7 +374,7 @@ function LearningRecommendations({ scores, confidence, background }: {
     recommendations.push({
       dimension: '理解力',
       color: '#6366F1',
-      icon: Brain,
+      iconName: 'brain',
       title: '提升理解力',
       items: [
         '预习新内容时先看目录和标题，建立整体框架',
@@ -453,7 +386,7 @@ function LearningRecommendations({ scores, confidence, background }: {
     recommendations.push({
       dimension: '理解力',
       color: '#6366F1',
-      icon: Brain,
+      iconName: 'brain',
       title: '保持理解力优势',
       items: [
         '尝试学习更高级的内容，挑战自己',
@@ -468,7 +401,7 @@ function LearningRecommendations({ scores, confidence, background }: {
     recommendations.push({
       dimension: '记忆力',
       color: '#06B6D4',
-      icon: BookOpen,
+      iconName: 'book',
       title: '提升记忆力',
       items: [
         '使用间隔重复法复习（当天→3天→7天→15天）',
@@ -483,7 +416,7 @@ function LearningRecommendations({ scores, confidence, background }: {
     recommendations.push({
       dimension: '应用转化',
       color: '#10B981',
-      icon: Wrench,
+      iconName: 'wrench',
       title: '提升应用能力',
       items: [
         '每学一个知识点，立刻找一个实际例子',
@@ -498,7 +431,7 @@ function LearningRecommendations({ scores, confidence, background }: {
     recommendations.push({
       dimension: '专注力',
       color: '#EF4444',
-      icon: Target,
+      iconName: 'target',
       title: '提升专注力',
       items: [
         '使用番茄工作法：25分钟专注 + 5分钟休息',
@@ -513,7 +446,7 @@ function LearningRecommendations({ scores, confidence, background }: {
     recommendations.push({
       dimension: '知识基础',
       color: '#8B5CF6',
-      icon: BookOpen,
+      iconName: 'book',
       title: '补充基础知识',
       items: [
         '回顾先修课程的核心概念',
@@ -528,7 +461,7 @@ function LearningRecommendations({ scores, confidence, background }: {
     recommendations.push({
       dimension: '学习目标',
       color: '#EC4899',
-      icon: Target,
+      iconName: 'target',
       title: '明确学习目标',
       items: [
         '思考学习这门课程的长期价值',
@@ -543,7 +476,7 @@ function LearningRecommendations({ scores, confidence, background }: {
     recommendations.push({
       dimension: '综合',
       color: '#10B981',
-      icon: TrendingUp,
+      iconName: 'trendingUp',
       title: '保持优秀状态',
       items: [
         '你的各项能力都很均衡，继续保持',
@@ -559,7 +492,7 @@ function LearningRecommendations({ scores, confidence, background }: {
       padding: '24px', marginBottom: 20,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <TrendingUp size={18} color="#10B981" />
+        <Icon name="trendingUp" size={18} className="text-[#10B981]" />
         <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1C1917', margin: 0 }}>
           个性化学习建议
         </h3>
@@ -567,7 +500,6 @@ function LearningRecommendations({ scores, confidence, background }: {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
         {recommendations.map((rec, idx) => {
-          const Icon = rec.icon
           return (
             <div key={idx} style={{
               padding: 16, borderRadius: 12,
@@ -580,7 +512,7 @@ function LearningRecommendations({ scores, confidence, background }: {
                   background: `${rec.color}20`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <Icon size={14} color={rec.color} />
+                  <Icon name={rec.iconName} size={14} style={{ color: rec.color }} />
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: rec.color }}>
                   {rec.title}
@@ -604,8 +536,8 @@ function LearningRecommendations({ scores, confidence, background }: {
 
 // ═══ DIMENSION CARD ═══
 
-function DimensionCard({ dimKey, label, icon: Icon, color, desc, score, confidence }: {
-  dimKey: string; label: string; icon: typeof Brain; color: string; desc: string; score: number; confidence: number
+function DimensionCard({ dimKey, label, iconName, color, desc, score, confidence }: {
+  dimKey: string; label: string; iconName: string; color: string; desc: string; score: number; confidence: number
 }) {
   const level = levelMeta(score)
   const conf = confidenceMeta(confidence)
@@ -628,7 +560,7 @@ function DimensionCard({ dimKey, label, icon: Icon, color, desc, score, confiden
           background: `${color}14`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <Icon size={18} color={color} />
+          <Icon name={iconName} size={18} style={{ color }} />
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#1C1917' }}>{label}</div>
@@ -846,7 +778,7 @@ function AssessmentModal({
               onMouseEnter={e => e.currentTarget.style.background = '#E7E5E4'}
               onMouseLeave={e => e.currentTarget.style.background = '#F5F5F4'}
             >
-              <X size={16} />
+              <Icon name="close" size={16} />
             </button>
           )}
         </div>
@@ -858,7 +790,7 @@ function AssessmentModal({
               background: '#EEF2FF', display: 'flex',
               alignItems: 'center', justifyContent: 'center', marginBottom: 20,
             }}>
-              <Brain size={32} color="#6366F1" />
+              <Icon name="brain" size={32} className="text-[#6366F1]" />
             </div>
             <h3 style={{ fontSize: 18, fontWeight: 600, color: '#1C1917', marginBottom: 8 }}>
               开始评估你的学习能力
@@ -872,7 +804,7 @@ function AssessmentModal({
                 borderRadius: 10, fontSize: 14, fontWeight: 500, cursor: loading ? 'default' : 'pointer',
                 opacity: loading ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: 8,
               }}>
-                {loading ? '准备中...' : '开始对话评估'} <ArrowRight size={16} />
+                {loading ? '准备中...' : '开始对话评估'} <Icon name="arrowRight" size={16} />
               </button>
               <button onClick={onClose} style={{
                 padding: '11px 20px', background: 'transparent', color: '#A8A29E',
@@ -957,7 +889,7 @@ function AssessmentModal({
                   cursor: input.trim() ? 'pointer' : 'default',
                   display: 'flex', alignItems: 'center', gap: 6, fontWeight: 500,
                 }}>
-                  发送 <Send size={14} />
+                  发送 <Icon name="send" size={14} />
                 </button>
               </div>
             )}
@@ -994,6 +926,8 @@ export default function ProfilePage() {
   const [showAssess, setShowAssess] = useState(false)
   const [assessmentStatus, setAssessmentStatus] = useState<AssessmentStatus | null>(null)
   const [resetting, setResetting] = useState(false)
+  const [lastAnalyzedAt, setLastAnalyzedAt] = useState<string | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
 
   // Dialog states
   const [showResetConfirm, setShowResetConfirm] = useState(false)
@@ -1006,8 +940,37 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!studentId) return
+
+    // 检查缓存：如果4小时内已有数据，直接使用
+    const cacheKey = `profile_${studentId}`
+    const cacheTimeKey = `profile_time_${studentId}`
+    const cachedTime = localStorage.getItem(cacheTimeKey)
+    const cacheAge = cachedTime ? Date.now() - parseInt(cachedTime) : Infinity
+    const FOUR_HOURS = 4 * 60 * 60 * 1000
+
+    if (cacheAge < FOUR_HOURS) {
+      const cached = localStorage.getItem(cacheKey)
+      if (cached) {
+        try {
+          const data = JSON.parse(cached)
+          if (data.dimensions && Object.keys(data.dimensions).length > 0) {
+            setScores(prev => ({ ...prev, ...data.dimensions }))
+          }
+          if (data.confidence) {
+            setConfidence(prev => ({ ...prev, ...data.confidence }))
+          }
+          setLastAnalyzedAt(cachedTime)
+          loadAssessmentStatus()
+          loadAnalysisStatus()
+          return
+        } catch { /* ignore */ }
+      }
+    }
+
+    // 缓存过期，请求新数据
     loadProfile()
     loadAssessmentStatus()
+    loadAnalysisStatus()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentId])
 
@@ -1024,10 +987,27 @@ export default function ProfilePage() {
         setBackground(data.background as Record<string, string>)
       }
       setStatus(data.assessment_status || 'pending')
+      // 缓存数据
+      const sid = getStudentId()
+      if (sid) {
+        localStorage.setItem(`profile_${sid}`, JSON.stringify(data))
+        const now = Date.now().toString()
+        localStorage.setItem(`profile_time_${sid}`, now)
+        setLastAnalyzedAt(now)
+      }
     } catch (e) {
       console.error('Failed to load profile', e)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadAnalysisStatus() {
+    try {
+      const data = await profileApi.getAnalysisStatus()
+      setLastAnalyzedAt(data.last_analyzed_at)
+    } catch (e) {
+      console.error('Failed to load analysis status', e)
     }
   }
 
@@ -1039,6 +1019,44 @@ export default function ProfilePage() {
       console.error('Failed to load assessment status', e)
     }
   }
+
+  const handleForceAnalyze = useCallback(async () => {
+    setAnalyzing(true)
+    try {
+      const result = await profileApi.forceAnalyze()
+      if (result.status === 'updated') {
+        setAlertDialog({
+          title: '分析完成',
+          message: `AI 已更新 ${result.updated_count || 0} 个维度。${result.summary || ''}`,
+          type: 'success'
+        })
+        // 刷新画像并更新缓存
+        await loadProfile()
+      } else {
+        setAlertDialog({
+          title: '分析完成',
+          message: result.summary || '暂无更新',
+          type: 'info'
+        })
+        // 更新缓存时间
+        const sid = getStudentId()
+        if (sid) {
+          const now = Date.now().toString()
+          localStorage.setItem(`profile_time_${sid}`, now)
+          setLastAnalyzedAt(now)
+        }
+      }
+    } catch (e) {
+      setAlertDialog({
+        title: '分析失败',
+        message: '请稍后重试',
+        type: 'error'
+      })
+    } finally {
+      setAnalyzing(false)
+      setShowAlertDialog(true)
+    }
+  }, [])
 
   const handleComplete = useCallback((finalScores: Record<string, number>) => {
     setScores(prev => ({ ...prev, ...finalScores }))
@@ -1172,7 +1190,7 @@ export default function ProfilePage() {
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-                <Award size={22} color="#A8A29E" />
+                <Icon name="award" size={22} className="text-[#A8A29E]" />
                 <h2 style={{ color: '#fff', fontSize: 20, fontWeight: 600, margin: 0, fontFamily: "'Inter', sans-serif" }}>
                   个人能力画像
                 </h2>
@@ -1195,14 +1213,14 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {!hasScores && (
                 <button onClick={() => setShowAssess(true)} style={{
                   padding: '10px 24px', background: '#fff', color: '#1C1917',
                   border: 'none', borderRadius: 10, fontSize: 13.5, fontWeight: 500,
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                 }}>
-                  开始评估 <ArrowRight size={15} />
+                  开始评估 <Icon name="arrowRight" size={15} />
                 </button>
               )}
               {canResume && (
@@ -1211,20 +1229,40 @@ export default function ProfilePage() {
                   border: 'none', borderRadius: 10, fontSize: 13.5, fontWeight: 500,
                   cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
                 }}>
-                  继续评估 <ArrowRight size={15} />
+                  继续评估 <Icon name="arrowRight" size={15} />
                 </button>
               )}
               {hasScores && (
-                <button onClick={handleReset} disabled={resetting} style={{
-                  padding: '10px 16px', background: 'rgba(255,255,255,0.1)', color: '#fff',
-                  border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, fontSize: 13,
-                  cursor: resetting ? 'default' : 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  opacity: resetting ? 0.6 : 1,
-                }}>
-                  <RefreshCw size={14} className={resetting ? 'animate-spin' : ''} />
-                  重新评估
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <button onClick={handleForceAnalyze} disabled={analyzing} style={{
+                      padding: '10px 16px', background: 'rgba(99,102,241,0.2)', color: '#fff',
+                      border: '1px solid rgba(99,102,241,0.3)', borderRadius: 10, fontSize: 13,
+                      cursor: analyzing ? 'default' : 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      opacity: analyzing ? 0.6 : 1,
+                    }}>
+                      <Icon name="brain" size={14} className={analyzing ? 'animate-spin' : ''} />
+                      {analyzing ? '分析中...' : 'AI 分析'}
+                    </button>
+                    <button onClick={handleReset} disabled={resetting} style={{
+                      padding: '10px 16px', background: 'rgba(255,255,255,0.1)', color: '#fff',
+                      border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, fontSize: 13,
+                      cursor: resetting ? 'default' : 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      opacity: resetting ? 0.6 : 1,
+                    }}>
+                      <Icon name="refresh" size={14} className={resetting ? 'animate-spin' : ''} />
+                      重新评估
+                    </button>
+                  </div>
+                  {lastAnalyzedAt && (
+                    <span style={{ fontSize: 10, color: '#78716C', marginTop: 4, display: 'flex', alignItems: 'center', gap: 3, marginLeft: 2 }}>
+                      <Icon name="clock" size={10} />
+                      {new Date(lastAnalyzedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -1267,7 +1305,7 @@ export default function ProfilePage() {
             <div style={{
               textAlign: 'center', padding: '50px 20px', color: '#A8A29E',
             }}>
-              <Brain size={40} style={{ opacity: 0.3, marginBottom: 12 }} />
+              <Icon name="brain" size={40} className="opacity-30 mb-3" />
               <div style={{ fontSize: 14, marginBottom: 6, color: '#57534E', fontWeight: 500 }}>暂无能力数据</div>
               <div style={{ fontSize: 12.5, marginBottom: 20 }}>完成 AI 对话评估后，你的能力雷达图将在此展示</div>
               <button onClick={() => setShowAssess(true)} style={{
@@ -1293,7 +1331,7 @@ export default function ProfilePage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
               {DIMS.map(d => (
                 <DimensionCard
-                  key={d.key} dimKey={d.key} label={d.label} icon={d.icon}
+                  key={d.key} dimKey={d.key} label={d.label} iconName={d.iconName}
                   color={d.color} desc={d.desc} score={scores[d.key] || 0}
                   confidence={confidence[d.key] || 0}
                 />
@@ -1314,7 +1352,7 @@ export default function ProfilePage() {
             padding: '24px', marginBottom: 20,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-              <Info size={18} color="#6366F1" />
+              <Icon name="info" size={18} className="text-[#6366F1]" />
               <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1C1917', margin: 0 }}>
                 学习背景
               </h3>

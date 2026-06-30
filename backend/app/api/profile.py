@@ -13,6 +13,7 @@ from app.core.sse_utils import sse_stream_response
 from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.agents.initial_assessment_agent import initial_assessment_agent
+from app.agents.behavior_analysis_agent import behavior_analysis_agent
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -380,3 +381,55 @@ async def update_profile_by_behavior(
         logger.info(f"[profile] Updated profile for user {current_user.id} based on behavior")
 
     return {"status": "ok", "message": "画像已更新", "updated": updated}
+
+
+class AnalyzeBehaviorRequest(BaseModel):
+    behavior_type: str  # "chat", "exercise", "resource", "study"
+    behavior_data: dict = {}
+
+
+@router.post("/analyze-behavior")
+async def analyze_behavior(
+    req: AnalyzeBehaviorRequest,
+    current_user: Student = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """使用 AI Agent 分析学习行为并更新画像"""
+    result = await behavior_analysis_agent.analyze_and_update(
+        db=db,
+        student_id=str(current_user.id),
+        behavior_type=req.behavior_type,
+        behavior_data=req.behavior_data,
+    )
+    return result
+
+
+@router.post("/force-analyze")
+async def force_analyze(
+    current_user: Student = Depends(get_current_user),
+):
+    """手动触发画像分析（立即执行）"""
+    from app.services.scheduled_analysis_service import scheduled_analysis_service
+    result = await scheduled_analysis_service.force_analyze(str(current_user.id))
+    return result
+
+
+@router.get("/analysis-status")
+async def analysis_status(
+    current_user: Student = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取画像分析状态"""
+    result = await db.execute(
+        select(StudentProfile).where(StudentProfile.student_id == current_user.id)
+    )
+    profile = result.scalar_one_or_none()
+    
+    if not profile:
+        return {"has_profile": False, "last_analyzed_at": None}
+    
+    return {
+        "has_profile": True,
+        "last_analyzed_at": profile.last_analyzed_at.isoformat() if profile.last_analyzed_at else None,
+        "assessment_status": profile.assessment_status,
+    }

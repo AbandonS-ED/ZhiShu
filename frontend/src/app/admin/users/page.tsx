@@ -40,9 +40,9 @@ export default function UsersPage() {
     if (!selected.size) return
     if (!confirm(`确认禁用选中的 ${selected.size} 个用户？`)) return
     try {
-      selected.forEach(async (id) => {
+      for (const id of Array.from(selected)) {
         await adminApi.updateUser(id, { is_active: false })
-      })
+      }
       showToast(`已禁用 ${selected.size} 个用户`)
       clear()
       loadUsers()

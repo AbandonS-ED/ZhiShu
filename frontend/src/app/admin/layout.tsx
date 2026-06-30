@@ -98,7 +98,7 @@ function AdminShell({ children }: { children: ReactNode }) {
               <rect x="14" y="14" width="7" height="7" rx="1.5" />
               <rect x="3" y="14" width="7" height="7" rx="1.5" />
             </svg>
-            仪表盘
+            <span className="sb-text">仪表盘</span>
           </div>
           <div className="sb-lb">管理</div>
           <div
@@ -110,7 +110,7 @@ function AdminShell({ children }: { children: ReactNode }) {
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
               <circle cx="9" cy="7" r="4" />
             </svg>
-            用户管理
+            <span className="sb-text">用户管理</span>
           </div>
           <div
             className={`sb-it${activePanel === 'pRes' ? ' on' : ''}`}
@@ -121,7 +121,7 @@ function AdminShell({ children }: { children: ReactNode }) {
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
             </svg>
-            资源管理
+            <span className="sb-text">资源管理</span>
           </div>
           <div
             className={`sb-it${activePanel === 'pEx' ? ' on' : ''}`}
@@ -132,7 +132,7 @@ function AdminShell({ children }: { children: ReactNode }) {
               <path d="M9 11l3 3L22 4" />
               <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
             </svg>
-            练习题
+            <span className="sb-text">练习题</span>
           </div>
           <div
             className={`sb-it${activePanel === 'pPath' ? ' on' : ''}`}
@@ -144,7 +144,7 @@ function AdminShell({ children }: { children: ReactNode }) {
               <circle cx="18" cy="18" r="2.5" />
               <path d="M8.5 8.5a6 6 0 0 1 7 7" />
             </svg>
-            学习路径
+            <span className="sb-text">学习路径</span>
           </div>
           <div
             className={`sb-it${activePanel === 'pChat' ? ' on' : ''}`}
@@ -154,7 +154,7 @@ function AdminShell({ children }: { children: ReactNode }) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
-            对话记录
+            <span className="sb-text">对话记录</span>
           </div>
           <div
             className={`sb-it${activePanel === 'pDoc' ? ' on' : ''}`}
@@ -165,7 +165,7 @@ function AdminShell({ children }: { children: ReactNode }) {
               <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
               <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
             </svg>
-            知识库
+            <span className="sb-text">知识库</span>
           </div>
           <div className="sb-lb">监控</div>
           <div
@@ -177,7 +177,7 @@ function AdminShell({ children }: { children: ReactNode }) {
               <polyline points="16 18 22 12 16 6" />
               <polyline points="8 6 2 12 8 18" />
             </svg>
-            Agent 监控
+            <span className="sb-text">Agent 监控</span>
           </div>
         </nav>
         <div className="sb-ft">

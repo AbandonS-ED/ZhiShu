@@ -1,4 +1,6 @@
 """Admin API — 管理后台"""
+import asyncio
+import json
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -8,13 +10,15 @@ from sqlalchemy import select, func as sa_func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_admin
 from app.models.student import Student
 from app.models.resource import Resource
 from app.models.learning_path import LearningPath
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
 from app.models.exercise import Exercise
+from app.models.exercise_bank import ExerciseBank
+from app.models.learning_record import LearningRecord
 from app.models.document_chunk import DocumentChunk
 from app.core.agent_metrics import agent_metrics
 
@@ -22,8 +26,8 @@ router = APIRouter()
 
 
 def _require_admin(user: Student):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="仅管理员可操作")
+    """兼容旧调用，委托给共享依赖"""
+    require_admin(user)
 
 
 # ====================================================================
@@ -39,28 +43,47 @@ async def get_stats(
 
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
-    # 各表计数
-    user_count = (await db.execute(select(sa_func.count()).select_from(Student).where(Student.role == "student"))).scalar() or 0
-    admin_count = (await db.execute(select(sa_func.count()).select_from(Student).where(Student.role == "admin"))).scalar() or 0
-    resource_count = (await db.execute(select(sa_func.count()).select_from(Resource))).scalar() or 0
-    exercise_count = (await db.execute(select(sa_func.count()).select_from(Exercise))).scalar() or 0
-    exercise_bank_count = (await db.execute(select(sa_func.count()).select_from(Text("1")) if False else text("SELECT count(*) FROM exercise_bank"))).scalar() or 0
-    path_count = (await db.execute(select(sa_func.count()).select_from(LearningPath))).scalar() or 0
-    chat_count = (await db.execute(select(sa_func.count()).select_from(ChatSession))).scalar() or 0
-    doc_count = (await db.execute(select(sa_func.count()).select_from(DocumentChunk))).scalar() or 0
+    # 并行执行所有计数查询
+    [
+        user_count,
+        admin_count,
+        resource_count,
+        exercise_count,
+        exercise_bank_count,
+        path_count,
+        chat_count,
+        doc_count,
+        today_active,
+        today_new_resources,
+    ] = await asyncio.gather(
+        db.execute(select(sa_func.count()).select_from(Student).where(Student.role == "student")),
+        db.execute(select(sa_func.count()).select_from(Student).where(Student.role == "admin")),
+        db.execute(select(sa_func.count()).select_from(Resource)),
+        db.execute(select(sa_func.count()).select_from(Exercise)),
+        db.execute(select(sa_func.count()).select_from(ExerciseBank)),
+        db.execute(select(sa_func.count()).select_from(LearningPath)),
+        db.execute(select(sa_func.count()).select_from(ChatSession)),
+        db.execute(select(sa_func.count()).select_from(DocumentChunk)),
+        db.execute(
+            select(sa_func.count(sa_func.distinct(LearningRecord.student_id)))
+            .where(LearningRecord.created_at >= today_start)
+        ),
+        db.execute(
+            select(sa_func.count()).select_from(Resource)
+            .where(Resource.created_at >= today_start)
+        ),
+    )
 
-    # 今日活跃（有学习记录的用户）
-    today_active = (await db.execute(
-        select(sa_func.count(sa_func.distinct(text("student_id"))))
-        .select_from(text("learning_records"))
-        .where(text(f"created_at >= '{today_start.isoformat()}'"))
-    )).scalar() or 0
-
-    # 今日新增资源
-    today_new_resources = (await db.execute(
-        select(sa_func.count()).select_from(Resource)
-        .where(Resource.created_at >= today_start)
-    )).scalar() or 0
+    user_count = user_count.scalar() or 0
+    admin_count = admin_count.scalar() or 0
+    resource_count = resource_count.scalar() or 0
+    exercise_count = exercise_count.scalar() or 0
+    exercise_bank_count = exercise_bank_count.scalar() or 0
+    path_count = path_count.scalar() or 0
+    chat_count = chat_count.scalar() or 0
+    doc_count = doc_count.scalar() or 0
+    today_active = today_active.scalar() or 0
+    today_new_resources = today_new_resources.scalar() or 0
 
     return {
         "total_users": user_count,
@@ -88,23 +111,40 @@ async def get_trends(
     _require_admin(user)
 
     now = datetime.now(timezone.utc)
+    day_start_base = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = day_start_base + timedelta(days=days)
+
+    # 批量查询注册趋势
+    reg_rows = (await db.execute(
+        select(
+            sa_func.date(Student.created_at).label("day"),
+            sa_func.count().label("cnt"),
+        )
+        .where(Student.created_at >= day_start_base, Student.created_at < day_end)
+        .group_by(sa_func.date(Student.created_at))
+    )).all()
+    reg_map = {str(r.day): r.cnt for r in reg_rows}
+
+    # 批量查询资源趋势
+    res_rows = (await db.execute(
+        select(
+            sa_func.date(Resource.created_at).label("day"),
+            sa_func.count().label("cnt"),
+        )
+        .where(Resource.created_at >= day_start_base, Resource.created_at < day_end)
+        .group_by(sa_func.date(Resource.created_at))
+    )).all()
+    res_map = {str(r.day): r.cnt for r in res_rows}
+
     labels = []
     registrations = []
     resources = []
     for i in range(days - 1, -1, -1):
-        day_start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
-        day_end = day_start + timedelta(days=1)
-        labels.append(day_start.strftime("%m-%d"))
-        reg = (await db.execute(
-            select(sa_func.count()).select_from(Student)
-            .where(Student.created_at >= day_start, Student.created_at < day_end)
-        )).scalar() or 0
-        registrations.append(reg)
-        res = (await db.execute(
-            select(sa_func.count()).select_from(Resource)
-            .where(Resource.created_at >= day_start, Resource.created_at < day_end)
-        )).scalar() or 0
-        resources.append(res)
+        d = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
+        day_str = d.strftime("%Y-%m-%d")
+        labels.append(d.strftime("%m-%d"))
+        registrations.append(reg_map.get(day_str, 0))
+        resources.append(res_map.get(day_str, 0))
 
     return {
         "labels": labels,
@@ -128,7 +168,27 @@ async def list_users(
 ):
     _require_admin(user)
 
-    q = select(Student)
+    # 子查询：每个用户的资源数
+    res_sub = (
+        select(Resource.student_id, sa_func.count().label("resource_count"))
+        .group_by(Resource.student_id)
+    ).subquery()
+
+    # 子查询：每个用户的题数
+    ex_sub = (
+        select(Exercise.student_id, sa_func.count().label("exercise_count"))
+        .group_by(Exercise.student_id)
+    ).subquery()
+
+    q = (
+        select(
+            Student,
+            sa_func.coalesce(res_sub.c.resource_count, 0).label("resource_count"),
+            sa_func.coalesce(ex_sub.c.exercise_count, 0).label("exercise_count"),
+        )
+        .outerjoin(res_sub, Student.id == res_sub.c.student_id)
+        .outerjoin(ex_sub, Student.id == ex_sub.c.student_id)
+    )
     count_q = select(sa_func.count()).select_from(Student)
 
     if search:
@@ -144,31 +204,22 @@ async def list_users(
         q.order_by(Student.created_at.desc())
         .offset((page - 1) * page_size).limit(page_size)
     )
-    rows = result.scalars().all()
+    rows = result.all()
 
     items = []
     for r in rows:
-        # 统计每个用户的资源数和题数
-        res_count = (await db.execute(
-            select(sa_func.count()).select_from(Resource)
-            .where(Resource.student_id == r.id)
-        )).scalar() or 0
-        ex_count = (await db.execute(
-            select(sa_func.count()).select_from(Exercise)
-            .where(Exercise.student_id == r.id)
-        )).scalar() or 0
-
+        student = r[0]  # Student object
         items.append({
-            "id": str(r.id),
-            "student_no": r.student_no,
-            "name": r.name,
-            "email": r.email or "",
-            "role": r.role or "student",
-            "is_active": r.is_active if r.is_active is not None else True,
-            "resource_count": res_count,
-            "exercise_count": ex_count,
-            "last_login": r.last_login.isoformat() if r.last_login else None,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "id": str(student.id),
+            "student_no": student.student_no,
+            "name": student.name,
+            "email": student.email or "",
+            "role": student.role or "student",
+            "is_active": student.is_active if student.is_active is not None else True,
+            "resource_count": r.resource_count,
+            "exercise_count": r.exercise_count,
+            "last_login": student.last_login.isoformat() if student.last_login else None,
+            "created_at": student.created_at.isoformat() if student.created_at else None,
         })
 
     return {"items": items, "total": total, "page": page, "page_size": page_size}
@@ -249,39 +300,49 @@ async def list_resources(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     student_id: uuid.UUID | None = None,
+    search: str | None = None,
     db: AsyncSession = Depends(get_db),
     user: Student = Depends(get_current_user),
 ):
     _require_admin(user)
 
-    q = select(Resource)
+    # 子查询获取学生姓名
+    stu_sub = select(Student.id, Student.name).subquery()
+
+    q = (
+        select(Resource, sa_func.coalesce(stu_sub.c.name, "未知").label("student_name"))
+        .outerjoin(stu_sub, Resource.student_id == stu_sub.c.id)
+    )
     count_q = select(sa_func.count()).select_from(Resource)
 
     if student_id:
         q = q.where(Resource.student_id == student_id)
         count_q = count_q.where(Resource.student_id == student_id)
 
+    if search:
+        ilike = f"%{search}%"
+        q = q.where(Resource.title.ilike(ilike) | Resource.knowledge_point.ilike(ilike))
+        count_q = count_q.where(Resource.title.ilike(ilike) | Resource.knowledge_point.ilike(ilike))
+
     total = (await db.execute(count_q)).scalar() or 0
     result = await db.execute(
         q.order_by(Resource.created_at.desc())
         .offset((page - 1) * page_size).limit(page_size)
     )
-    rows = result.scalars().all()
+    rows = result.all()
 
     items = []
     for r in rows:
-        # 获取学生姓名
-        s_result = await db.execute(select(Student).where(Student.id == r.student_id))
-        s = s_result.scalar_one_or_none()
+        res_obj = r[0]  # Resource object
         items.append({
-            "id": str(r.id),
-            "student_id": str(r.student_id),
-            "student_name": s.name if s else "未知",
-            "title": r.title or "",
-            "knowledge_point": r.knowledge_point or "",
-            "resource_type": r.resource_type or "",
-            "is_favorited": r.is_favorited if r.is_favorited is not None else False,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "id": str(res_obj.id),
+            "student_id": str(res_obj.student_id),
+            "student_name": r.student_name,
+            "title": res_obj.title or "",
+            "knowledge_point": res_obj.knowledge_point or "",
+            "resource_type": res_obj.resource_type or "",
+            "is_favorited": res_obj.is_favorited if res_obj.is_favorited is not None else False,
+            "created_at": res_obj.created_at.isoformat() if res_obj.created_at else None,
         })
 
     return {"items": items, "total": total, "page": page, "page_size": page_size}
@@ -301,7 +362,12 @@ async def list_paths(
 ):
     _require_admin(user)
 
-    q = select(LearningPath)
+    stu_sub = select(Student.id, Student.name).subquery()
+
+    q = (
+        select(LearningPath, sa_func.coalesce(stu_sub.c.name, "未知").label("student_name"))
+        .outerjoin(stu_sub, LearningPath.student_id == stu_sub.c.id)
+    )
     count_q = select(sa_func.count()).select_from(LearningPath)
 
     if student_id:
@@ -313,25 +379,24 @@ async def list_paths(
         q.order_by(LearningPath.created_at.desc())
         .offset((page - 1) * page_size).limit(page_size)
     )
-    rows = result.scalars().all()
+    rows = result.all()
 
     items = []
     for r in rows:
-        s_result = await db.execute(select(Student).where(Student.id == r.student_id))
-        s = s_result.scalar_one_or_none()
-        nodes = r.nodes or []
-        edges = r.edges or []
+        path_obj = r[0]  # LearningPath object
+        nodes = path_obj.nodes or []
+        edges = path_obj.edges or []
         items.append({
-            "id": str(r.id),
-            "student_id": str(r.student_id),
-            "student_name": s.name if s else "未知",
-            "title": r.title or "",
-            "total_days": r.total_days or 0,
+            "id": str(path_obj.id),
+            "student_id": str(path_obj.student_id),
+            "student_name": r.student_name,
+            "title": path_obj.title or "",
+            "total_days": path_obj.total_days or 0,
             "node_count": len(nodes),
             "edge_count": len(edges),
             "nodes": nodes,
             "edges": edges,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "created_at": path_obj.created_at.isoformat() if path_obj.created_at else None,
         })
 
     return {"items": items, "total": total, "page": page, "page_size": page_size}
@@ -351,7 +416,21 @@ async def list_chats(
 ):
     _require_admin(user)
 
-    q = select(ChatSession)
+    stu_sub = select(Student.id, Student.name).subquery()
+    msg_sub = (
+        select(ChatMessage.session_id, sa_func.count().label("message_count"))
+        .group_by(ChatMessage.session_id)
+    ).subquery()
+
+    q = (
+        select(
+            ChatSession,
+            sa_func.coalesce(stu_sub.c.name, "未知").label("student_name"),
+            sa_func.coalesce(msg_sub.c.message_count, 0).label("message_count"),
+        )
+        .outerjoin(stu_sub, ChatSession.student_id == stu_sub.c.id)
+        .outerjoin(msg_sub, ChatSession.id == msg_sub.c.session_id)
+    )
     count_q = select(sa_func.count()).select_from(ChatSession)
 
     if student_id:
@@ -363,23 +442,18 @@ async def list_chats(
         q.order_by(ChatSession.created_at.desc())
         .offset((page - 1) * page_size).limit(page_size)
     )
-    rows = result.scalars().all()
+    rows = result.all()
 
     items = []
     for r in rows:
-        s_result = await db.execute(select(Student).where(Student.id == r.student_id))
-        s = s_result.scalar_one_or_none()
-        msg_count = (await db.execute(
-            select(sa_func.count()).select_from(ChatMessage)
-            .where(ChatMessage.session_id == r.id)
-        )).scalar() or 0
+        chat_obj = r[0]  # ChatSession object
         items.append({
-            "id": str(r.id),
-            "student_id": str(r.student_id),
-            "student_name": s.name if s else "未知",
-            "title": r.title or "",
-            "message_count": msg_count,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "id": str(chat_obj.id),
+            "student_id": str(chat_obj.student_id),
+            "student_name": r.student_name,
+            "title": chat_obj.title or "",
+            "message_count": r.message_count,
+            "created_at": chat_obj.created_at.isoformat() if chat_obj.created_at else None,
         })
 
     return {"items": items, "total": total, "page": page, "page_size": page_size}
@@ -405,7 +479,6 @@ async def get_chat_messages(
         content = r.content or ""
         # assistant 消息是 JSON，尝试解析
         if r.role == "assistant":
-            import json
             try:
                 parsed = json.loads(content)
                 if isinstance(parsed, dict):

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAdmin } from '@/lib/admin/context'
 import { AdminCheckbox, BatchDeleteBar, useSelection } from '@/lib/admin/components'
 import { adminApi, type AdminResource } from '@/lib/api'
@@ -33,22 +33,16 @@ export default function ResourcesPage() {
   const loadResources = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await adminApi.getResources(page, 20)
+      const data = await adminApi.getResources(page, 20, undefined, search || undefined)
       setList(data.items)
       setTotal(data.total)
     } catch { showToast('加载资源失败') }
     setLoading(false)
-  }, [page])
+  }, [page, search])
 
   useEffect(() => { loadResources() }, [loadResources])
 
-  const filtered = useMemo(() => {
-    if (!search) return list
-    const q = search.toLowerCase()
-    return list.filter((r) => r.title.toLowerCase().includes(q) || r.knowledge_point.toLowerCase().includes(q))
-  }, [list, search])
-
-  const sel = useSelection(filtered)
+  const sel = useSelection(list)
 
   const totalPages = Math.ceil(total / 20)
 
@@ -59,7 +53,7 @@ export default function ResourcesPage() {
           className="admin-si"
           placeholder="搜索资源标题..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(1) }}
         />
         <div style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>
           共 <b style={{ color: 'var(--ink)' }}>{total}</b> 条
@@ -87,7 +81,7 @@ export default function ResourcesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r) => {
+                {list.map((r) => {
                   const isSel = sel.selected.has(r.id)
                   return (
                     <tr key={r.id} className={isSel ? 'is-selected' : ''}>
@@ -113,7 +107,7 @@ export default function ResourcesPage() {
                     </tr>
                   )
                 })}
-                {filtered.length === 0 && !loading && (
+                {list.length === 0 && !loading && (
                   <tr><td colSpan={7} style={{ textAlign: 'center', padding: 20, color: 'var(--ink-2)' }}>暂无资源</td></tr>
                 )}
               </tbody>

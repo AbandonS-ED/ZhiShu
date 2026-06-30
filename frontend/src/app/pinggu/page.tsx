@@ -218,11 +218,34 @@ export default function PingguPage() {
   const displayWeeklyHours = useMemo(() => deriveWeeklyHours(evalReport), [evalReport])
   const displayTopicAccuracy = useMemo(() => deriveTopicAccuracy(evalReport), [evalReport])
   const [evalLoading, setEvalLoading] = useState(true)
+  const [lastGeneratedAt, setLastGeneratedAt] = useState<string | null>(null)
 
   // 记录页面停留时间
   usePageTimer('evaluation')
 
   useEffect(() => {
+    // 检查缓存：如果4小时内已有报告，直接使用缓存
+    const cacheKey = `eval_report_${getStudentId()}`
+    const cacheTimeKey = `eval_report_time_${getStudentId()}`
+    const cachedTime = localStorage.getItem(cacheTimeKey)
+    const cacheAge = cachedTime ? Date.now() - parseInt(cachedTime) : Infinity
+    const FOUR_HOURS = 4 * 60 * 60 * 1000
+
+    if (cacheAge < FOUR_HOURS) {
+      const cached = localStorage.getItem(cacheKey)
+      if (cached) {
+        try {
+          const r = JSON.parse(cached)
+          setEvalReport(r)
+          setCurrentScore(r.overall_score)
+          setLastGeneratedAt(cachedTime)
+          setEvalLoading(false)
+          return
+        } catch { /* ignore parse error */ }
+      }
+    }
+
+    // 缓存过期或不存在，请求新数据
     msgQueueRef.current = [...PROGRESS_MSGS]
 
     const processQueue = () => {
@@ -240,7 +263,15 @@ export default function PingguPage() {
     processQueue()
 
     evaluationApi.getReport(getStudentId())
-      .then((r) => { setEvalReport(r); setCurrentScore(r.overall_score) })
+      .then((r) => {
+        setEvalReport(r)
+        setCurrentScore(r.overall_score)
+        // 缓存报告
+        localStorage.setItem(cacheKey, JSON.stringify(r))
+        const now = Date.now().toString()
+        localStorage.setItem(cacheTimeKey, now)
+        setLastGeneratedAt(now)
+      })
       .catch(() => {})
       .finally(() => {
         setEvalLoading(false)
@@ -279,6 +310,13 @@ export default function PingguPage() {
       const r = await evaluationApi.regenerateReport(getStudentId())
       setEvalReport(r)
       setCurrentScore(r.overall_score)
+      // 更新缓存
+      const cacheKey = `eval_report_${getStudentId()}`
+      const cacheTimeKey = `eval_report_time_${getStudentId()}`
+      localStorage.setItem(cacheKey, JSON.stringify(r))
+      const now = Date.now().toString()
+      localStorage.setItem(cacheTimeKey, now)
+      setLastGeneratedAt(now)
       showToast('评估报告已重新生成')
     } catch (e: any) {
       showToast(`重新生成失败: ${e.message}`)
@@ -467,21 +505,27 @@ export default function PingguPage() {
         <div className="card">
           <div className="card-hd">
             <h3>评估报告</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {evalReport?.generated_at && (
-                <span className="tag tag-info" style={{ fontSize: 11 }}>
-                  {new Date(evalReport.generated_at).toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit' })} 生成
-                </span>
-              )}
-              <span className="tag tag-dark">AI 生成</span>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
               <button
-                className="btn btn-sm"
                 onClick={regenerateReport}
                 disabled={regenerating}
-                style={{ opacity: regenerating ? 0.6 : 1 }}
+                style={{
+                  padding: '8px 14px', background: 'rgba(99,102,241,0.15)', color: '#6366F1',
+                  border: '1px solid rgba(99,102,241,0.25)', borderRadius: 8, fontSize: 12,
+                  cursor: regenerating ? 'default' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  opacity: regenerating ? 0.6 : 1,
+                }}
               >
+                <Icon name="refresh" size={12} className={regenerating ? 'animate-spin' : ''} />
                 {regenerating ? '生成中...' : '重新生成'}
               </button>
+              {lastGeneratedAt && (
+                <span style={{ fontSize: 10, color: '#78716C', marginTop: 4, display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <Icon name="clock" size={10} />
+                  {new Date(parseInt(lastGeneratedAt)).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
             </div>
           </div>
           <div className="card-bd">

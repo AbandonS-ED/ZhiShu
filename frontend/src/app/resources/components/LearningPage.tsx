@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { resourceApi, evaluationApi } from '@/lib/api'
+import { resourceApi, evaluationApi, profileApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { markdownToHtml } from '@/lib/utils'
 import { usePhaseGeneration } from '../hooks/usePhaseGeneration'
@@ -83,6 +83,11 @@ export default function LearningPage({ knowledge_point }: { knowledge_point: str
         student_id: studentId,
         action: `${phase}_complete`,
         resource_type: 'resource_package',
+        knowledge_point: knowledge_point,
+      })
+      // 使用 AI Agent 分析学习行为并更新画像
+      await profileApi.analyzeBehavior('study', {
+        phase: phase,
         knowledge_point: knowledge_point,
       })
     } catch {}

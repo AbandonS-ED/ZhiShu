@@ -32,17 +32,31 @@ const ICONS = {
   bookOpen: 'M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2V3zm20 0h-6a4 4 0 00-4 4v14a3 3 0 013-3h7V3z',
   idea: 'M12 2a6 6 0 00-6 6c0 2.5 1.5 4.5 3 5.5V16h6v-2.5c1.5-1 3-3 3-5.5a6 6 0 00-6-6zM10 20h4',
   robot: 'M9 3h6v2h4a2 2 0 012 2v4a2 2 0 01-2 2h-1v6a2 2 0 01-2 2H8a2 2 0 01-2-2v-6H5a2 2 0 01-2-2V7a2 2 0 012-2h4V3zM8 10a1 1 0 100 2 1 1 0 000-2zm8 0a1 1 0 100 2 1 1 0 000-2zm-8 5c1.5 1.5 4.5 1.5 6 0',
+  // 新增图标
+  info: 'M12 2a10 10 0 100 20 10 10 0 000-20zm0 15v-4m0-4h.01',
+  trendingUp: 'M23 6l-9.5 9.5-5-5L1 18',
+  arrowRight: 'M5 12h14M12 5l7 7-7 7',
+  send: 'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z',
+  award: 'M12 15l-3.5 2 .67-3.89L6 9.11l3.92-.57L12 5l2.08 3.54 3.92.57-2.83 2.76.67 3.89z',
+  chevronRight: 'M9 18l6-6-6-6',
+  chevronDown: 'M6 9l6 6 6-6',
+  sparkles: 'M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z',
+  wrench: 'M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z',
+  checkCircle: 'M22 11.08V12a10 10 0 11-5.93-9.14',
+  xCircle: 'M12 2a10 10 0 100 20 10 10 0 000-20zm4 8l-4 4-4-4',
+  alertTriangle: 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zm0 12h.01M12 9v4',
 }
 
 export type IconName = keyof typeof ICONS
 
 interface IconProps {
-  name: IconName
+  name: IconName | string
   size?: number
   className?: string
+  style?: React.CSSProperties
 }
 
-export default function Icon({ name, size = 18, className = '' }: IconProps) {
+export default function Icon({ name, size = 18, className = '', style }: IconProps) {
   return (
     <svg
       width={size}
@@ -54,8 +68,9 @@ export default function Icon({ name, size = 18, className = '' }: IconProps) {
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
+      style={style}
     >
-      <path d={ICONS[name]} />
+      <path d={ICONS[name as IconName] || ''} />
     </svg>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { resourceApi, evaluationApi } from '@/lib/api'
+import { resourceApi, evaluationApi, profileApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { showToast } from '@/lib/utils'
 import RobotIcon from '@/components/RobotIcon'
@@ -317,6 +317,11 @@ export default function ResourcesPage() {
               action: 'generate',
               resource_type: 'resource',
               resource_id: String(data.resource_id || ''),
+              knowledge_point: String(data.knowledge_point || genInput.trim()),
+            }).catch(() => {})
+            // 使用 AI Agent 分析资源访问行为并更新画像
+            profileApi.analyzeBehavior('resource', {
+              resource_type: data.resource_type || 'document',
               knowledge_point: String(data.knowledge_point || genInput.trim()),
             }).catch(() => {})
           }

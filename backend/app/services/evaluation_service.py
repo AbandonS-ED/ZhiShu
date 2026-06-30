@@ -274,7 +274,7 @@ class EvaluationService:
 
         report_data = {
             "student_id": student_id,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now().isoformat(),  # 使用本地时间
             "summary": {
                 "total_resources": total_resources,
                 "total_exercises": total_exercises,

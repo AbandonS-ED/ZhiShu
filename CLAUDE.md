@@ -143,6 +143,11 @@ intent_recognition → task_planning → conditional_route
 Token: zhishu_admin_token (与学生端 zhishu_token 隔离)
 登录: /admin/login → 调用 /auth/login → 校验 role === 'admin' → 存 zhishu_admin_user
 题库 CRUD: admin_exercises.py 6 个端点 (列表/创建/批量导入/编辑/删除/知识点列表)
+管理端点: admin.py 10 个端点 (统计/趋势/用户管理/资源管理/路径管理/对话管理/Agent 监控)
+Agent 监控: agent_metrics.py 内存计数器 (threading.Lock 线程安全)
+并行查询: get_stats 用 asyncio.gather() 并行 10 个计数查询
+N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
+共享依赖: require_admin() 提取到 dependencies.py，admin.py + admin_exercises.py 复用
 ```
 
 ## 已知问题
@@ -163,6 +168,15 @@ Token: zhishu_admin_token (与学生端 zhishu_token 隔离)
 - ✅ 对话页刷新修复 (sessionId 持久化 + loadSession 渲染)
 - ✅ 骨架屏 loading (4 页面 shimmer 动画)
 - ✅ 评估报告 AI 化 + 预生成缓存 + 定时生成
+- ✅ 管理后台 API 增强 (10 端点 + Agent 监控 + 并行查询 + N+1 优化)
+- ✅ forEach async 批量操作修复 (users/page.tsx)
+- ✅ SQL 注入风险修复 (admin.py 改用 ORM 模型)
+- ✅ 图表 innerHTML 改为 React BarChart 组件
+- ✅ 搜索改为后端搜索 (resources/page.tsx)
+- ✅ 共享 require_admin 依赖提取
+- ✅ agent_metrics 线程安全 (threading.Lock)
+- ✅ dashboard 骨架屏 loading 状态
+- ✅ Agent 卡片样式优化 (响应式网格 + 文字截断)
 
 ### P2 — 清理项
 

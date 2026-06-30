@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 加载旋转动画 */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.loading-spinner {
+  border: 2px solid var(--ink-2);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    智枢 SmartHub · 全局样式（来自模板 7 页面合并）
    模板：D:/桌面/muban/{yibiaopan,huaxiang,zhiyuan,lujing,tiku,duihua,pinggu}.html
@@ -1372,6 +1383,7 @@ body.auth-mode .auth-root{min-height:100vh}
 .admin-sb .sb-it.on .ld{height:16px}
 .admin-sb .sb-it svg{width:16px;height:16px;flex-shrink:0;opacity:.5}
 .admin-sb .sb-it.on svg{opacity:.9}
+.admin-sb .sb-text{transition:opacity .2s}
 .admin-sb .sb-ft{padding:14px 18px;border-top:1px solid var(--line);display:flex;align-items:center;gap:9px}
 .admin-sb .sb-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
 .admin-sb .sb-nm{font-size:12px;color:var(--ink);font-weight:500}
@@ -1479,17 +1491,17 @@ body.auth-mode .auth-root{min-height:100vh}
 .admin-ch-l span{flex:1;text-align:center}
 
 /* Agent */
-.admin-ag-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
-.admin-ag-c{padding:14px;border:1px solid var(--line);border-radius:var(--r-sm);transition:all .2s}
+.admin-ag-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.admin-ag-c{padding:16px;border:1px solid var(--line);border-radius:var(--r-sm);transition:all .2s;min-width:0}
 .admin-ag-c:hover{box-shadow:var(--shadow-sm);border-color:var(--ink-4)}
-.admin-ag-t{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.admin-ag-ic{width:30px;height:30px;border-radius:var(--r-xs);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
-.admin-ag-nm{font-size:12px;font-weight:500;color:var(--ink)}
-.admin-ag-rl{font-size:10px;color:var(--ink-3)}
-.admin-ag-bg{margin-left:auto;font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:5px}
-.admin-ag-bar{height:3px;background:var(--bg-subtle);border-radius:2px;margin:6px 0;overflow:hidden}
+.admin-ag-t{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.admin-ag-ic{width:36px;height:36px;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0}
+.admin-ag-nm{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.admin-ag-rl{font-size:11px;color:var(--ink-3);margin-top:1px}
+.admin-ag-bg{margin-left:auto;font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;flex-shrink:0}
+.admin-ag-bar{height:4px;background:var(--bg-subtle);border-radius:2px;margin:8px 0;overflow:hidden}
 .admin-ag-fill{height:100%;border-radius:2px;transition:width .5s}
-.admin-ag-mt{display:flex;justify-content:space-between;font-size:10px;color:var(--ink-3)}
+.admin-ag-mt{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3);gap:8px}
 
 /* Toolbar */
 .admin-tb{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}

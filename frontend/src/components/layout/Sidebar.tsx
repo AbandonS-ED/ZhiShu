@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/stores/appStore'
+import { clearStudentIdCache } from '@/lib/student'
 
 type NavItem = {
   href: string
@@ -94,6 +95,15 @@ export default function Sidebar() {
     } catch {}
   }, [student, setStudent])
 
+  // 预加载关键页面
+  useEffect(() => {
+    router.prefetch('/duihua')
+    router.prefetch('/profile')
+    router.prefetch('/resources')
+    router.prefetch('/tiku')
+    router.prefetch('/pinggu')
+  }, [router])
+
   const userName = student?.name || student?.student_no || '未登录'
   const userAvatar = (userName).charAt(0) || '未'
   const userRole = [student?.major, student?.grade].filter(Boolean).join(' · ') || '智枢用户'
@@ -102,6 +112,7 @@ export default function Sidebar() {
     localStorage.removeItem('zhishu_token')
     localStorage.removeItem('zhishu_refresh_token')
     localStorage.removeItem('zhishu_student')
+    clearStudentIdCache() // 清除缓存
     router.push('/login')
   }
 

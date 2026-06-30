@@ -1,4 +1,5 @@
 """Agent 调用指标采集器（内存计数器，重启清零）"""
+import threading
 import time
 from collections import defaultdict
 
@@ -21,40 +22,44 @@ class AgentMetrics:
         self._data: dict[str, dict] = defaultdict(
             lambda: {"calls": 0, "errors": 0, "total_ms": 0.0}
         )
+        self._lock = threading.Lock()
 
     def record(self, agent_name: str, success: bool, duration_ms: float):
-        d = self._data[agent_name]
-        d["calls"] += 1
-        if not success:
-            d["errors"] += 1
-        d["total_ms"] += duration_ms
+        with self._lock:
+            d = self._data[agent_name]
+            d["calls"] += 1
+            if not success:
+                d["errors"] += 1
+            d["total_ms"] += duration_ms
 
     def get_all(self) -> list[dict]:
-        result = []
-        for key, meta in self._AGENT_META.items():
-            d = self._data.get(key)
-            calls = d["calls"] if d else 0
-            errors = d["errors"] if d else 0
-            total_ms = d["total_ms"] if d else 0.0
-            result.append({
-                "name": meta["name"],
-                "role": meta["role"],
-                "calls": calls,
-                "errors": errors,
-                "error_rate": round(errors / calls * 100, 1) if calls else 0.0,
-                "avg_ms": round(total_ms / calls, 1) if calls else 0.0,
-            })
-        return result
+        with self._lock:
+            result = []
+            for key, meta in self._AGENT_META.items():
+                d = self._data.get(key)
+                calls = d["calls"] if d else 0
+                errors = d["errors"] if d else 0
+                total_ms = d["total_ms"] if d else 0.0
+                result.append({
+                    "name": meta["name"],
+                    "role": meta["role"],
+                    "calls": calls,
+                    "errors": errors,
+                    "error_rate": round(errors / calls * 100, 1) if calls else 0.0,
+                    "avg_ms": round(total_ms / calls, 1) if calls else 0.0,
+                })
+            return result
 
     def get_summary(self) -> dict:
-        total_calls = sum(d["calls"] for d in self._data.values())
-        total_errors = sum(d["errors"] for d in self._data.values())
-        return {
-            "total_agents": len(self._AGENT_META),
-            "total_calls": total_calls,
-            "total_errors": total_errors,
-            "error_rate": round(total_errors / total_calls * 100, 1) if total_calls else 0.0,
-        }
+        with self._lock:
+            total_calls = sum(d["calls"] for d in self._data.values())
+            total_errors = sum(d["errors"] for d in self._data.values())
+            return {
+                "total_agents": len(self._AGENT_META),
+                "total_calls": total_calls,
+                "total_errors": total_errors,
+                "error_rate": round(total_errors / total_calls * 100, 1) if total_calls else 0.0,
+            }
 
 
 agent_metrics = AgentMetrics()

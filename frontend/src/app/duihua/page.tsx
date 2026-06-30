@@ -5,6 +5,7 @@ import { chatApi, profileApi, evaluationApi, resourceApi, type StudentProfile } 
 import { getStudentId } from '@/lib/student'
 import { escapeHtml, markdownToHtml, extractAnswer } from '@/lib/utils'
 import { usePageTimer } from '@/hooks/usePageTimer'
+import Icon from '@/components/Icon'
 
 // Mermaid 渲染组件（客户端动态加载）
 let mermaid: any = null
@@ -79,11 +80,14 @@ export default function DuihuaPage() {
   const [profile, setProfile] = useState<StudentProfile | null>(null)
   const [genResources, setGenResources] = useState<GenResource[]>([])
   const [dbResources, setDbResources] = useState<Array<{ resource_id: string; title: string; knowledge_point: string; resource_type: string; created_at: string }>>([])
+  const [suggestions, setSuggestions] = useState<Array<{ text: string; tag: string; tagClass: string; reason: string }>>([])
+  const [loadingSuggestions, setLoadingSuggestions] = useState(true)
 
   const msgsRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<(() => void) | null>(null)
   const studentId = getStudentId()
   const loadedSessionRef = useRef(false)
+  const allSuggestionsRef = useRef<Array<{ text: string; tag: string; tagClass: string; reason: string }>>([])
 
   // 记录页面停留时间
   usePageTimer('chat')
@@ -100,30 +104,63 @@ export default function DuihuaPage() {
     }
   }, [messages])
 
-  // 加载会话列表 + 自动恢复上次会话
+  // 合并数据获取：会话列表 + 画像 + 资源列表
   useEffect(() => {
-    chatApi.getSessions(studentId).then((list) => {
-      setSessions(list)
-      // 自动恢复上次会话
-      if (!loadedSessionRef.current) {
-        loadedSessionRef.current = true
-        const savedSid = localStorage.getItem(SESSION_STORAGE_KEY)
-        if (savedSid && list.some((s) => s.id === savedSid)) {
-          loadSession(savedSid)
+    const loadData = async () => {
+      try {
+        const [sessions, profile, resources] = await Promise.all([
+          chatApi.getSessions(studentId),
+          profileApi.getMe(),
+          resourceApi.list(studentId)
+        ])
+        
+        setSessions(sessions)
+        setProfile(profile)
+        setDbResources(resources)
+        
+        // 自动恢复上次会话
+        if (!loadedSessionRef.current) {
+          loadedSessionRef.current = true
+          const savedSid = localStorage.getItem(SESSION_STORAGE_KEY)
+          if (savedSid && sessions.some((s) => s.id === savedSid)) {
+            loadSession(savedSid)
+          }
         }
+      } catch (error) {
+        console.error('Failed to load data:', error)
       }
-    }).catch(() => {})
+    }
+    loadData()
   }, [studentId])
 
-  // 加载画像（右侧知识点）
-  useEffect(() => {
-    profileApi.getMe().then(setProfile).catch(() => {})
-  }, [studentId])
+  // 加载推荐问题（API）——可手动重调（"换一批"按钮）
+  const loadSuggestions = useCallback(async (shuffle = false) => {
+    setLoadingSuggestions(true)
+    try {
+      // 如果是换一批且已有候选问题，从候选中随机选择
+      if (shuffle && allSuggestionsRef.current.length > 0) {
+        const shuffled = [...allSuggestionsRef.current].sort(() => Math.random() - 0.5)
+        setSuggestions(shuffled.slice(0, 4))
+        setLoadingSuggestions(false)
+        return
+      }
+      
+      const res = await chatApi.recommendQuestions(sessionId ?? undefined, 10) // 多获取一些候选
+      allSuggestionsRef.current = res.questions || []
+      
+      // 随机选择 4 个
+      const shuffled = [...allSuggestionsRef.current].sort(() => Math.random() - 0.5)
+      setSuggestions(shuffled.slice(0, 4))
+    } catch {
+      setSuggestions([])
+    } finally {
+      setLoadingSuggestions(false)
+    }
+  }, [sessionId])
 
-  // 加载资源列表（右侧已生成资源）
   useEffect(() => {
-    resourceApi.list(studentId).then(setDbResources).catch(() => {})
-  }, [studentId])
+    loadSuggestions()
+  }, [loadSuggestions])
 
   // 切换会话时加载历史消息
   const loadSession = useCallback(async (sid: string) => {
@@ -147,11 +184,15 @@ export default function DuihuaPage() {
             } else if (data.type === 'exercise' || inner.exercises) {
               // exercise 意图：显示题目列表 + 跳转链接
               const list = inner.exercises || []
-              const jumpLink = inner.jump_link || ''
+              let jumpLink = inner.jump_link || ''
+              if (jumpLink) {
+                jumpLink = jumpLink.replace(/\[([^\]]+)\]\(([^)]+)\)/, '<a href="$2" style="color:var(--brand);text-decoration:underline;font-weight:600">$1</a>')
+              }
               content = `<p>📝 为你生成了 <strong>${list.length}</strong> 道练习题</p>`
               if (jumpLink) {
                 content += `<p style="margin-top:12px;padding:10px;background:var(--brand-soft);border-radius:6px;border:1px solid var(--brand)">${jumpLink}</p>`
               }
+              return { role: m.role as 'user' | 'assistant', content, rendered: true }
             } else if (data.type === 'document' || inner.knowledge) {
               // document 意图：显示知识内容
               content = inner.knowledge || JSON.stringify(inner)
@@ -222,6 +263,7 @@ export default function DuihuaPage() {
     let resultData: any = null
     let streamContent = ''
     let isExerciseIntent = false
+    let isStructuredResult = false
 
     abortRef.current = chatApi.stream(
       studentId,
@@ -240,8 +282,8 @@ export default function DuihuaPage() {
         // 逐 token 追加到当前 assistant 消息（存原始 markdown，显示时再渲染）
         if (e.type === 'token' && e.content) {
           streamContent += e.content
-          // exercise 意图在流式阶段不显示内容，只在完成后显示
-          if (!isExerciseIntent) {
+          // exercise/document 意图在流式阶段不显示内容，只在完成后显示
+          if (!isExerciseIntent && !isStructuredResult) {
             setMessages((prev) => {
               const arr = [...prev]
               arr[arr.length - 1] = { role: 'assistant', content: streamContent }
@@ -263,6 +305,16 @@ export default function DuihuaPage() {
               return arr
             })
           }
+          // 检测是否为 document 意图，清空流式显示的原始 JSON
+          if (resultData?.type === 'document' || resultData?.data?.knowledge) {
+            isStructuredResult = true
+            streamContent = ''
+            setMessages((prev) => {
+              const arr = [...prev]
+              arr[arr.length - 1] = { role: 'assistant', content: '' }
+              return arr
+            })
+          }
         }
 
         if (e.type === 'done' || e.type === 'error') {
@@ -274,6 +326,14 @@ export default function DuihuaPage() {
             resource_type: 'chat',
             knowledge_point: userMsg,
           }).catch(() => {})
+          
+          // 使用 AI Agent 分析对话行为并更新画像
+          if (e.type === 'done' && (streamContent || isStructuredResult)) {
+            profileApi.analyzeBehavior('chat', {
+              message: userMsg,
+              response_length: streamContent.length,
+            }).catch(() => {})
+          }
           if (e.type === 'error') {
             setMessages((prev) => {
               const arr = [...prev]
@@ -287,8 +347,12 @@ export default function DuihuaPage() {
             // exercise 意图：只显示题目列表 + 跳转链接，清空之前的流式内容
             if (resultData.type === 'exercise' || data.exercises) {
               const list = data.exercises || []
+              let jl = data.jump_link || ''
+              if (jl) {
+                jl = jl.replace(/\[([^\]]+)\]\(([^)]+)\)/, '<a href="$2" style="color:var(--brand);text-decoration:underline;font-weight:600">$1</a>')
+              }
               const renderedHtml = `<p>📝 为你生成了 <strong>${list.length}</strong> 道练习题</p>` +
-                (data.jump_link ? `<p style="margin-top:12px;padding:10px;background:var(--brand-soft);border-radius:6px;border:1px solid var(--brand)">${markdownToHtml(data.jump_link)}</p>` : '')
+                (jl ? `<p style="margin-top:12px;padding:10px;background:var(--brand-soft);border-radius:6px;border:1px solid var(--brand)">${jl}</p>` : '')
               setMessages((prev) => {
                 const arr = [...prev]
                 arr[arr.length - 1] = { role: 'assistant', content: renderedHtml, rendered: true }
@@ -296,26 +360,25 @@ export default function DuihuaPage() {
               })
               setGenResources((prev) => [...prev, { name: `${userMsg} · 练习题`, status: 'done' }])
             }
+            // document 意图：显示知识内容（结构化数据，不依赖流式内容）
+            else if (resultData.type === 'document' || data.knowledge) {
+              const html = `<div>${markdownToHtml(data.knowledge || JSON.stringify(data))}</div>`
+              setMessages((prev) => {
+                const arr = [...prev]
+                arr[arr.length - 1] = { role: 'assistant', content: html, rendered: true }
+                return arr
+              })
+              setGenResources((prev) => [...prev, { name: `${userMsg} · 文档`, status: 'done' }])
+              resourceApi.saveFromChat(studentId, `${userMsg} 学习材料`, 'knowledge', { knowledge: data.knowledge || '' }, userMsg)
+                .then(() => resourceApi.list(studentId).then(setDbResources))
+                .catch(() => {})
+            }
             // 如果没有 token 内容（非流式 Agent），渲染完整结果
             else if (!streamContent) {
               let html = ''
-              if (resultData.type === 'exercise' || data.exercises) {
-                const list = data.exercises || []
-                html = `<p>📝 为你生成了 <strong>${list.length}</strong> 道题：</p><ul>${list.map((ex: any) => `<li>${markdownToHtml(ex.question || '')}</li>`).join('')}</ul>`
-                if (data.jump_link) {
-                  html += `<p style="margin-top:8px">${markdownToHtml(data.jump_link)}</p>`
-                }
-                setGenResources((prev) => [...prev, { name: `${userMsg} · 练习题`, status: 'done' }])
-              } else if (resultData.type === 'tutor' || resultData.type === 'chat' || data.answer) {
+              if (resultData.type === 'tutor' || resultData.type === 'chat' || data.answer) {
                 const { answer: ans, suggestion: sug } = extractAnswer(data)
                 html = `<div>${markdownToHtml(ans)}${sug ? `<div style="margin-top:8px;padding:8px;background:#f0f8e8;border-radius:6px;font-size:12px">💡 ${markdownToHtml(sug)}</div>` : ''}</div>`
-              } else if (resultData.type === 'document' || data.knowledge) {
-                html = `<div>${markdownToHtml(data.knowledge || JSON.stringify(data))}</div>`
-                setGenResources((prev) => [...prev, { name: `${userMsg} · 文档`, status: 'done' }])
-                // 自动保存到资源中心
-                resourceApi.saveFromChat(studentId, `${userMsg} 学习材料`, 'knowledge', { knowledge: data.knowledge || '' }, userMsg)
-                  .then(() => resourceApi.list(studentId).then(setDbResources))
-                  .catch(() => {})
               } else if (resultData.type === 'mindmap') {
                 html = `<div><p>🧠 思维导图已生成：</p><pre style="background:#f5f5f5;padding:8px;border-radius:4px;font-size:12px;overflow-x:auto">${data.mermaid || data.code || ''}</pre></div>`
                 setGenResources((prev) => [...prev, { name: `${userMsg} · 思维导图`, status: 'done' }])
@@ -375,7 +438,7 @@ export default function DuihuaPage() {
     }
   }
 
-  // 从画像提取知识点列表和薄弱环节
+  // 从画像提取知识点列表（右侧当前上下文用）
   const knowledgePoints: string[] = profile?.dimensions
     ? Object.entries(profile.dimensions)
         .filter(([, v]) => v && typeof v === 'object' && (v as { score?: number }).score !== undefined)
@@ -390,24 +453,44 @@ export default function DuihuaPage() {
           .map(([k]) => k)
       : []
 
-  // 根据画像薄弱环节动态生成推荐问题
-  const dynamicSuggestions = (() => {
-    const base = [
-      { text: '讲解 A* 搜索算法的原理', tag: '搜索', tagClass: 'tag-info' },
-      { text: 'CNN 卷积神经网络原理', tag: 'CV', tagClass: 'tag-green' },
-      { text: '监督学习 vs 无监督学习', tag: 'ML', tagClass: 'tag-dark' },
-      { text: '出 5 道搜索算法练习题', tag: '练习', tagClass: 'tag-warm' },
-    ]
-    if (weakTopics.length > 0) {
-      const weakSuggestions = weakTopics.slice(0, 2).map((t) => ({
-        text: `讲解${t}的核心概念`,
-        tag: '薄弱',
-        tagClass: 'tag-warm',
-      }))
-      return [...weakSuggestions, ...base.slice(0, 4 - weakSuggestions.length)]
+  // 推荐问题渲染
+  const renderSuggestions = () => {
+    if (loadingSuggestions) {
+      return (
+        <div className="sc-bd" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 0', gap: '8px', color: 'var(--ink-3)' }}>
+          <div className="loading-spinner" style={{ width: 16, height: 16 }}></div>
+          <span style={{ fontSize: 12 }}>正在生成推荐...</span>
+        </div>
+      )
     }
-    return base
-  })()
+    if (suggestions.length === 0) {
+      return (
+        <div className="sc-bd" style={{ padding: '20px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12 }}>
+          暂无推荐，开始对话后刷新
+        </div>
+      )
+    }
+    return (
+      <div className="sc-bd">
+        {suggestions.map((s, i) => (
+          <div key={i} className="suggest" onClick={() => setInput(s.text)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span className="sug-text">{s.text}</span>
+              <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.reason}</div>
+            </div>
+            <span className={`sug-tag ${s.tagClass}`}>{s.tag}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // 从会话列表获取当前会话标题（loadSession 用）
+  const activeSession = sessions.find(s => s.id === sessionId)
 
   return (
     <div className="chat-page" style={{ padding: '16px 20px', height: 'calc(100vh - var(--header-h))' }}>
@@ -586,9 +669,9 @@ export default function DuihuaPage() {
             )
           })}
           {streaming && status && (
-            <div className="status-bar">
-              <div className="spinner" style={{ display: 'inline-block', width: 12, height: 12, marginRight: 6 }}></div>
-              {status}
+            <div className="gen-loading">
+              <div className="gen-spinner" />
+              <span>{status}</span>
             </div>
           )}
         </div>
@@ -618,20 +701,23 @@ export default function DuihuaPage() {
         <div className="side-card">
           <div className="sc-hd">
             <h3>推荐问题</h3>
-            <span className="tag tag-warm">为你推荐</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="tag tag-warm">为你推荐</span>
+              <button
+                className="btn btn-ghost"
+                onClick={() => loadSuggestions(true)}
+                disabled={loadingSuggestions}
+                title="换一批推荐问题"
+              >
+                {loadingSuggestions ? (
+                  <><Icon name="refresh" size={14} className="animate-spin" /> 换中…</>
+                ) : (
+                  <><Icon name="refresh" size={14} /> 换一批</>
+                )}
+              </button>
+            </div>
           </div>
-          <div className="sc-bd">
-            {dynamicSuggestions.map((s, i) => (
-              <div key={i} className="suggest" onClick={() => setInput(s.text)}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-                <span className="sug-text">{s.text}</span>
-                <span className={`sug-tag ${s.tagClass}`}>{s.tag}</span>
-              </div>
-            ))}
-          </div>
+          {renderSuggestions()}
         </div>
 
         {/* 当前上下文 */}

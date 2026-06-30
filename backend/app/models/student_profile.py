@@ -16,5 +16,6 @@ class StudentProfile(Base):
     background = Column(JSONB, nullable=False, server_default='{}')
     assessment_status = Column(String(20), nullable=False, server_default="pending")
     assess_session_id = Column(UUID(as_uuid=True), nullable=True)
+    last_analyzed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
