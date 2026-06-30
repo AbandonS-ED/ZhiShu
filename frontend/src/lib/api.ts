@@ -673,6 +673,12 @@ export interface AdminAgent {
   avg_ms: number
 }
 
+export interface AdminDocument {
+  id: string
+  source_file: string
+  chunk_count: number
+}
+
 export const adminApi = {
   getStats: () => adminRequest<AdminStats>('/admin/stats'),
   getTrends: (days = 7) => adminRequest<AdminTrends>(`/admin/trends?days=${days}`),
@@ -705,4 +711,9 @@ export const adminApi = {
     adminRequest<{ items: AdminChatMessage[] }>(`/admin/chats/${sessionId}/messages`),
   getAgents: () =>
     adminRequest<{ agents: AdminAgent[]; system: { cpu_percent: number; memory_mb: number } }>('/admin/agents'),
+  getDocuments: (page = 1, pageSize = 20, search?: string) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+    if (search) params.set('search', search)
+    return adminRequest<{ items: AdminDocument[]; total: number; page: number; page_size: number }>(`/admin/documents?${params}`)
+  },
 }

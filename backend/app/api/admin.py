@@ -502,6 +502,50 @@ async def get_chat_messages(
 # Agent 监控
 # ====================================================================
 
+# ====================================================================
+# 知识库文档管理
+# ====================================================================
+
+@router.get("/documents")
+async def list_documents(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    search: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    _require_admin(user)
+
+    # 按 source_file 分组统计
+    q = (
+        select(
+            sa_func.coalesce(DocumentChunk.source_file, "未知来源").label("source_file"),
+            sa_func.count().label("chunk_count"),
+        )
+        .group_by(DocumentChunk.source_file)
+    )
+    count_q = select(sa_func.count(sa_func.distinct(DocumentChunk.source_file)))
+
+    if search:
+        ilike = f"%{search}%"
+        q = q.where(DocumentChunk.source_file.ilike(ilike))
+        count_q = count_q.where(DocumentChunk.source_file.ilike(ilike))
+
+    total = (await db.execute(count_q)).scalar() or 0
+    result = await db.execute(q.order_by(sa_func.count().desc()).offset((page - 1) * page_size).limit(page_size))
+    rows = result.all()
+
+    items = []
+    for i, r in enumerate(rows):
+        items.append({
+            "id": f"doc-{i}",
+            "source_file": r.source_file,
+            "chunk_count": r.chunk_count,
+        })
+
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
 @router.get("/agents")
 async def get_agents(
     user: Student = Depends(get_current_user),

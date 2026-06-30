@@ -54,13 +54,24 @@ $backendProc = Start-Process -FilePath $backendExe `
 
 Write-Host "  后端 PID: $($backendProc.Id)" -ForegroundColor Green
 
-# 2. 启动前端
+# 2. 启动前端 (直接调 next CLI,绕过 cmd /c npm wrapper,让 Start-Process 拿到 next-server 真实 PID)
 Write-Host "[2/4] 启动前端 (端口 3000)..." -ForegroundColor Cyan
 $frontendLog = Join-Path $LogDir 'frontend.log'
 $frontendErr = Join-Path $LogDir 'frontend.err.log'
 
-$frontendProc = Start-Process -FilePath 'cmd.exe' `
-    -ArgumentList '/c','npm run dev' `
+# next CLI 入口:优先用项目本地 node_modules/next/dist/bin/next,避免全局 next 不一致
+$nextExe = Join-Path $FrontendDir 'node_modules\next\dist\bin\next'
+if (-not (Test-Path $nextExe)) {
+    # 兜底走 npx
+    $nextExe = 'npx.cmd'
+    $nextArgs = @('--no-install','next','dev')
+} else {
+    $nextExe = 'node.exe'
+    $nextArgs = @('node_modules\next\dist\bin\next','dev')
+}
+
+$frontendProc = Start-Process -FilePath $nextExe `
+    -ArgumentList $nextArgs `
     -WorkingDirectory $FrontendDir `
     -RedirectStandardOutput $frontendLog `
     -RedirectStandardError $frontendErr `
@@ -79,10 +90,11 @@ Write-Host "  前端 PID: $($frontendProc.Id)" -ForegroundColor Green
 Write-Host "[3/4] 等待服务就绪..." -ForegroundColor Gray
 $backendOK = $false
 $frontendOK = $false
-for ($i = 1; $i -le 30; $i++) {
+# 后端 60s (startup 期间 scheduled_analysis 后台任务会偶发抢占 health 请求,需要更长等待窗口)
+for ($i = 1; $i -le 60; $i++) {
     Start-Sleep -Seconds 1
     try {
-        $r = Invoke-WebRequest -Uri 'http://localhost:8001/health' -UseBasicParsing -TimeoutSec 2
+        $r = Invoke-WebRequest -Uri 'http://localhost:8001/health' -UseBasicParsing -TimeoutSec 3
         if ($r.Content -like '*healthy*') { $backendOK = $true; break }
     } catch {}
 }
@@ -90,7 +102,7 @@ for ($i = 1; $i -le 30; $i++) {
 for ($i = 1; $i -le 60; $i++) {
     Start-Sleep -Seconds 1
     try {
-        $r = Invoke-WebRequest -Uri 'http://localhost:3000' -UseBasicParsing -TimeoutSec 2
+        $r = Invoke-WebRequest -Uri 'http://localhost:3000' -UseBasicParsing -TimeoutSec 3
         if ($r.StatusCode -eq 200) { $frontendOK = $true; break }
     } catch {}
 }

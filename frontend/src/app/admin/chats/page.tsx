@@ -1,161 +1,139 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useAdmin } from '@/lib/admin/context'
 import { AdminCheckbox, BatchDeleteBar, useSelection } from '@/lib/admin/components'
-
-interface ChatMsg {
-  r: 'u' | 'a'
-  x: string
-}
-
-interface Chat {
-  id: string
-  u: string
-  t: string
-  ct: number
-  tm: string
-  msg: ChatMsg[]
-}
-
-const INIT_CH: Chat[] = [
-  {
-    id: 'c1',
-    u: '张三',
-    t: 'ML 学习对话',
-    ct: 12,
-    tm: '06-11',
-    msg: [
-      { r: 'u', x: '什么是 Transformer？' },
-      { r: 'a', x: 'Transformer 是一种基于自注意力机制的深度学习架构，由 Vaswani 等人在 2017 年提出。' },
-      { r: 'u', x: '它和 RNN 有什么区别？' },
-      { r: 'a', x: '主要区别：1) Transformer 可以并行计算；2) 直接建模任意位置间的关系。' },
-    ],
-  },
-  {
-    id: 'c2',
-    u: '李四',
-    t: '路径规划讨论',
-    ct: 5,
-    tm: '06-10',
-    msg: [
-      { r: 'u', x: '帮我规划一个深度学习的学习路径' },
-      { r: 'a', x: '好的，基于你的学习画像，我为你规划了 21 天的学习路径...' },
-    ],
-  },
-  {
-    id: 'c3',
-    u: '赵六',
-    t: 'CNN 问题咨询',
-    ct: 8,
-    tm: '06-10',
-    msg: [
-      { r: 'u', x: 'CNN 的卷积操作是什么？' },
-      { r: 'a', x: '卷积操作通过卷积核在输入特征图上滑动来提取局部特征。' },
-    ],
-  },
-]
+import { adminApi, type AdminChat, type AdminChatMessage } from '@/lib/api'
 
 export default function ChatsPage() {
   const { showToast } = useAdmin()
-  const [list, setList] = useState<Chat[]>(INIT_CH)
-  const [search, setSearch] = useState('')
-  const [modal, setModal] = useState<{ open: boolean; item: Chat | null }>({
+  const [list, setList] = useState<AdminChat[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal] = useState<{ open: boolean; item: AdminChat | null }>({
     open: false,
     item: null,
   })
+  const [messages, setMessages] = useState<AdminChatMessage[]>([])
+  const [msgLoading, setMsgLoading] = useState(false)
 
-  const filtered = useMemo(() => {
-    let r = list
-    if (search) {
-      const q = search.toLowerCase()
-      r = r.filter((x) => x.u.toLowerCase().includes(q) || x.t.toLowerCase().includes(q))
+  async function load(p = 1) {
+    setLoading(true)
+    try {
+      const res = await adminApi.getChats(p, 20)
+      setList(res.items)
+      setTotal(res.total)
+      setPage(res.page)
+    } catch {
+      showToast('加载失败')
+    } finally {
+      setLoading(false)
     }
-    return r
-  }, [list, search])
+  }
 
-  const sel = useSelection(filtered)
+  useEffect(() => { load() }, [])
 
-  function batchDelete() {
+  const sel = useSelection(list)
+
+  async function openChat(chat: AdminChat) {
+    setModal({ open: true, item: chat })
+    setMsgLoading(true)
+    try {
+      const res = await adminApi.getChatMessages(chat.id)
+      setMessages(res.items)
+    } catch {
+      setMessages([])
+    } finally {
+      setMsgLoading(false)
+    }
+  }
+
+  async function batchDelete() {
     if (sel.selectedCount === 0) return
-    if (typeof window !== 'undefined' && !window.confirm(`确认删除选中的 ${sel.selectedCount} 个会话？`)) return
-    const ids = Array.from(sel.selected)
-    setList((prev) => prev.filter((x) => !ids.includes(x.id)))
+    if (!window.confirm(`确认删除选中的 ${sel.selectedCount} 个会话？`)) return
+    showToast('后端暂不支持删除会话')
     sel.clear()
-    showToast(`已批量删除 ${ids.length} 个会话`)
   }
 
   return (
     <div className="admin-pnl vis">
       <div className="admin-tb">
-        <input
-          className="admin-si"
-          placeholder="搜索用户..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
         <div style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>
-          共 <b style={{ color: 'var(--ink)' }}>{filtered.length}</b> 条会话
+          共 <b style={{ color: 'var(--ink)' }}>{total}</b> 条会话
         </div>
       </div>
       <BatchDeleteBar
         selectedCount={sel.selectedCount}
-        totalCount={filtered.length}
+        totalCount={list.length}
         onClear={sel.clear}
         onDelete={batchDelete}
         itemLabel="个会话"
       />
       <div className="admin-cd">
         <div className="admin-cd-b" style={{ padding: 0 }}>
-          <div className="admin-tw">
-            <table>
-              <thead>
-                <tr>
-                  <th className="admin-cb-th">
-                    <AdminCheckbox
-                      checked={sel.allSelected}
-                      indeterminate={sel.indeterminate}
-                      onChange={sel.toggleAll}
-                      ariaLabel="全选"
-                    />
-                  </th>
-                  <th>用户</th>
-                  <th>标题</th>
-                  <th>消息数</th>
-                  <th>时间</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((c) => {
-                  const isSel = sel.selected.has(c.id)
-                  return (
-                    <tr key={c.id} className={isSel ? 'is-selected' : ''}>
-                      <td className="admin-cb-td">
-                        <AdminCheckbox
-                          checked={isSel}
-                          onChange={() => sel.toggleOne(c.id)}
-                          ariaLabel={`选择 ${c.t}`}
-                        />
-                      </td>
-                      <td style={{ fontWeight: 500 }}>{c.u}</td>
-                    <td>{c.t}</td>
-                    <td>{c.ct}</td>
-                    <td style={{ fontSize: 11, color: 'var(--ink-3)' }}>{c.tm}</td>
-                    <td>
-                      <button
-                        className="admin-btn admin-btn-sm"
-                        onClick={() => setModal({ open: true, item: c })}
-                      >
-                        查看对话
-                      </button>
-                    </td>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--ink-3)' }}>加载中...</div>
+          ) : (
+            <div className="admin-tw">
+              <table>
+                <thead>
+                  <tr>
+                    <th className="admin-cb-th">
+                      <AdminCheckbox
+                        checked={sel.allSelected}
+                        indeterminate={sel.indeterminate}
+                        onChange={sel.toggleAll}
+                        ariaLabel="全选"
+                      />
+                    </th>
+                    <th>用户</th>
+                    <th>标题</th>
+                    <th>消息数</th>
+                    <th>时间</th>
+                    <th>操作</th>
                   </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {list.map((c) => {
+                    const isSel = sel.selected.has(c.id)
+                    return (
+                      <tr key={c.id} className={isSel ? 'is-selected' : ''}>
+                        <td className="admin-cb-td">
+                          <AdminCheckbox
+                            checked={isSel}
+                            onChange={() => sel.toggleOne(c.id)}
+                            ariaLabel={`选择 ${c.title}`}
+                          />
+                        </td>
+                        <td style={{ fontWeight: 500 }}>{c.student_name}</td>
+                        <td>{c.title || '(无标题)'}</td>
+                        <td>{c.message_count}</td>
+                        <td style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                          {c.created_at ? new Date(c.created_at).toLocaleDateString() : '-'}
+                        </td>
+                        <td>
+                          <button
+                            className="admin-btn admin-btn-sm"
+                            onClick={() => openChat(c)}
+                          >
+                            查看对话
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {total > 20 && (
+            <div style={{ padding: '12px 16px', display: 'flex', justifyContent: 'center', gap: 8 }}>
+              <button className="admin-btn admin-btn-sm" disabled={page <= 1} onClick={() => load(page - 1)}>上一页</button>
+              <span style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: '28px' }}>第 {page} 页</span>
+              <button className="admin-btn admin-btn-sm" disabled={list.length < 20} onClick={() => load(page + 1)}>下一页</button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -168,7 +146,7 @@ export default function ChatsPage() {
         >
           <div className="admin-md">
             <div className="admin-md-h">
-              <h3>对话: {modal.item.t}</h3>
+              <h3>对话: {modal.item.title || '(无标题)'}</h3>
               <button
                 className="admin-md-x"
                 onClick={() => setModal({ open: false, item: null })}
@@ -179,22 +157,28 @@ export default function ChatsPage() {
             <div className="admin-md-body">
               <div className="admin-md-r" style={{ marginBottom: 16 }}>
                 <span className="ml">用户</span>
-                <span className="mv">{modal.item.u}</span>
+                <span className="mv">{modal.item.student_name}</span>
               </div>
               <div className="admin-cht-m">
-                {modal.item.msg.map((m, i) => {
-                  const cls = m.r === 'u' ? 'u' : 'a'
-                  const av = { background: m.r === 'u' ? 'var(--warm-soft)' : 'var(--info-soft)', color: m.r === 'u' ? 'var(--warm)' : 'var(--info)' }
-                  const ico = m.r === 'u' ? 'U' : 'A'
-                  return (
-                    <div key={i} className={`admin-cht-msg ${cls}`}>
-                      <div className="admin-cht-av" style={av}>
-                        {ico}
+                {msgLoading ? (
+                  <div style={{ padding: 20, textAlign: 'center', color: 'var(--ink-3)' }}>加载中...</div>
+                ) : messages.length === 0 ? (
+                  <div style={{ padding: 20, textAlign: 'center', color: 'var(--ink-3)' }}>暂无消息</div>
+                ) : (
+                  messages.map((m) => {
+                    const cls = m.role === 'user' ? 'u' : 'a'
+                    const av = { background: m.role === 'user' ? 'var(--warm-soft)' : 'var(--info-soft)', color: m.role === 'user' ? 'var(--warm)' : 'var(--info)' }
+                    const ico = m.role === 'user' ? 'U' : 'A'
+                    return (
+                      <div key={m.id} className={`admin-cht-msg ${cls}`}>
+                        <div className="admin-cht-av" style={av}>
+                          {ico}
+                        </div>
+                        <div className="admin-cht-bl">{m.content}</div>
                       </div>
-                      <div className="admin-cht-bl">{m.x}</div>
-                    </div>
-                  )
-                })}
+                    )
+                  })
+                )}
               </div>
             </div>
             <div className="admin-md-ft">
