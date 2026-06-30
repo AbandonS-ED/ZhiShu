@@ -1,5 +1,7 @@
 """Auth API — 登录 / 注册 / 查询 / 更新用户"""
 import uuid
+import random
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -14,6 +16,10 @@ from app.core.security import hash_password, verify_password, create_token, crea
 from app.models.student import Student
 
 router = APIRouter()
+
+# 内存验证码存储 {phone: (code, expire_timestamp)}
+_verification_codes: dict[str, tuple[str, float]] = {}
+CODE_TTL = 300  # 5 分钟有效
 
 
 class LoginRequest(BaseModel):
@@ -39,6 +45,8 @@ class LoginRequest(BaseModel):
 class RegisterRequest(BaseModel):
     student_no: str
     password: str
+    phone: str
+    code: str
     name: str = ""
     email: Optional[str] = None
     major: str = ""
@@ -56,6 +64,22 @@ class RegisterRequest(BaseModel):
     def _pwd_len(cls, v: str) -> str:
         if not v or len(v) < 6:
             raise ValueError("密码至少 6 位")
+        return v
+
+    @field_validator("phone")
+    @classmethod
+    def _phone_fmt(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v or len(v) != 11 or not v.isdigit():
+            raise ValueError("请输入 11 位手机号")
+        return v
+
+    @field_validator("code")
+    @classmethod
+    def _code_fmt(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v or len(v) != 6 or not v.isdigit():
+            raise ValueError("验证码为 6 位数字")
         return v
 
     @field_validator("email")
@@ -104,6 +128,7 @@ class StudentDTO(BaseModel):
     id: str
     student_no: str
     name: str = ""
+    phone: str = ""
     email: str = ""
     major: str = ""
     grade: str = ""
@@ -123,6 +148,7 @@ def _to_dto(s: Student) -> StudentDTO:
         id=str(s.id),
         student_no=s.student_no or "",
         name=s.name or "",
+        phone=s.phone or "",
         email=s.email or "",
         major=s.major or "",
         grade=s.grade or "",
@@ -156,19 +182,100 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     return AuthResponse(token=token, refresh_token=refresh, student=_to_dto(student))
 
 
+class SendCodeRequest(BaseModel):
+    phone: str
+
+    @field_validator("phone")
+    @classmethod
+    def _phone_fmt(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v or len(v) != 11 or not v.isdigit():
+            raise ValueError("请输入 11 位手机号")
+        return v
+
+
+class VerifyCodeRequest(BaseModel):
+    phone: str
+    code: str
+
+    @field_validator("phone")
+    @classmethod
+    def _phone_fmt(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v or len(v) != 11 or not v.isdigit():
+            raise ValueError("请输入 11 位手机号")
+        return v
+
+    @field_validator("code")
+    @classmethod
+    def _code_fmt(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v or len(v) != 6 or not v.isdigit():
+            raise ValueError("验证码为 6 位数字")
+        return v
+
+
+@router.post("/send-code")
+async def send_code(req: SendCodeRequest):
+    """发送验证码（模拟：打印到控制台）"""
+    code = f"{random.randint(0, 999999):06d}"
+    _verification_codes[req.phone] = (code, time.time() + CODE_TTL)
+    print(f"\n{'='*40}")
+    print(f"  验证码已发送到 {req.phone}")
+    print(f"  验证码: {code}")
+    print(f"  有效期: 5 分钟")
+    print(f"{'='*40}\n")
+    return {"message": f"验证码已发送到 {req.phone}，请查看控制台"}
+
+
+@router.post("/verify-code")
+async def verify_code(req: VerifyCodeRequest):
+    """验证验证码"""
+    stored = _verification_codes.get(req.phone)
+    if not stored:
+        raise HTTPException(status_code=400, detail="验证码已过期或未发送，请重新获取")
+    code, expire_at = stored
+    if time.time() > expire_at:
+        _verification_codes.pop(req.phone, None)
+        raise HTTPException(status_code=400, detail="验证码已过期，请重新获取")
+    if code != req.code:
+        raise HTTPException(status_code=400, detail="验证码错误")
+    return {"message": "验证成功"}
+
+
 @router.post("/register", response_model=AuthResponse)
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    # 校验验证码
+    stored = _verification_codes.get(req.phone)
+    if not stored:
+        raise HTTPException(status_code=400, detail="验证码已过期或未发送，请先获取验证码")
+    code, expire_at = stored
+    if time.time() > expire_at:
+        _verification_codes.pop(req.phone, None)
+        raise HTTPException(status_code=400, detail="验证码已过期，请重新获取")
+    if code != req.code:
+        raise HTTPException(status_code=400, detail="验证码错误")
+
+    # 检查学号唯一
     result = await db.execute(
         select(Student).where(Student.student_no == req.student_no)
     )
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="该学号已注册")
 
+    # 检查手机号唯一
+    result = await db.execute(
+        select(Student).where(Student.phone == req.phone)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="该手机号已注册")
+
     student = Student(
         id=uuid.uuid4(),
         student_no=req.student_no,
         password_hash=hash_password(req.password),
         name=req.name or ("用户" + req.student_no[-4:]),
+        phone=req.phone,
         email=req.email or None,
         major=req.major or None,
         role="student",
@@ -177,6 +284,9 @@ async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)):
     db.add(student)
     await db.commit()
     await db.refresh(student)
+
+    # 验证通过，删除验证码
+    _verification_codes.pop(req.phone, None)
 
     token = create_token(str(student.id))
     refresh = create_refresh_token(str(student.id))

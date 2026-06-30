@@ -26,12 +26,18 @@ export default function LoginPage() {
   const [studentNo, setStudentNo] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [phone, setPhone] = useState('')
+  const [code, setCode] = useState('')
   const [remember, setRemember] = useState(true)
+  const [countdown, setCountdown] = useState(0)
+  const [isSending, setIsSending] = useState(false)
 
   // 错误高亮
   const [studentNoErr, setStudentNoErr] = useState('')
   const [passwordErr, setPasswordErr] = useState('')
   const [confirmErr, setConfirmErr] = useState('')
+  const [phoneErr, setPhoneErr] = useState('')
+  const [codeErr, setCodeErr] = useState('')
 
   // Particles
   useEffect(() => {
@@ -68,6 +74,8 @@ export default function LoginPage() {
     setStudentNoErr('')
     setPasswordErr('')
     setConfirmErr('')
+    setPhoneErr('')
+    setCodeErr('')
   }
 
   function showAlert(type: 'error' | 'success' | 'info', text: string) {
@@ -81,6 +89,33 @@ export default function LoginPage() {
 
   function togglePassword() {
     setShowPassword((s) => !s)
+  }
+
+  async function sendCode() {
+    setPhoneErr('')
+    if (!phone || phone.length !== 11 || !/^\d+$/.test(phone)) {
+      setPhoneErr('请输入 11 位手机号')
+      return
+    }
+    setIsSending(true)
+    try {
+      await authApi.sendCode(phone)
+      showAlert('info', '验证码已发送，请查看控制台')
+      setCountdown(60)
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer)
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    } catch (err: any) {
+      showAlert('error', err?.message || '发送失败')
+    } finally {
+      setIsSending(false)
+    }
   }
 
   function validate(): boolean {
@@ -98,6 +133,14 @@ export default function LoginPage() {
     if (tab === 'register') {
       if (!name.trim()) {
         showAlert('error', '请填写姓名')
+        valid = false
+      }
+      if (!phone || phone.length !== 11 || !/^\d+$/.test(phone)) {
+        setPhoneErr('请输入 11 位手机号')
+        valid = false
+      }
+      if (!code || code.length !== 6 || !/^\d+$/.test(code)) {
+        setCodeErr('验证码为 6 位数字')
         valid = false
       }
       if (password !== confirmPassword) {
@@ -133,6 +176,8 @@ export default function LoginPage() {
         const res = await authApi.register({
           student_no: studentNo,
           password,
+          phone,
+          code,
           name,
           email,
           major,
@@ -320,6 +365,53 @@ export default function LoginPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                     />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="phone">手机号</label>
+                    <div className="form-input-wrap">
+                      <input
+                        className={`form-input${phoneErr ? ' error' : ''}`}
+                        id="phone"
+                        type="tel"
+                        placeholder="13800138000"
+                        autoComplete="off"
+                        value={phone}
+                        onChange={(e) => {
+                          setPhone(e.target.value)
+                          if (phoneErr) setPhoneErr('')
+                        }}
+                      />
+                    </div>
+                    {phoneErr && <div className="form-error show">{phoneErr}</div>}
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="code">验证码</label>
+                    <div className="form-input-wrap" style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        className={`form-input${codeErr ? ' error' : ''}`}
+                        id="code"
+                        type="text"
+                        placeholder="6 位验证码"
+                        maxLength={6}
+                        autoComplete="off"
+                        value={code}
+                        onChange={(e) => {
+                          setCode(e.target.value)
+                          if (codeErr) setCodeErr('')
+                        }}
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        type="button"
+                        className="submit-btn"
+                        onClick={sendCode}
+                        disabled={countdown > 0 || isSending}
+                        style={{ minWidth: 100, fontSize: 13 }}
+                      >
+                        {countdown > 0 ? `${countdown}s` : isSending ? '发送中...' : '获取验证码'}
+                      </button>
+                    </div>
+                    {codeErr && <div className="form-error show">{codeErr}</div>}
                   </div>
                 </div>
 

@@ -7,7 +7,8 @@
 5. students.role 列 (VARCHAR(20) DEFAULT 'student')
 6. students.is_active 列 (BOOLEAN DEFAULT true)
 7. students.last_login 列 (TIMESTAMP)
-8. chat_messages.content 列改为 TEXT（原 VARCHAR(10000)）
+    8. chat_messages.content 列改为 TEXT（原 VARCHAR(10000)）
+    9. students.phone 列 (VARCHAR(20) UNIQUE)
 
 用法:
     cd backend && venv\\Scripts\\python scripts/migrate_schema_drift.py
@@ -91,7 +92,14 @@ async def migrate():
         except Exception as e:
             print(f"[SKIP] chat_messages.content 已是 TEXT 或无法更改: {e}")
 
-        # 9. 索引
+        # 9. students.phone 列
+        try:
+            await conn.execute("ALTER TABLE students ADD COLUMN phone VARCHAR(20) UNIQUE")
+            print("[OK] students.phone 列已添加")
+        except asyncpg.DuplicateColumnError:
+            print("[SKIP] students.phone 列已存在")
+
+        # 10. 索引
         for idx_sql in [
             "CREATE INDEX IF NOT EXISTS idx_exercises_kp ON exercises(knowledge_point)",
             "CREATE INDEX IF NOT EXISTS idx_exercise_bank_kp ON exercise_bank(knowledge_point)",

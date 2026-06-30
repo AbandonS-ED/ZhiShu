@@ -10,6 +10,7 @@ class Student(Base):
     student_no = Column(String(50), unique=True, nullable=True)
     password_hash = Column(String(255), nullable=True)
     name = Column(String(100), nullable=False)
+    phone = Column(String(20), unique=True, nullable=True)
     email = Column(String(255), unique=True, nullable=True)
     major = Column(String(100), nullable=True)
     grade = Column(String(50), nullable=True)

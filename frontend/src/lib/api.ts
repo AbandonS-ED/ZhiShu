@@ -541,6 +541,8 @@ export const authApi = {
   register: (data: {
     student_no: string
     password: string
+    phone: string
+    code: string
     name?: string
     email?: string
     major?: string
@@ -548,6 +550,16 @@ export const authApi = {
     request<AuthResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+  sendCode: (phone: string) =>
+    request<{ message: string }>('/auth/send-code', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    }),
+  verifyCode: (phone: string, code: string) =>
+    request<{ message: string }>('/auth/verify-code', {
+      method: 'POST',
+      body: JSON.stringify({ phone, code }),
     }),
   getMe: () => request<AuthStudent>('/auth/me', { method: 'GET' }),
   updateMe: (data: { name?: string; email?: string }) =>
