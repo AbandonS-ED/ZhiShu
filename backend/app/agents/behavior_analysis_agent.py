@@ -12,19 +12,9 @@ from app.models.chat_session import ChatSession
 from app.models.exercise import Exercise
 from app.models.learning_record import LearningRecord
 from app.services.llm_factory import get_llm_client
+from app.core.profile_dimensions import DIM_CN
 
 logger = logging.getLogger(__name__)
-
-# 维度中文名
-DIM_CN = {
-    "comprehension": "理解力",
-    "memory": "记忆力",
-    "application": "应用转化",
-    "imagination": "想象力",
-    "focus": "专注力",
-    "knowledge_base": "知识基础",
-    "learning_goal": "学习目标",
-}
 
 SYSTEM_PROMPT = """你是一个学习行为分析专家。根据学生最近的学习行为数据，分析其能力维度的变化。
 
