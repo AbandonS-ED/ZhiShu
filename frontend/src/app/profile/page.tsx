@@ -962,6 +962,7 @@ export default function ProfilePage() {
           setLastAnalyzedAt(cachedTime)
           loadAssessmentStatus()
           loadAnalysisStatus()
+          setLoading(false)
           return
         } catch { /* ignore */ }
       }

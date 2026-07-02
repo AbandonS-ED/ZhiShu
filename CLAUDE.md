@@ -212,6 +212,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 | 坑 | 症状 | 解法 |
 |---|---|---|
 | `.next` 缓存损坏 | `npm run build` 后切 dev 报 `Cannot find module` | 杀 node → 删除 `.next` → 重启 |
+| profile 页面缓存 bug | 有缓存时 `setLoading(false)` 未调用，骨架屏卡住 | 缓存命中时加 `setLoading(false)` |
 | Windows 8000 端口僵尸 | 进程死了端口还占着 | 直接用 8001 |
 | PowerShell `$2b$` 插值 | bcrypt 哈希被 shell 解析成变量 | 用 `init_admin.py` 脚本 |
 | pgvector 扩展未装 | Python 包装了但 PG 扩展没装 | embedding 用 JSONB 占位 |
