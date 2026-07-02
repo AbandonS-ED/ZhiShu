@@ -4,16 +4,16 @@
 
 ## 项目简介
 
-智枢 (SmartHub) 是一个面向《人工智能导论》课程的多智能体个性化学习系统。通过 9 个 AI Agent 协同工作，为学生提供对话式学习画像评估、个性化学习资源生成、智能学习路径规划、RAG 智能辅导和效果评估等服务。
+智枢 (SmartHub) 是一个面向《人工智能导论》课程的多智能体个性化学习系统。通过 10 个 AI Agent 协同工作，为学生提供对话式学习画像评估、个性化学习资源生成、智能学习路径规划、RAG 智能辅导和效果评估等服务。
 
 ### 核心功能
 
 - **F1 对话式画像 (35%)** — 7 维学生画像评估（理解力/记忆力/应用转化/想象力/专注力/学习节奏/知识广度）
-- **F2 多智能体资源生成 (45%)** — 9 Agent 协同生成学习资源
+- **F2 多智能体资源生成 (45%)** — 10 Agent 协同生成学习资源
 - **F3 学习路径规划** — DAG 可视化路径 + 每日学习计划
 - **F4 智能辅导** — RAG 问答 + 多轮对话上下文
 - **F5 效果评估** — LLM 生成评估报告 + 趋势分析
-- **管理后台** — 仪表盘 + 用户/资源/题库管理 + Agent 监控 + 手机验证码注册
+- **管理后台** — 仪表盘 + 用户/资源/题库管理 + Agent 监控 + 手机验证码注册 + 用户删除
 
 ## 技术栈
 
@@ -26,12 +26,13 @@
 | 数据库 | PostgreSQL 18 (12 张表) + Redis | - |
 | 向量库 | pgvector (JSONB 降级方案) | - |
 | 异步任务 | Celery (Redis broker) | - |
+| 测试 | pytest (114 个测试) + 端到端冒烟测试 | - |
 
 ## 项目结构
 
 ```
 ZhiShu/
-├── frontend/                      # Next.js 前端 (19 页面)
+├── frontend/                      # Next.js 前端 (18 页面)
 │   └── src/
 │       ├── app/                   # 页面路由
 │       │   ├── layout.tsx         # 根布局 (本地字体 + ClientShell)
@@ -61,13 +62,13 @@ ZhiShu/
 ├── backend/                       # FastAPI 后端
 │   └── app/
 │       ├── main.py                # 应用入口 + 路由注册
-│       ├── api/                   # 12 个路由模块 (68 端点)
-│       ├── agents/                # 9 个 Agent + StateGraph 编排
+│       ├── api/                   # 12 个路由模块 (67 端点)
+│       ├── agents/                # 10 个 Agent + StateGraph 编排
 │       │   ├── master_agent.py    # LangGraph StateGraph 10 节点
 │       │   ├── state.py           # AgentState + IntentType
 │       │   └── communicator.py    # MessageBus pub/sub
-│       ├── services/              # 15 个服务模块
-│       ├── models/                # 12 个数据模型
+│       ├── services/              # 16 个服务模块
+│       ├── models/                # 13 个数据模型
 │       ├── tasks/                 # Celery 异步任务
 │       └── core/                  # 核心模块 (配置/数据库/安全/Agent 指标)
 ├── tests/                         # 114 pytest + 冒烟测试
@@ -169,7 +170,7 @@ npm run dev
 
 1. `/admin/login` → admin/admin123 登录
 2. `/admin` → 查看统计仪表盘（并行查询 + 骨架屏加载）
-3. `/admin/users` → 用户管理（搜索/筛选/禁用）
+3. `/admin/users` → 用户管理（搜索/筛选/禁用/删除）
 4. `/admin/resources` → 资源管理（后端搜索 + 分页）
 5. `/admin/exercises` → 题库管理（CRUD + 批量导入）
 6. `/admin/paths` → 学习路径管理（DAG 可视化）
@@ -199,14 +200,14 @@ npm run build
 
 ## 技术亮点
 
-- **多智能体编排**: LangGraph StateGraph 10 节点 + 9 子 Agent 协同
+- **多智能体编排**: LangGraph StateGraph 10 节点 + 10 子 Agent 协同
 - **防幻觉机制**: PatternDetector + SourceValidator + LLMValidator 三层验证
-- **流式输出**: 5 个 SSE 端点 (对话/资源/练习/路径/画像评估)
+- **流式输出**: 7 个 SSE 端点 (对话/资源/练习/路径/画像评估/学习包)
 - **RAG 管道**: 文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排
 - **统一 SSE 工具**: 前后端统一流式处理，支持重试 + 指数退避 + 120s 超时
 - **评估报告 AI 化**: LLM 生成自然语言报告 + 趋势分析 + 知识点掌握度统计
 - **推荐系统**: 基于画像/评估/对话/题库/路径的多维度打分推荐
-- **管理后台**: 18 个端点 (含 Agent 监控) + 并行查询 + N+1 优化
+- **管理后台**: 25 个端点 (含 Agent 监控 + 用户删除) + 并行查询 + N+1 优化
 - **手机验证码**: 模拟短信服务（控制台输出），5 分钟有效期
 - **行为驱动画像**: 对话/练习/资源/路径学习自动更新 7 维画像
 

@@ -15,7 +15,7 @@
 |---|---|---|---|
 | 前端 | Next.js (App Router) + Tailwind CSS + TypeScript | 14.2.5 | 本地 woff 字体，无 Google Fonts |
 | 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 | Python 3.11 |
-| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 7 子 Agent |
+| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 10 子 Agent |
 | LLM | 双客户端: MiniMaxClient (开发) / SparkClient (上线) | - | `LLM_PROVIDER=minimax\|spark` 切换 |
 | 向量库 | pgvector (JSONB 降级方案) | - | embedding 用 JSONB 占位 |
 | 数据库 | PostgreSQL 18 + Redis | - | 12 张表 |
@@ -34,10 +34,10 @@ ZhiShu/
 │   └── src/hooks/usePageTimer.ts    # 页面停留计时器
 ├── backend/                         # FastAPI 后端
 │   ├── app/main.py                  # 应用入口 + 路由注册
-│   ├── app/api/                     # 10 个路由模块 (41+ 端点)
-│   ├── app/agents/                  # 8 个 Agent + StateGraph 编排
-│   ├── app/services/                # 14 个服务模块
-│   ├── app/models/                  # 12 个数据模型
+│   ├── app/api/                     # 12 个路由模块 (67 端点)
+│   ├── app/agents/                  # 10 个 Agent + StateGraph 编排
+│   ├── app/services/                # 16 个服务模块
+│   ├── app/models/                  # 13 个数据模型
 │   ├── app/tasks/                   # Celery 异步任务
 │   └── app/core/                    # 核心模块 (配置/数据库/安全)
 ├── tests/                           # 114 pytest + 冒烟测试
@@ -88,7 +88,7 @@ cd backend && celery -A app.core.celery_config beat --loglevel=info
 cd backend && python -m pytest tests/ -v          # 114 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
-cd frontend && npm run build                       # 19 页面
+cd frontend && npm run build                       # 18 页面
 ```
 
 ## 架构要点
@@ -102,6 +102,10 @@ intent_recognition → task_planning → conditional_route
 ```
 
 `master_agent.py` 实际节点: `intent_recognition` + `task_planning` + 6 个 `run_*_agent` (document / mindmap / exercise / path / tutor / audio) + `result_aggregation` + `response_generation` = **10 个节点**。
+
+### 7 维学生画像
+
+`student_profiles.dimensions` JSONB: `comprehension / memory / application / imagination / focus / learning_speed / knowledge_breadth`（理解力/记忆力/应用转化/想象力/专注力/学习节奏/知识广度），每个维度含 `score` (0-100) 和 `confidence` (0-1)，由 `initial_assessment_agent.py` 通过对话评估生成。
 
 ### 7 维学生画像
 
@@ -137,7 +141,7 @@ intent_recognition → task_planning → conditional_route
      POST /auth/register → 校验验证码 + bcrypt 哈希密码 + 手机号唯一 → 存入 students → 返回 JWT
 登录: POST /auth/login → bcrypt 校验密码 → 检查 is_active → 记录 last_login → 返回 JWT
 验证: Authorization: Bearer <token> → decode_token() → get_current_user() 依赖
-门禁: 68 个业务端点全部加 Depends(get_current_user) + student_id 所有权校验
+门禁: 67 个业务端点全部加 Depends(get_current_user) + student_id 所有权校验
 ```
 
 ### 管理后台系统
@@ -148,7 +152,7 @@ intent_recognition → task_planning → conditional_route
 Token: zhishu_admin_token (与学生端 zhishu_token 隔离)
 登录: /admin/login → 调用 /auth/login → 校验 role === 'admin' → 存 zhishu_admin_user
 题库 CRUD: admin_exercises.py 6 个端点 (列表/创建/批量导入/编辑/删除/知识点列表)
-管理端点: admin.py 18 个端点 (统计/趋势/用户/资源/路径/对话/文档/Agent 监控)
+管理端点: admin.py 12 个端点 (统计/趋势/用户CRUD/资源/路径/对话/文档/Agent 监控)
 Agent 监控: agent_metrics.py 内存计数器 (threading.Lock 线程安全)
 并行查询: get_stats 用 asyncio.gather() 并行 10 个计数查询
 N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
@@ -184,6 +188,12 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ agent_metrics 线程安全 (threading.Lock)
 - ✅ dashboard 骨架屏 loading 状态
 - ✅ Agent 卡片样式优化 (响应式网格 + 文字截断)
+- ✅ 登录页滚动修复 (body:has(.login-page) overflow:auto)
+- ✅ 验证码按钮样式重构 (code-row + code-btn 独立样式)
+- ✅ 注册表单平滑展开动画 (register-extras max-height transition)
+- ✅ 管理后台用户删除功能 (级联删除 + 安全检查 + 二次确认)
+- ✅ 资源中心重构 (推荐 Feed + 三阶段学习包)
+- ✅ 评估报告 AI 化 (LLM 生成 + 趋势分析 + 知识点统计)
 
 ### P2 — 清理项
 

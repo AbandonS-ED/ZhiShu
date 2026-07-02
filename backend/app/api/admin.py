@@ -6,12 +6,13 @@ from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, func as sa_func, text
+from sqlalchemy import select, delete, func as sa_func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_admin
 from app.models.student import Student
+from app.models.student_profile import StudentProfile
 from app.models.resource import Resource
 from app.models.learning_path import LearningPath
 from app.models.chat_session import ChatSession
@@ -19,6 +20,8 @@ from app.models.chat_message import ChatMessage
 from app.models.exercise import Exercise
 from app.models.exercise_bank import ExerciseBank
 from app.models.learning_record import LearningRecord
+from app.models.learning_activity_log import LearningActivityLog
+from app.models.evaluation_report import EvaluationReport
 from app.models.document_chunk import DocumentChunk
 from app.core.agent_metrics import agent_metrics
 
@@ -289,6 +292,53 @@ async def update_user(
 
     await db.commit()
     return {"message": "更新成功"}
+
+
+@router.delete("/users/{student_id}")
+async def delete_user(
+    student_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    """删除用户及其所有关联数据（事务内完成）"""
+    _require_admin(user)
+
+    # 1. 查找目标用户
+    result = await db.execute(select(Student).where(Student.id == student_id))
+    target = result.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    # 2. 安全检查
+    if target.role == "admin":
+        raise HTTPException(status_code=400, detail="不能删除管理员账号")
+    if target.id == user.id:
+        raise HTTPException(status_code=400, detail="不能删除自己的账号")
+
+    # 3. 按依赖顺序级联删除
+    # 3a. chat_messages（通过 chat_sessions 间接关联）
+    sessions_subq = select(ChatSession.id).where(ChatSession.student_id == student_id)
+    await db.execute(
+        delete(ChatMessage).where(ChatMessage.session_id.in_(sessions_subq))
+    )
+    # 3b. chat_sessions
+    await db.execute(
+        delete(ChatSession).where(ChatSession.student_id == student_id)
+    )
+    # 3c. 其他关联表
+    await db.execute(delete(Resource).where(Resource.student_id == student_id))
+    await db.execute(delete(Exercise).where(Exercise.student_id == student_id))
+    await db.execute(delete(LearningPath).where(LearningPath.student_id == student_id))
+    await db.execute(delete(LearningRecord).where(LearningRecord.student_id == student_id))
+    await db.execute(delete(LearningActivityLog).where(LearningActivityLog.student_id == student_id))
+    await db.execute(delete(EvaluationReport).where(EvaluationReport.student_id == student_id))
+    # 3d. student_profiles（有 FK，必须在 student 之前删）
+    await db.execute(delete(StudentProfile).where(StudentProfile.student_id == student_id))
+    # 3e. 最后删 student
+    await db.execute(delete(Student).where(Student.id == student_id))
+
+    await db.commit()
+    return {"message": f"已删除用户「{target.name}」及其所有关联数据"}
 
 
 # ====================================================================

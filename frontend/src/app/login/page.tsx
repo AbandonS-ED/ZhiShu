@@ -368,25 +368,23 @@ export default function LoginPage() {
                   </div>
                   <div className="form-group">
                     <label className="form-label" htmlFor="phone">手机号</label>
-                    <div className="form-input-wrap">
-                      <input
-                        className={`form-input${phoneErr ? ' error' : ''}`}
-                        id="phone"
-                        type="tel"
-                        placeholder="13800138000"
-                        autoComplete="off"
-                        value={phone}
-                        onChange={(e) => {
-                          setPhone(e.target.value)
-                          if (phoneErr) setPhoneErr('')
-                        }}
-                      />
-                    </div>
+                    <input
+                      className={`form-input${phoneErr ? ' error' : ''}`}
+                      id="phone"
+                      type="tel"
+                      placeholder="13800138000"
+                      autoComplete="off"
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value)
+                        if (phoneErr) setPhoneErr('')
+                      }}
+                    />
                     {phoneErr && <div className="form-error show">{phoneErr}</div>}
                   </div>
                   <div className="form-group">
                     <label className="form-label" htmlFor="code">验证码</label>
-                    <div className="form-input-wrap" style={{ display: 'flex', gap: 8 }}>
+                    <div className="code-row">
                       <input
                         className={`form-input${codeErr ? ' error' : ''}`}
                         id="code"
@@ -399,14 +397,12 @@ export default function LoginPage() {
                           setCode(e.target.value)
                           if (codeErr) setCodeErr('')
                         }}
-                        style={{ flex: 1 }}
                       />
                       <button
                         type="button"
-                        className="submit-btn"
+                        className="code-btn"
                         onClick={sendCode}
                         disabled={countdown > 0 || isSending}
-                        style={{ minWidth: 100, fontSize: 13 }}
                       >
                         {countdown > 0 ? `${countdown}s` : isSending ? '发送中...' : '获取验证码'}
                       </button>

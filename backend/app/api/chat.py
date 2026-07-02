@@ -325,7 +325,7 @@ async def _handle_single_agent_stream(
     from app.agents.mindmap_agent import mindmap_agent
     from app.agents.exercise_agent import exercise_agent
     from app.agents.path_agent import path_agent
-from app.services.llm_factory import get_llm_client
+    from app.services.llm_factory import get_llm_client
     from app.services.anti_hallucination import anti_hallucination
 
     # 提取知识点

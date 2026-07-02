@@ -1,14 +1,14 @@
 # 智枢(SmartHub) Backend
 
-> 最后更新：2026-06-28（端点 33→41 / StateGraph 10 节点 / 5 维画像 / 12 表 / Celery 预生成 / 114 pytest / P1 全量修复）
+> 最后更新：2026-07-02（代码审计 + 文档同步版本）
 
-基于 FastAPI + 8 Agent 的多智能体学习资源生成系统后端。
+基于 FastAPI + 10 Agent 的多智能体学习资源生成系统后端。
 
 ## 技术栈
 
 - **框架**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg
-- **Agent**: 7 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）
-- **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 33 业务端点门禁
+- **Agent**: 10 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）
+- **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 67 业务端点门禁
 - **角色**: `role` 字段（student / admin）+ `is_active` 软删除 + `last_login` 记录
 - **LLM**: MiniMax-M3（开发）→ 讯飞星火 V4（上线前切换 `LLM_PROVIDER=spark`）
 - **数据库**: PostgreSQL 18 + **12 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（Celery broker，当前未起 worker）
@@ -42,17 +42,17 @@ uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 backend/
 ├── app/
-│   ├── main.py              # 入口（10 个 router + lifespan 初始化）= 33 唯一端点
-│   ├── api/                 # 10 个 router：auth / profile / resource / path / tutor / chat / mindmap / dashboard / evaluation / admin_exercises
+│   ├── main.py              # 入口（12 个 router + lifespan 初始化）= 67 唯一端点
+│   ├── api/                 # 12 个 router：auth / profile / resource / path / tutor / chat / mindmap / dashboard / evaluation / admin / admin_exercises
 │   ├── core/
 │   │   ├── config.py        # Settings（MINIMAX_* + SPARK_* + JWT_SECRET + LLM_PROVIDER）
 │   │   ├── database.py      # async SQLAlchemy + pgvector 可选
 │   │   ├── security.py      # 密码哈希（bcrypt）+ JWT 生成/验证
 │   │   ├── dependencies.py  # UUID 校验 + get_current_user 门禁
 │   │   └── celery_config.py # Celery 配置（未启用）
-│   ├── models/              # 11 个 Model
+│   ├── models/              # 13 个 Model
 │   │   ├── student.py       # ⭐ 学生/管理员（student_no + password_hash + role + is_active + last_login）
-│   │   ├── student_profile.py # **5 维** JSONB 画像（理解力/记忆力/应用转化/想象力/专注力 + confidence）
+│   │   ├── student_profile.py # **7 维** JSONB 画像（理解力/记忆力/应用转化/想象力/专注力/学习节奏/知识广度 + confidence）
 │   │   ├── document_chunk.py  # RAG 文档分块（embedding 用 JSONB 占位）
 │   │   ├── resource.py      # 学习资源
 │   │   ├── learning_path.py # DAG 学习路径
@@ -61,19 +61,21 @@ backend/
 │   │   ├── chat_session.py  # 聊天会话
 │   │   ├── chat_message.py  # 聊天消息
 │   │   ├── learning_record.py # 学习行为记录（F5 评估）
-│   │   └── learning_activity_log.py # 学习行为日志（wyy 独占）
-│   ├── agents/              # 8 个 Agent
+│   │   ├── learning_activity_log.py # 学习行为日志（wyy 独占）
+│   │   └── evaluation_report.py # 预生成评估报告缓存
+│   ├── agents/              # 10 个 Agent
 │   │   ├── state.py           # AgentState TypedDict + IntentType（11 种意图）
 │   │   ├── communicator.py    # MessageBus pub/sub
-│   │   ├── initial_assessment_agent.py  # 对话式 **5 维** 画像评估（替换旧 profile_agent）
+│   │   ├── initial_assessment_agent.py  # 对话式 **7 维** 画像评估（替换旧 profile_agent）
 │   │   ├── document_agent.py  # 知识讲解 + 代码 + 音频脚本 + 防幻觉验证
 │   │   ├── exercise_agent.py  # 自适应练习题生成 + 防幻觉验证
 │   │   ├── path_agent.py      # 学习路径规划（DAG）
 │   │   ├── tutor_agent.py     # RAG 智能问答 + 多轮上下文
 │   │   ├── mindmap_agent.py   # 思维导图 Mermaid 生成
 │   │   ├── audio_agent.py     # 音频脚本生成
+│   │   ├── behavior_analysis_agent.py # 行为分析 + 画像更新
 │   │   └── master_agent.py    # LangGraph StateGraph **10 节点**
-│   └── services/
+│   └── services/              # 16 个 Service
 │       ├── minimax_client.py     # httpx OpenAI 兼容格式客户端
 │       ├── minimax_langchain.py  # LangChain BaseChatModel 封装
 │       ├── spark_client.py       # 讯飞星火 V4 客户端
@@ -85,9 +87,13 @@ backend/
 │       ├── json_parser.py        # JSON 解析工具
 │       ├── reranker.py           # LLM 语义重排
 │       ├── text_chunker.py       # 语义切片器（800字限制 + 重叠窗口）
-│       └── vector_store.py       # pgvector 检索 + JSONB 降级方案
+│       ├── vector_store.py       # pgvector 检索 + JSONB 降级方案
+│       ├── recommendation_service.py # 推荐服务
+│       ├── chat_recommendation_service.py # 对话推荐服务
+│       ├── llm_factory.py        # LLM 客户端工厂
+│       └── scheduled_analysis_service.py # 定时画像分析
 ├── scripts/
-│   ├── init_db.sql          # 手动建库 + 建表 SQL 脚本（**11 张表** + 14 索引 + admin 种子数据）
+│   ├── init_db.sql          # 手动建库 + 建表 SQL 脚本（**12 张表** + 14 索引 + admin 种子数据）
 │   ├── init_admin.py        # ⭐ 自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号
 │   ├── migrate_exercise_bank.sql # 练习题库迁移（已合并到 init_db.sql）
 │   └── run_migration.py     # 通用迁移执行器
@@ -98,39 +104,52 @@ backend/
 └── .env                     # API Key（已 gitignore）
 ```
 
-## API 路由（41 个唯一端点）
+## API 路由（67 个唯一端点）
 
-> 唯一端点 = 唯一路径 + 方法组合。`backend/app/main.py` 注册 10 router，含 `/` 和 `/health` 根路由。
-> 端点变更历史：33（2026-06-14）→ 41（2026-06-28），新增 8 个端点：
+> 唯一端点 = 唯一路径 + 方法组合。`backend/app/main.py` 注册 12 router，含 `/` 和 `/health` 根路由。
+> 端点变更历史：33（2026-06-14）→ 41（2026-06-28）→ 67（2026-07-02），新增 26 个端点：
 
 - `POST /profile/reset` / `GET /profile/assessment-status` / `PUT /profile/background`（profile 重置与背景）
 - `POST /resource/{id}/favorite`（资源收藏）
 - `POST /resource/batch-generate`（批量生成）
 - `POST /resource/save-from-chat`（对话保存资源）
 - `POST /evaluation/report/{student_id}/regenerate`（强制重生成报告，跳过缓存）
+- `POST /auth/send-code` / `POST /auth/verify-code`（手机验证码）
+- `DELETE /path/{student_id}/{path_id}`（删除路径）
+- `DELETE /chat/sessions/{session_id}`（删除会话）
+- `POST /chat/recommend-questions`（推荐问题）
+- `POST /profile/update-behavior` / `POST /profile/analyze-behavior` / `POST /profile/force-analyze` / `GET /profile/analysis-status`（行为分析）
+- `POST /resource/recommendations` / `GET /resource/learning-package` / `POST /resource/learning-package/generate/stream`（推荐与学习包）
+- `GET /admin/stats` / `GET /admin/trends` / `GET /admin/users` / `GET /admin/users/{student_id}` / `PUT /admin/users/{student_id}` / `DELETE /admin/users/{student_id}` / `GET /admin/resources` / `GET /admin/paths` / `GET /admin/chats` / `GET /admin/chats/{session_id}/messages` / `GET /admin/documents` / `GET /admin/agents`（管理端）
 
-### 认证（auth.py）— 6 个端点
+### 认证（auth.py）— 8 个端点
 
 | 方法 | 路径 | 门禁 | 说明 |
 |------|------|------|------|
 | POST | `/api/v1/auth/login` | 无需 | 登录（bcrypt + 记录 last_login + 校验 is_active） |
+| POST | `/api/v1/auth/send-code` | 无需 | 发送手机验证码（控制台打印） |
+| POST | `/api/v1/auth/verify-code` | 无需 | 验证手机验证码 |
 | POST | `/api/v1/auth/register` | 无需 | 注册（bcrypt 存储 + JWT） |
 | GET | `/api/v1/auth/me` | ✅ | 获取当前用户信息（含 role） |
 | PUT | `/api/v1/auth/me` | ✅ | 更新当前用户（name, email） |
 | POST | `/api/v1/auth/change-password` | ✅ | 修改密码 |
 | GET | `/api/v1/auth/me/{student_id}` | ✅ | 按 ID 获取用户（仅自己） |
 
-### 学习画像（profile.py）— 5 个端点
+### 学习画像（profile.py）— 9 个端点
 
 | 方法 | 路径 | 门禁 | 说明 |
 |------|------|------|------|
-| POST | `/api/v1/profile/assess/stream` | ✅ | **SSE 流式 5 维画像评估**（Initial Assessment Agent） |
+| POST | `/api/v1/profile/assess/stream` | ✅ | **SSE 流式 7 维画像评估**（Initial Assessment Agent） |
 | GET | `/api/v1/profile/me` | ✅ | 获取当前学生画像 |
 | POST | `/api/v1/profile/reset` | ✅ | **重置画像**，允许重新评估 |
 | GET | `/api/v1/profile/assessment-status` | ✅ | **获取评估状态**（用于恢复评估） |
 | PUT | `/api/v1/profile/background` | ✅ | **更新学习背景信息** |
+| POST | `/api/v1/profile/update-behavior` | ✅ | **更新行为画像**（根据学习行为自动更新） |
+| POST | `/api/v1/profile/analyze-behavior` | ✅ | **分析行为画像**（触发画像分析） |
+| POST | `/api/v1/profile/force-analyze` | ✅ | **强制分析画像**（忽略缓存） |
+| GET | `/api/v1/profile/analysis-status` | ✅ | **获取分析状态**（查看分析进度） |
 
-### 资源生成（resource.py）— 11 个端点
+### 资源生成（resource.py）— 13 个端点
 
 | 方法 | 路径 | 门禁 | 说明 |
 |------|------|------|------|
@@ -141,11 +160,14 @@ backend/
 | POST | `/api/v1/resource/exercises/generate/stream` | ✅ | SSE 流式练习题生成（dual-format） |
 | GET | `/api/v1/resource/exercises/{student_id}` | ✅ | 列出学生练习题 |
 | GET | `/api/v1/resource/exercises/pool` | ✅ | 获取练习题池（题库 + AI 生成，随机采样） |
-| POST | `/api/v1/resource/{id}/favorite` | ✅ | **收藏/取消收藏资源** |
+| POST | `/api/v1/resource/{resource_id}/favorite` | ✅ | **收藏/取消收藏资源** |
 | POST | `/api/v1/resource/batch-generate` | ✅ | **批量生成多个知识点的资源** |
 | POST | `/api/v1/resource/save-from-chat` | ✅ | **从对话页保存资源到资源中心** |
+| POST | `/api/v1/resource/recommendations` | ✅ | **获取推荐资源**（基于画像/评估/对话/题库/路径） |
+| GET | `/api/v1/resource/learning-package` | ✅ | **获取学习包**（三阶段：Learn/Practice/Review） |
+| POST | `/api/v1/resource/learning-package/generate/stream` | ✅ | **SSE 流式生成学习包** |
 
-### 学习路径（path.py）— 4 个端点
+### 学习路径（path.py）— 5 个端点
 
 | 方法 | 路径 | 门禁 | 说明 |
 |------|------|------|------|
@@ -153,6 +175,7 @@ backend/
 | POST | `/api/v1/path/generate/stream` | ✅ | SSE 流式路径生成 |
 | GET | `/api/v1/path/{student_id}` | ✅ | 列出学生所有路径 |
 | GET | `/api/v1/path/{student_id}/{path_id}` | ✅ | 获取路径详情 |
+| DELETE | `/api/v1/path/{student_id}/{path_id}` | ✅ | **删除学习路径** |
 
 ### 智能辅导（tutor.py）— 1 个端点
 
@@ -160,7 +183,7 @@ backend/
 |------|------|------|------|
 | POST | `/api/v1/tutor/ask` | ✅ | RAG 问答 |
 
-### 聊天（chat.py）— 4 个端点
+### 聊天（chat.py）— 5 个端点
 
 | 方法 | 路径 | 门禁 | 说明 |
 |------|------|------|------|
@@ -168,6 +191,7 @@ backend/
 | GET | `/api/v1/chat/sessions/{student_id}` | ✅ | 列出会话 |
 | GET | `/api/v1/chat/sessions/{session_id}/messages` | ✅ | 获取消息历史 |
 | DELETE | `/api/v1/chat/sessions/{session_id}` | ✅ | 删除会话及所有消息 |
+| POST | `/api/v1/chat/recommend-questions` | ✅ | **推荐问题**（基于会话上下文） |
 
 ### 思维导图（mindmap.py）— 2 个端点
 
@@ -203,6 +227,23 @@ backend/
 | DELETE | `/api/v1/admin/exercises/{exercise_id}` | ✅ + admin | 删除题目 |
 | GET | `/api/v1/admin/exercises/knowledge-points` | ✅ + admin | 知识点列表（含题目数） |
 
+### 管理端系统（admin.py）— 12 个端点
+
+| 方法 | 路径 | 门禁 | 说明 |
+|------|------|------|------|
+| GET | `/api/v1/admin/stats` | ✅ + admin | **统计数据**（并行查询 10 个计数） |
+| GET | `/api/v1/admin/trends` | ✅ + admin | **周趋势数据**（近 7 天新增） |
+| GET | `/api/v1/admin/users` | ✅ + admin | **用户列表**（搜索/筛选/分页） |
+| GET | `/api/v1/admin/users/{student_id}` | ✅ + admin | **用户详情** |
+| PUT | `/api/v1/admin/users/{student_id}` | ✅ + admin | **更新用户**（角色/状态） |
+| DELETE | `/api/v1/admin/users/{student_id}` | ✅ + admin | **删除用户**（级联清理） |
+| GET | `/api/v1/admin/resources` | ✅ + admin | **资源列表**（搜索/分页） |
+| GET | `/api/v1/admin/paths` | ✅ + admin | **学习路径列表**（搜索/分页） |
+| GET | `/api/v1/admin/chats` | ✅ + admin | **对话列表**（搜索/分页） |
+| GET | `/api/v1/admin/chats/{session_id}/messages` | ✅ + admin | **对话消息详情** |
+| GET | `/api/v1/admin/documents` | ✅ + admin | **知识库文档列表**（搜索/分页） |
+| GET | `/api/v1/admin/agents` | ✅ + admin | **Agent 监控**（调用统计/错误率） |
+
 ### 根路由（main.py）— 2 个端点
 
 | 方法 | 路径 | 说明 |
@@ -226,6 +267,10 @@ backend/
 | `services/reranker.py` | LLM 语义重排 | ✅ 已实现 |
 | `services/text_chunker.py` | 语义切片器（800字限制 + 重叠窗口） | ✅ 已实现 |
 | `services/vector_store.py` | pgvector 检索 + JSONB 降级方案 | ✅ 已实现 |
+| `services/recommendation_service.py` | 推荐服务（多维度打分推荐） | ✅ 已实现 |
+| `services/chat_recommendation_service.py` | 对话推荐服务（基于会话上下文） | ✅ 已实现 |
+| `services/llm_factory.py` | LLM 客户端工厂（MiniMax/Spark） | ✅ 已实现 |
+| `services/scheduled_analysis_service.py` | 定时画像分析（每日自动分析） | ✅ 已实现 |
 
 ## 数据库
 
@@ -234,7 +279,7 @@ backend/
 | 表名 | 用途 | 索引 |
 |------|------|------|
 | `students` | **学生/管理员**（student_no + password_hash + role + is_active + last_login） | `student_no` UNIQUE + `idx_students_role` + `idx_students_is_active` |
-| `student_profiles` | **5 维** JSONB 画像（理解力/记忆力/应用转化/想象力/专注力 + confidence） | `idx_student_profiles_student_id` |
+| `student_profiles` | **7 维** JSONB 画像（理解力/记忆力/应用转化/想象力/专注力/学习节奏/知识广度 + confidence） | `idx_student_profiles_student_id` |
 | `document_chunks` | RAG 文档分块（embedding JSONB 占位） | — |
 | `resources` | 生成的学习资源 | `idx_resources_student_id` |
 | `learning_paths` | DAG 学习路径 | `idx_learning_paths_student_id` |
@@ -250,7 +295,7 @@ backend/
 
 - **密码哈希**：`bcrypt`（`core/security.py`）
 - **JWT**：HS256，7 天过期，密钥从 `JWT_SECRET` 环境变量读取
-- **门禁**：41 个业务端点全部加 `Depends(get_current_user)` + `student_id` 所有权校验
+- **门禁**：67 个业务端点全部加 `Depends(get_current_user)` + `student_id` 所有权校验
 - **角色隔离**：`students.role` 字段（`student` / `admin`），管理员通过 `_require_admin()` 额外校验
 - **软删除**：`is_active=false` 时登录返回 403
 - **登录审计**：登录成功后自动 `last_login = now()`
@@ -269,7 +314,7 @@ backend/
 ```bash
 cd backend
 
-# ⭐ 端到端冒烟测试 (9 API 验证，四次 9/9 PASS)
+# ⭐ 端到端冒烟测试 (9 API 验证，七次 9/9 PASS)
 python -m tests.smoke_test
 
 # 单元 + 集成（**114** 个 pytest 测试）

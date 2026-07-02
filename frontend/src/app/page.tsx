@@ -3,9 +3,36 @@
 import { useState, useEffect } from 'react'
 import { getStudentId } from '@/lib/student'
 
+interface Activity {
+  type: string
+  title?: string
+  content?: string
+  time: string
+  color?: string
+}
+
+interface Course {
+  name: string
+  progress: number
+  status: string
+}
+
+interface Stats {
+  knowledge_points: number
+  knowledge_points_trend: string
+  learning_hours: string
+  learning_hours_trend: string
+  accuracy: string
+  accuracy_trend: string
+  path_progress: string
+  path_progress_trend: string
+  recent_activities: Activity[]
+  recent_chats: Activity[]
+}
+
 export default function Home() {
-  const [stats, setStats] = useState<any>(null)
-  const [courses, setCourses] = useState<any[]>([])
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [courses, setCourses] = useState<Course[]>([])
 
   useEffect(() => {
     const sid = getStudentId()
@@ -16,29 +43,42 @@ export default function Home() {
     })
   }, [])
 
-  // 默认值
   const s = stats || {
-    knowledge_points: 12,
-    knowledge_points_trend: '+3 本周',
-    learning_hours: '28.5h',
-    learning_hours_trend: '+4.2h 本周',
-    accuracy: '78%',
-    accuracy_trend: '+5% 较上周',
-    path_progress: '42%',
-    path_progress_trend: '5 / 12 节点',
+    knowledge_points: 0,
+    knowledge_points_trend: '',
+    learning_hours: '0h',
+    learning_hours_trend: '',
+    accuracy: '0%',
+    accuracy_trend: '',
+    path_progress: '0%',
+    path_progress_trend: '',
+    recent_activities: [],
+    recent_chats: [],
   }
 
-  const c = courses.length > 0 ? courses : [
-    { name: '人工智能概述', progress: 100 },
-    { name: '搜索算法', progress: 85 },
-    { name: '机器学习基础', progress: 60 },
-    { name: '深度学习与神经网络', progress: 30 },
-    { name: '自然语言处理', progress: 10 },
-  ]
+  // 合并活动和聊天记录，按时间排序
+  const allActivities: Activity[] = [...s.recent_activities, ...s.recent_chats]
+    .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+    .slice(0, 5)
+
+  function formatTime(iso: string): string {
+    if (!iso) return ''
+    const d = new Date(iso)
+    const now = new Date()
+    const diffMs = now.getTime() - d.getTime()
+    const diffMin = Math.floor(diffMs / 60000)
+    if (diffMin < 1) return '刚刚'
+    if (diffMin < 60) return `${diffMin} 分钟前`
+    const diffH = Math.floor(diffMin / 60)
+    if (diffH < 24) return `${diffH} 小时前`
+    const diffD = Math.floor(diffH / 24)
+    if (diffD === 1) return '昨天'
+    if (diffD < 7) return `${diffD} 天前`
+    return d.toLocaleDateString('zh-CN')
+  }
 
   return (
     <>
-      {/* ═══ DASHBOARD ═══ */}
       <div className="page active" id="pg-dashboard">
         <div className="stats">
           <div className="stat">
@@ -70,42 +110,31 @@ export default function Home() {
               <span className="tag tag-dark">Today</span>
             </div>
             <div className="card-bd">
-              <div className="act-item">
-                <div className="act-dot" style={{ background: 'var(--success)' }}></div>
-                <div className="act-body">
-                  <p>
-                    完成了 <strong>A* 算法</strong> 的学习
-                  </p>
-                  <div className="time">2 小时前</div>
+              {allActivities.length === 0 ? (
+                <div className="act-item">
+                  <div className="act-dot" style={{ background: 'var(--ink-4)' }}></div>
+                  <div className="act-body">
+                    <p>暂无活动记录</p>
+                    <div className="time">开始学习后将在此显示</div>
+                  </div>
                 </div>
-              </div>
-              <div className="act-item">
-                <div className="act-dot" style={{ background: 'var(--accent)' }}></div>
-                <div className="act-body">
-                  <p>
-                    生成了 <strong>Transformer</strong> 思维导图
-                  </p>
-                  <div className="time">3 小时前</div>
-                </div>
-              </div>
-              <div className="act-item">
-                <div className="act-dot" style={{ background: 'var(--info)' }}></div>
-                <div className="act-body">
-                  <p>
-                    完成 <strong>机器学习</strong> 练习 8/10
-                  </p>
-                  <div className="time">昨天</div>
-                </div>
-              </div>
-              <div className="act-item">
-                <div className="act-dot" style={{ background: 'var(--ink-3)' }}></div>
-                <div className="act-body">
-                  <p>
-                    更新学习画像，新增 <strong>深度学习</strong> 标签
-                  </p>
-                  <div className="time">昨天</div>
-                </div>
-              </div>
+              ) : (
+                allActivities.map((act, i) => (
+                  <div className="act-item" key={i}>
+                    <div className="act-dot" style={{ background: act.color || 'var(--ink-3)' }}></div>
+                    <div className="act-body">
+                      <p>
+                        {act.type === 'chat' ? (
+                          <>对话：{act.content ? `"${act.content.slice(0, 30)}${act.content.length > 30 ? '...' : ''}"` : '新消息'}</>
+                        ) : (
+                          <>学习了 <strong>{act.title || '新资源'}</strong></>
+                        )}
+                      </p>
+                      <div className="time">{formatTime(act.time)}</div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -153,23 +182,35 @@ export default function Home() {
               <span className="tag tag-green">进行中</span>
             </div>
             <div className="card-bd">
-              {c.map((course: any, i: number) => (
-                <div className="prog-item" key={i}>
+              {courses.length === 0 ? (
+                <div className="prog-item">
                   <div className="prog-top">
-                    <span>{course.name}</span>
-                    <span>{course.progress}%</span>
+                    <span>暂无课程</span>
+                    <span>--</span>
                   </div>
                   <div className="prog-track">
-                    <div
-                      className="prog-fill"
-                      style={{
-                        width: `${course.progress}%`,
-                        background: course.progress >= 100 ? 'var(--success)' : course.progress >= 50 ? 'var(--ink)' : 'var(--warm)',
-                      }}
-                    ></div>
+                    <div className="prog-fill" style={{ width: '0%' }}></div>
                   </div>
                 </div>
-              ))}
+              ) : (
+                courses.map((course, i) => (
+                  <div className="prog-item" key={i}>
+                    <div className="prog-top">
+                      <span>{course.name}</span>
+                      <span>{course.progress}%</span>
+                    </div>
+                    <div className="prog-track">
+                      <div
+                        className="prog-fill"
+                        style={{
+                          width: `${course.progress}%`,
+                          background: course.progress >= 100 ? 'var(--success)' : course.progress >= 50 ? 'var(--ink)' : 'var(--warm)',
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

@@ -36,6 +36,29 @@ export default function UsersPage() {
     } catch { showToast('操作失败') }
   }
 
+  async function handleDelete(user: AdminUser) {
+    if (user.role === 'admin') {
+      showToast('不能删除管理员账号')
+      return
+    }
+    const ok = confirm(
+      `确认删除用户「${user.name}」（${user.student_no}）？\n\n` +
+      `关联数据将一并删除：\n` +
+      `· 学习资源 ${user.resource_count} 个\n` +
+      `· 练习题 ${user.exercise_count} 个\n\n` +
+      `此操作不可恢复！`
+    )
+    if (!ok) return
+
+    try {
+      await adminApi.deleteStudent(user.id)
+      showToast(`已删除用户「${user.name}」及所有关联数据`)
+      loadUsers()
+    } catch (err: any) {
+      showToast(err?.message || '删除失败')
+    }
+  }
+
   async function batchDelete() {
     if (!selected.size) return
     if (!confirm(`确认禁用选中的 ${selected.size} 个用户？`)) return
@@ -118,6 +141,11 @@ export default function UsersPage() {
                       <button className="admin-btn-s" onClick={() => toggleActive(u)} style={{ marginLeft: 4 }}>
                         {u.is_active ? '禁用' : '启用'}
                       </button>
+                      {u.role !== 'admin' && (
+                        <button className="admin-btn-d" onClick={() => handleDelete(u)} style={{ marginLeft: 4 }}>
+                          删除
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

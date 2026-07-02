@@ -125,7 +125,7 @@ class ScheduledAnalysisService:
     async def _get_profile(self, db: AsyncSession, student_id: str) -> StudentProfile | None:
         """获取学生画像"""
         result = await db.execute(
-            select(StudentProfile).where(StudentProfile.student_id == student_id)
+            select(StudentProfile).where(StudentProfile.student_id == student_id).limit(1)
         )
         return result.scalar_one_or_none()
 

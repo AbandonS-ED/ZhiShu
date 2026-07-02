@@ -703,6 +703,8 @@ export const adminApi = {
   getUserDetail: (id: string) => adminRequest<AdminUser>(`/admin/users/${id}`),
   updateUser: (id: string, data: { is_active?: boolean; name?: string }) =>
     adminRequest<{ message: string }>(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteStudent: (id: string) =>
+    adminRequest<{ message: string }>(`/admin/users/${id}`, { method: 'DELETE' }),
   getResources: (page = 1, pageSize = 20, studentId?: string, search?: string) => {
     const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
     if (studentId) params.set('student_id', studentId)

@@ -1,7 +1,7 @@
 # 智枢 (SmartHub) - 前端项目
 
 > 多智能体学习资源生成系统 · 前端部分（学生端 9 页 + 管理后台 9 页）
-> 最后更新：2026-06-28（P1 全量修复 / 统一 SSE 工具 sse.ts / 评估报告 LLM 渲染 / SQLAlchemy 2.0 eval 修复）
+> 最后更新：2026-07-02（代码审计 + 文档同步版本）
 
 ## 技术栈
 
@@ -9,6 +9,7 @@
 - **样式**: Tailwind CSS 3.4 + 自定义 CSS（模板 1:1 复刻）
 - **状态管理**: React useState + Context（学生端 + 管理端独立 Context）+ Zustand（setting 页）
 - **路由隔离**: `/admin` 路由前缀，独立的 RootLayout 拦截
+- **Agent**: 10 个 AI Agent 协同工作
 
 ## 项目结构
 
@@ -38,7 +39,7 @@ src/
 │       ├── paths/          # /admin/paths 学习路径
 │       ├── chats/          # /admin/chats 对话记录
 │       ├── documents/      # /admin/documents 知识库
-│       └── agents/         # /admin/agents Agent 监控
+│       └── agents/         # /admin/agents Agent 监控（10 Agent）
 ├── components/
 │   ├── layout/                # 学生端 Sidebar + Header
 │   └── RobotIcon.tsx          # ⭐ 极简机器人 SVG（替换 🤖 emoji）
@@ -61,7 +62,7 @@ src/
 ```bash
 npm install
 npm run dev       # http://localhost:3000
-npm run build     # 验证编译（✅ 通过：18 路由）
+npm run build     # 验证编译（✅ 通过：18 页面）
 npm run lint      # ESLint 检查（✅ 0 errors）
 ```
 
@@ -95,11 +96,11 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 | `/admin/paths` | 学习路径 | 表格 + DAG 详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/chats` | 对话记录 | 表格 + 对话详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/documents` | 知识库 | 表格 + 类型筛选 + **批量删除** | 硬编码 |
-| `/admin/agents` | Agent 监控 | 7 Agent 集群卡片 + 调用统计 + 错误率 | 硬编码 |
+| `/admin/agents` | Agent 监控 | 10 Agent 集群卡片 + 调用统计 + 错误率 | 硬编码 |
 
 > 管理后台 exercises 页面已接入 `admin_exercises` API（CRUD + 批量导入），其余页面数据为模板硬编码（演示用）。
 
-端到端测试（6 次 9/9 PASS + 第 7 次 P1 全量修复后 SQLAlchemy 2.0 兼容验证）见 `../SMOKE_TEST_REPORT.md`。
+端到端测试（7 次 9/9 PASS）见 `../SMOKE_TEST_REPORT.md`。
 
 ## 开发规范
 
@@ -117,6 +118,7 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 - **student_id**：从 `localStorage.getItem('zhishu_student')` 读取（登录时存入）
 - **管理后台认证**：独立 `zhishu_admin_token` 存储，`/admin/login` 页面校验 `role === 'admin'`
 - **批量删除复用**：`useSelection` Hook + `BatchDeleteBar` + `AdminCheckbox` 共享组件，6 个列表页统一模式
+- **Agent 监控**：10 个 Agent 状态 + 调用统计 + 30s 自动刷新
 
 ## 演示入口
 
