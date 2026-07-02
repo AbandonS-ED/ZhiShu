@@ -9,7 +9,7 @@
 - **样式**: Tailwind CSS 3.4 + 自定义 CSS（模板 1:1 复刻）
 - **状态管理**: React useState + Context（学生端 + 管理端独立 Context）+ Zustand（setting 页）
 - **路由隔离**: `/admin` 路由前缀，独立的 RootLayout 拦截
-- **Agent**: 10 个 AI Agent 协同工作
+- **Agent**: 9 个 AI Agent 协同工作
 
 ## 项目结构
 
@@ -96,7 +96,7 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 | `/admin/paths` | 学习路径 | 表格 + DAG 详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/chats` | 对话记录 | 表格 + 对话详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/documents` | 知识库 | 表格 + 类型筛选 + **批量删除** | 硬编码 |
-| `/admin/agents` | Agent 监控 | 10 Agent 集群卡片 + 调用统计 + 错误率 | 硬编码 |
+| `/admin/agents` | Agent 监控 | 9 Agent 集群卡片 + 调用统计 + 错误率 | 硬编码 |
 
 > 管理后台 exercises 页面已接入 `admin_exercises` API（CRUD + 批量导入），其余页面数据为模板硬编码（演示用）。
 
@@ -118,7 +118,7 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 - **student_id**：从 `localStorage.getItem('zhishu_student')` 读取（登录时存入）
 - **管理后台认证**：独立 `zhishu_admin_token` 存储，`/admin/login` 页面校验 `role === 'admin'`
 - **批量删除复用**：`useSelection` Hook + `BatchDeleteBar` + `AdminCheckbox` 共享组件，6 个列表页统一模式
-- **Agent 监控**：10 个 Agent 状态 + 调用统计 + 30s 自动刷新
+- **Agent 监控**：9 个 Agent 状态 + 调用统计 + 30s 自动刷新
 
 ## 演示入口
 

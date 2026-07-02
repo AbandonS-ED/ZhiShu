@@ -2,12 +2,12 @@
 
 > 最后更新：2026-07-02（代码审计 + 文档同步版本）
 
-基于 FastAPI + 10 Agent 的多智能体学习资源生成系统后端。
+基于 FastAPI + 9 Agent 的多智能体学习资源生成系统后端。
 
 ## 技术栈
 
 - **框架**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg
-- **Agent**: 10 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）
+- **Agent**: 9 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）
 - **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 67 业务端点门禁
 - **角色**: `role` 字段（student / admin）+ `is_active` 软删除 + `last_login` 记录
 - **LLM**: MiniMax-M3（开发）→ 讯飞星火 V4（上线前切换 `LLM_PROVIDER=spark`）
@@ -63,7 +63,7 @@ backend/
 │   │   ├── learning_record.py # 学习行为记录（F5 评估）
 │   │   ├── learning_activity_log.py # 学习行为日志（wyy 独占）
 │   │   └── evaluation_report.py # 预生成评估报告缓存
-│   ├── agents/              # 10 个 Agent
+│   ├── agents/              # 9 个 Agent
 │   │   ├── state.py           # AgentState TypedDict + IntentType（11 种意图）
 │   │   ├── communicator.py    # MessageBus pub/sub
 │   │   ├── initial_assessment_agent.py  # 对话式 **7 维** 画像评估（替换旧 profile_agent）

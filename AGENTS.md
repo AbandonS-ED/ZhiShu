@@ -71,7 +71,7 @@ cd frontend && npm run build                       # 18 页面
 - **RAG**: `document_parser → text_chunker → embedding → vector_store.search → reranker`
 - **认证**: bcrypt + JWT（HS256，7 天），全 **67** 端点 `Depends(get_current_user)` 门禁
 - **手机验证码**: 内存存储 + 5 分钟有效期，控制台 print 模拟短信，注册时校验
-- **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，18 管理端点（含 Agent 监控 + 文档管理 + 用户删除）
+- **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，18 管理端点（含 9 Agent 监控 + 文档管理 + 用户删除）
 - **Agent 监控**: `agent_metrics.py` 内存计数器 + `threading.Lock` 线程安全，30s 自动刷新
 - **并行查询**: `get_stats` 用 `asyncio.gather()` 并行 10 个计数查询，响应速度提升约 50%
 - **N+1 优化**: users/resources/paths/chats 列表全部改用 JOIN 子查询
