@@ -21,6 +21,7 @@ from app.models.learning_path import LearningPath
 from app.models.exercise import Exercise
 from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
+from app.models.learning_record import LearningRecord
 import uuid
 from datetime import datetime, timedelta
 
@@ -75,6 +76,16 @@ async def get_dashboard_stats(
 
     # 最近活动（最近 7 天的资源）
     week_ago = datetime.utcnow() - timedelta(days=7)
+
+    # 本周自习次数（来自 study_session_end 记录）
+    study_sessions_result = await db.execute(
+        select(func.count(LearningRecord.id))
+        .where(LearningRecord.student_id == sid,
+               LearningRecord.action == 'study_session_end',
+               LearningRecord.created_at >= week_ago)
+    )
+    weekly_study_sessions = study_sessions_result.scalar_one() or 0
+
     recent_resources_result = await db.execute(
         select(Resource)
         .where(Resource.student_id == sid, Resource.created_at >= week_ago)
@@ -108,6 +119,8 @@ async def get_dashboard_stats(
         "accuracy_trend": f"+{min(5, avg_score * 0.1):.0f}% 较上周",
         "path_progress": f"{path_progress:.0f}%",
         "path_progress_trend": f"{completed_nodes} / {total_nodes} 节点",
+        "study_sessions": weekly_study_sessions,
+        "study_sessions_trend": f"+{weekly_study_sessions} 本周",
         "recent_activities": [
             {
                 "type": "resource",

@@ -107,17 +107,37 @@ intent_recognition → task_planning → conditional_route
 
 `student_profiles.dimensions` JSONB: `comprehension / memory / application / imagination / focus / learning_speed / knowledge_breadth`（理解力/记忆力/应用转化/想象力/专注力/学习节奏/知识广度），每个维度含 `score` (0-100) 和 `confidence` (0-1)，由 `initial_assessment_agent.py` 通过对话评估生成。
 
-### 7 维学生画像
-
-`student_profiles.dimensions` JSONB: `comprehension / memory / application / imagination / focus / learning_speed / knowledge_breadth`（理解力/记忆力/应用转化/想象力/专注力/学习节奏/知识广度），每个维度含 `score` (0-100) 和 `confidence` (0-1)，由 `initial_assessment_agent.py` 通过对话评估生成。
-
-### 7 维学生画像
-
-`student_profiles.dimensions` JSONB: `comprehension / memory / application / imagination / focus / learning_speed / knowledge_breadth`（理解力/记忆力/应用转化/想象力/专注力/学习节奏/知识广度），每个维度含 `score` (0-100) 和 `confidence` (0-1)，由 `initial_assessment_agent.py` 通过对话评估生成。
-
 ### 防幻觉 (N3 评分项)
 
 三层验证: PatternDetector → SourceValidator → LLMValidator。6 个 Agent 已接入。
+
+### 自习模式（v1.5 · 2026-07-04）
+
+`/zixi` 是智枢新增的**第 10 个学生页面**，番茄钟式专注自习 + 浏览器本地姿态检测。
+
+**前端栈**：
+- **TF.js + MoveNet Lightning**（Google 预训练，~3MB）— 浏览器内推理，CPU ~30ms/帧，零上传
+- 3 个关键点判定（鼻子 + 左肩 + 右肩），三档巡查频率（30s / 60s / 120s）
+- 三状态机（`idle` → `running` → `report`），摄像头流由页面持有复用
+- 物理摄像头智能过滤（自动排除 Iriun / OBS Virtual / DroidCam 等）
+
+**后端栈**：**零改动**。复用现有 `POST /api/v1/evaluation/record` + `learning_records` 表，写 3 种新 action（`study_session_start` / `study_patrol` / `study_session_end`）。
+
+**联动链路**（零代码自动）：
+```
+study_patrol / study_session_end → learning_records
+  → scheduled_analysis_service (每 4h)
+  → behavior_analysis_agent
+  → student_profiles.dimensions.focus 自动更新
+  → /profile 页显示新的专注力分数
+```
+
+仪表盘联动：`dashboard.py:81-87` +8 行 SQL，`weekly_study_sessions` 字段自动展示。
+
+**关键文件**：
+- `frontend/src/app/zixi/page.tsx` — 主页
+- `frontend/src/hooks/useCameraPatrol.ts` — TF.js + MoveNet hook
+- `frontend/src/components/CameraToggle.tsx` — 摄像头开关组件
 
 ### 流式输出
 
@@ -198,6 +218,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 管理后台用户删除功能 (级联删除 + 安全检查 + 二次确认)
 - ✅ 资源中心重构 (推荐 Feed + 三阶段学习包)
 - ✅ 评估报告 AI 化 (LLM 生成 + 趋势分析 + 知识点统计)
+- ✅ 自习模式 v1.5 (TF.js + MoveNet + 3 状态机 + 物理摄像头过滤 + 横排布局)
 
 ### P2 — 清理项
 
@@ -226,6 +247,9 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 | DB schema 漂移 | 老 DB 缺表/列 | 跑 `scripts/migrate_schema_drift.py` 幂等修复 |
 | Celery import 路径 | `from app.core.celery_config import app` 报错 | celery 必须在 `backend/` 目录下执行 |
 | recommendation_service 时区 | `datetime.utcnow()` 与 DB offset-aware 时间比较失败 | 用 `datetime.now(timezone.utc)` 替代 |
+| 自习模式 callback ref | `<video ref={inline}>` 在倒计时每秒 re-render 时被 React 调用 ref(null) + ref(el)，触发 `play()` 重启视频 → 屏幕每秒闪烁黑屏 | 把 inline ref 改成 `useCallback` 稳定 + `useEffect([stream])` 只在 stream 真正变化时设 srcObject |
+| 自习模式摄像头选错 | Edge 默认枚举到 Iriun Webcam（虚拟摄像头驱动未启动 → 黑屏但 token 已授权） | `enumerateDevices()` + 启发式过滤虚拟摄像头关键词（Iriun / OBS Virtual / DroidCam 等），锁定 `deviceId.exact` |
+| 自习模式 useImperativeHandle 时序 | `useImperativeHandle` 在渲染期执行，`localRef.current` 仍为 null，导致父 ref 在第一次 render 后被设为 null | 改用 callback ref 直接在 mount 时设 srcObject，不依赖 useEffect 异步时机 |
 
 ## 提交规范
 

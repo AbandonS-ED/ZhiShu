@@ -59,6 +59,13 @@ const evalSvg = (
     <line x1="6" y1="20" x2="6" y2="14" />
   </svg>
 )
+const zixiSvg = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="13" r="8" />
+    <path d="M12 9v4l2.5 2.5" />
+    <path d="M9 2h6" />
+  </svg>
+)
 
 const navGroups: { label: string; items: NavItem[] }[] = [
   {
@@ -76,6 +83,12 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { href: '/path', label: '学习计划', svg: pathSvg },
       { href: '/tiku', label: '练习题库', svg: checkSvg },
       { href: '/pinggu', label: '学习评估', svg: evalSvg },
+    ],
+  },
+  {
+    label: 'Focus',
+    items: [
+      { href: '/zixi', label: '自习模式', tag: 'NEW', svg: zixiSvg },
     ],
   },
 ]
@@ -102,6 +115,7 @@ export default function Sidebar() {
     router.prefetch('/resources')
     router.prefetch('/tiku')
     router.prefetch('/pinggu')
+    router.prefetch('/zixi')
   }, [router])
 
   const userName = student?.name || student?.student_no || '未登录'

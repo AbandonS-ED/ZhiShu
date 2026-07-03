@@ -11,7 +11,7 @@ const nextConfig = {
     formats: ['image/webp'],
   },
   experimental: {
-    optimizeCss: true,
+    // optimizeCss: true, // 暂关闭:experimental 功能,与当前 webpack 构建冲突,导致 layout.css 500
   },
   async rewrites() {
     return []
