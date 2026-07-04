@@ -1,6 +1,6 @@
 # 智枢 (SmartHub) 前端 API 集成文档
 
-> ⚠️ **DEPRECATED · 2026-06-09**（最后同步：2026-06-28 — `lib/api.ts` 已扩到 10 模块 + auth 6 端点 + 统一 SSE 工具 `sse.ts`，本文档结论仍然成立）
+> ⚠️ **DEPRECATED · 2026-06-09**（最后同步：2026-07-04 — `lib/api.ts` 已扩到 10 模块 + auth 8 端点 + 统一 SSE 工具 `sse.ts` + evaluationApi.recordAction，自习模式写入 learning_records，本文档结论仍然成立）
 >
 > 本文档描述的 `ApiClient` 类、Token 刷新、SWR 集成、Auth 模块等**全部未在项目中实现**。
 >

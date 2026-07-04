@@ -15,7 +15,7 @@
 |---|---|---|---|
 | 前端 | Next.js (App Router) + Tailwind CSS + TypeScript | 14.2.5 | 本地 woff 字体，无 Google Fonts |
 | 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 | Python 3.11 |
-| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 9 子 Agent |
+| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 9 子 Agent（含 Master 编排器） |
 | LLM | 双客户端: MiniMaxClient (开发) / SparkClient (上线) | - | `LLM_PROVIDER=minimax\|spark` 切换 |
 | 向量库 | pgvector (JSONB 降级方案) | - | embedding 用 JSONB 占位 |
 | 数据库 | PostgreSQL 18 + Redis | - | 12 张表 |
@@ -26,7 +26,7 @@
 ```
 ZhiShu/
 ├── frontend/                        # Next.js 前端
-│   ├── src/app/                     # 页面路由 (9 学生页 + 9 管理页)
+│   ├── src/app/                     # 页面路由 (10 学生页 + 9 管理页)
 │   ├── src/components/              # 共享组件 (Icon.tsx + RobotIcon.tsx + layout/)
 │   ├── src/lib/                     # 工具库 (api.ts + sse.ts + admin/)
 │   ├── src/stores/appStore.ts       # Zustand 全局状态
