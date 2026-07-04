@@ -200,30 +200,36 @@ async def get_dashboard_stats(
         "resource":     {"type": "resource",   "title": "学习资源",      "color": "#059669"},
         "assessment":   {"type": "profile",    "title": "画像评估",      "color": "#EC4899"},
         "study_focus":  {"type": "study",      "title": "专注自习",      "color": "#6366F1"},
+        "like":         {"type": "chat",       "title": "对话反馈",      "color": "#8a9ba8"},
+        "dislike":      {"type": "chat",       "title": "对话反馈",      "color": "#8a9ba8"},
+        "learn_complete":    {"type": "resource", "title": "完成学习",   "color": "#10B981"},
+        "practice_complete": {"type": "exercise", "title": "完成练习",   "color": "#F59E0B"},
+        "review_complete":   {"type": "resource", "title": "完成复习",   "color": "#10B981"},
     }
 
     for rec in recent_records:
         meta = ACTION_MAP.get(rec.action)
         if not meta:
-            # 未知 action：尝试翻译，不显示英文
-            if "study" in rec.action:
-                meta = {"type": "study", "title": "自习学习", "color": "#6366F1"}
-            elif "resource" in rec.action or "view" in rec.action:
-                meta = {"type": "resource", "title": "学习资源", "color": "#059669"}
-            elif "exercise" in rec.action or "quiz" in rec.action:
+            # 未知 action：用关键词兜底，绝不显示英文
+            action_lower = rec.action.lower()
+            if "study" in action_lower or "focus" in action_lower:
+                meta = {"type": "study", "title": "学习活动", "color": "#6366F1"}
+            elif "exercise" in action_lower or "quiz" in action_lower:
                 meta = {"type": "exercise", "title": "做练习题", "color": "#F59E0B"}
-            elif "profile" in rec.action or "assess" in rec.action:
+            elif "resource" in action_lower or "view" in action_lower or "generate" in action_lower:
+                meta = {"type": "resource", "title": "学习资源", "color": "#059669"}
+            elif "profile" in action_lower or "assess" in action_lower:
                 meta = {"type": "profile", "title": "学习画像", "color": "#EC4899"}
-            elif "path" in rec.action:
+            elif "path" in action_lower:
                 meta = {"type": "path", "title": "学习路径", "color": "#10B981"}
-            elif "chat" in rec.action:
+            elif "chat" in action_lower:
                 meta = {"type": "chat", "title": "智能对话", "color": "#8a9ba8"}
             else:
-                meta = {"type": "resource", "title": "学习记录", "color": "#78716C"}
+                meta = {"type": "resource", "title": "学习活动", "color": "#78716C"}
 
         title = meta["title"]
-        # 拼接知识点（过滤掉英文技术 key）
-        if rec.knowledge_point and not rec.knowledge_point.isascii():
+        # 拼接知识点（过滤掉英文技术 key，如 study_focus / feedback）
+        if rec.knowledge_point and not rec.knowledge_point.isascii() and '_' not in rec.knowledge_point:
             title = f"{title}：{rec.knowledge_point}"
         elif rec.resource_type:
             type_zh = {"resource": "资源", "exercise": "练习", "path": "路径", "chat": "对话", "evaluation": "评估"}.get(rec.resource_type)
