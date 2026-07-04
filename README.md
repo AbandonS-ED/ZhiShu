@@ -34,7 +34,7 @@
 
 ```
 ZhiShu/
-├── frontend/                      # Next.js 前端 (21 页面)
+├── frontend/                      # Next.js 前端 (19 页面)
 │   └── src/
 │       ├── app/                   # 页面路由
 │       │   ├── layout.tsx         # 根布局 (本地字体 + ClientShell)
