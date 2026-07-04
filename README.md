@@ -8,8 +8,8 @@
 
 ### 核心功能
 
-- **F1 对话式画像 (35%)** — 7 维学生画像评估（理解力/记忆力/应用转化/想象力/专注力/学习节奏/知识广度）
-- **F2 多智能体资源生成 (45%)** — 9 Agent 协同生成学习资源
+- **F1 对话式画像 (35%)** — 7 维学生画像评估（理解力/记忆力/应用转化/想象力/专注力/知识基础/学习目标）
+- **F2 多智能体资源生成 (45%)** — 9 Agent 协同生成学习资源（含防幻觉三层验证）
 - **F3 学习路径规划** — DAG 可视化路径 + 每日学习计划
 - **F4 智能辅导** — RAG 问答 + 多轮对话上下文
 - **F5 效果评估** — LLM 生成评估报告 + 趋势分析
@@ -28,7 +28,7 @@
 | 向量库 | pgvector (JSONB 降级方案) | - |
 | 异步任务 | Celery (Redis broker) | - |
 | **前端 AI** | **@tensorflow/tfjs 4.20 + @tensorflow-models/pose-detection 2.1（MoveNet Lightning · 自习模式）** | **~3MB 模型 · 浏览器本地推理** |
-| 测试 | pytest (114 个测试) + 端到端冒烟测试 | - |
+| 测试 | pytest (129 个测试) + 端到端冒烟测试 | - |
 
 ## 项目结构
 
@@ -54,14 +54,14 @@ ZhiShu/
 │       │   ├── RobotIcon.tsx      # 机器人图标
 │       │   └── layout/            # Sidebar + Header + ClientShell
 │       ├── lib/                   # 工具库
-│       │   ├── api.ts             # API 客户端 (55+ 接口封装)
+│       │   ├── api.ts             # API 客户端
 │       │   ├── sse.ts             # 统一 SSE 流式工具
 │       │   ├── student.ts         # 学生 ID 获取工具
 │       │   ├── utils.ts           # 工具函数
 │       │   └── admin/             # 管理后台 Context + 共享组件
 │       ├── stores/appStore.ts     # Zustand 全局状态
 │       ├── types/index.ts         # TypeScript 类型定义
-│       └── hooks/                 # 自定义 hooks (4 个)
+│       └── hooks/usePageTimer.ts  # 页面停留计时器
 ├── backend/                       # FastAPI 后端
 │   └── app/
 │       ├── main.py                # 应用入口 + 路由注册
@@ -69,14 +69,22 @@ ZhiShu/
 │       ├── agents/                # 9 个 Agent + StateGraph 编排
 │       │   ├── master_agent.py    # LangGraph StateGraph 10 节点
 │       │   ├── state.py           # AgentState + IntentType
-│       │   └── communicator.py    # MessageBus pub/sub
+│       │   ├── communicator.py    # MessageBus pub/sub
+│       │   ├── initial_assessment_agent.py  # 画像评估
+│       │   ├── document_agent.py  # 知识讲解
+│       │   ├── mindmap_agent.py   # 思维导图
+│       │   ├── exercise_agent.py  # 练习题生成
+│       │   ├── path_agent.py      # 学习路径
+│       │   ├── tutor_agent.py     # RAG 问答
+│       │   ├── audio_agent.py     # 音频脚本
+│       │   └── behavior_analysis_agent.py # 行为分析
 │       ├── services/              # 16 个服务模块
 │       ├── models/                # 13 个数据模型
 │       ├── tasks/                 # Celery 异步任务
 │       └── core/                  # 核心模块 (配置/数据库/安全/Agent 指标)
-├── tests/                         # 114 pytest + 冒烟测试
+├── tests/                         # 129 pytest + 冒烟测试
 ├── docs/                          # 设计文档
-├── scripts/                       # 数据库初始化脚本 (12 个)
+├── scripts/                       # 数据库初始化脚本
 ├── docker-compose.yml             # Docker 编排
 ├── start.ps1                      # Windows 一键启动
 └── stop.ps1                       # Windows 一键停止
@@ -91,14 +99,7 @@ ZhiShu/
 - PostgreSQL 16+
 - Redis 7+
 
-### 1. 克隆项目
-
-```bash
-git clone https://github.com/AbandonS-ED/ZhiShu.git
-cd ZhiShu
-```
-
-### 2. 初始化数据库
+### 1. 初始化数据库
 
 ```bash
 # 建库 (只需一次)
@@ -112,18 +113,18 @@ pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 python scripts/init_admin.py
 ```
 
-### 3. 配置环境变量
+### 2. 配置环境变量
 
 ```bash
 # 复制环境变量模板
-cp .env.example .env
+cp backend/.env.example backend/.env
 
 # 编辑 .env 填入你的 API Key
 # MINIMAX_API_KEY=your_key_here
 # 或切换到讯飞星火: LLM_PROVIDER=spark + SPARK_API_KEY=your_key_here
 ```
 
-### 4. 启动服务
+### 3. 启动服务
 
 ```bash
 # 方式一：一键启停 (推荐)
@@ -142,7 +143,7 @@ npm install
 npm run dev
 ```
 
-### 5. 访问系统
+### 4. 访问系统
 
 | 入口 | 地址 | 账号 |
 |---|---|---|
@@ -155,13 +156,14 @@ npm run dev
 ### 学生端
 
 1. `/login` → 注册 → 登录
-2. `/profile` → 开始评估 → 回答 3-5 个问题 → 查看 5 维画像
+2. `/profile` → 开始评估 → 回答问题 → 查看 7 维画像
 3. `/duihua` → 发送消息 → SSE 流式对话 + 多轮上下文
 4. `/resources` → 查看推荐资源 → 输入知识点生成新资源
 5. `/tiku` → 查看题库 → AI 生成练习题
 6. `/path` → 输入知识点 → 生成学习路径
 7. `/pinggu` → 查看 LLM 评估报告
 8. `/zixi` → 自习模式 → 选时长/难度 → 可选开摄像头 → 开始番茄钟 → 静默巡查 → 结束看报告
+9. `/` → 仪表盘 → 查看统计数据
 9. `/setting` → 修改个人信息
 
 ### 注册体验
@@ -173,11 +175,11 @@ npm run dev
 ### 管理后台
 
 1. `/admin/login` → admin/admin123 登录
-2. `/admin` → 查看统计仪表盘（并行查询 + 骨架屏加载）
+2. `/admin` → 查看统计仪表盘
 3. `/admin/users` → 用户管理（搜索/筛选/禁用/删除）
 4. `/admin/resources` → 资源管理（后端搜索 + 分页）
 5. `/admin/exercises` → 题库管理（CRUD + 批量导入）
-6. `/admin/paths` → 学习路径管理（DAG 可视化）
+6. `/admin/paths` → 学习路径管理
 7. `/admin/chats` → 对话记录（消息详情）
 8. `/admin/documents` → 知识库文档管理
 9. `/admin/agents` → Agent 监控面板（9 Agent 实时调用统计 + 30s 自动刷新）
@@ -185,7 +187,7 @@ npm run dev
 ## 测试
 
 ```bash
-# 单元测试 (114 pytest)
+# 单元测试 (129 pytest)
 cd backend
 python -m pytest tests/ -v
 
@@ -211,7 +213,7 @@ npm run build
 - **统一 SSE 工具**: 前后端统一流式处理，支持重试 + 指数退避 + 120s 超时
 - **评估报告 AI 化**: LLM 生成自然语言报告 + 趋势分析 + 知识点掌握度统计
 - **推荐系统**: 基于画像/评估/对话/题库/路径的多维度打分推荐
-- **管理后台**: 25 个端点 (含 Agent 监控 + 用户删除) + 并行查询 + N+1 优化
+- **管理后台**: 18 个管理端点 + Agent 监控 + 并行查询 + N+1 优化
 - **手机验证码**: 模拟短信服务（控制台输出），5 分钟有效期
 - **行为驱动画像**: 对话/练习/资源/路径学习自动更新 7 维画像
 - **自习模式**: TF.js + MoveNet 浏览器本地姿态检测（零上传）· 番茄钟专注 + 静默巡查 + 物理摄像头智能过滤 + 联动学习画像 focus 维度

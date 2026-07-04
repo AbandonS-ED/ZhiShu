@@ -1,6 +1,6 @@
 # 智枢(SmartHub) Backend
 
-> 最后更新：2026-07-02（代码审计 + 文档同步版本）
+> 最后更新：2026-07-02（数据库 schema 修复 + 文档同步版本）
 
 基于 FastAPI + 9 Agent 的多智能体学习资源生成系统后端。
 
@@ -51,8 +51,8 @@ backend/
 │   │   ├── dependencies.py  # UUID 校验 + get_current_user 门禁
 │   │   └── celery_config.py # Celery 配置（未启用）
 │   ├── models/              # 13 个 Model
-│   │   ├── student.py       # ⭐ 学生/管理员（student_no + password_hash + role + is_active + last_login）
-│   │   ├── student_profile.py # **7 维** JSONB 画像（理解力/记忆力/应用转化/想象力/专注力/学习节奏/知识广度 + confidence）
+│   │   ├── student.py       # 学生/管理员（student_no + password_hash + role + is_active + last_login）
+│   │   ├── student_profile.py # 7 维 JSONB 画像（comprehension/memory/application/imagination/focus/knowledge_base/learning_goal + confidence）
 │   │   ├── document_chunk.py  # RAG 文档分块（embedding 用 JSONB 占位）
 │   │   ├── resource.py      # 学习资源
 │   │   ├── learning_path.py # DAG 学习路径
@@ -61,12 +61,12 @@ backend/
 │   │   ├── chat_session.py  # 聊天会话
 │   │   ├── chat_message.py  # 聊天消息
 │   │   ├── learning_record.py # 学习行为记录（F5 评估）
-│   │   ├── learning_activity_log.py # 学习行为日志（wyy 独占）
+│   │   ├── learning_activity_log.py # 学习行为日志
 │   │   └── evaluation_report.py # 预生成评估报告缓存
 │   ├── agents/              # 9 个 Agent
 │   │   ├── state.py           # AgentState TypedDict + IntentType（11 种意图）
 │   │   ├── communicator.py    # MessageBus pub/sub
-│   │   ├── initial_assessment_agent.py  # 对话式 **7 维** 画像评估（替换旧 profile_agent）
+│   │   ├── initial_assessment_agent.py  # 对话式 7 维画像评估
 │   │   ├── document_agent.py  # 知识讲解 + 代码 + 音频脚本 + 防幻觉验证
 │   │   ├── exercise_agent.py  # 自适应练习题生成 + 防幻觉验证
 │   │   ├── path_agent.py      # 学习路径规划（DAG）
@@ -94,12 +94,12 @@ backend/
 │       └── scheduled_analysis_service.py # 定时画像分析
 ├── scripts/
 │   ├── init_db.sql          # 手动建库 + 建表 SQL 脚本（**12 张表** + 14 索引 + admin 种子数据）
-│   ├── init_admin.py        # ⭐ 自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号
-│   ├── migrate_exercise_bank.sql # 练习题库迁移（已合并到 init_db.sql）
+│   ├── init_admin.py        # 自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号
+│   ├── migrate_schema_drift.py # 数据库 schema 漂移迁移（幂等）
 │   └── run_migration.py     # 通用迁移执行器
-├── tests/                   # smoke_test.py（端到端）+ 7 个 pytest 文件（**114** 个测试）+ 6 个 debug 脚本
+├── tests/                   # smoke_test.py（端到端）+ 7 个 pytest 文件（**129** 个测试）
 ├── pytest.ini               # asyncio_mode=auto, testpaths=tests
-├── Dockerfile               # ⚠️ 未实际使用，后端本地裸跑
+├── Dockerfile               # 未实际使用，后端本地裸跑
 ├── requirements.txt
 └── .env                     # API Key（已 gitignore）
 ```
@@ -107,7 +107,6 @@ backend/
 ## API 路由（67 个唯一端点）
 
 > 唯一端点 = 唯一路径 + 方法组合。`backend/app/main.py` 注册 12 router，含 `/` 和 `/health` 根路由。
-> 端点变更历史：33（2026-06-14）→ 41（2026-06-28）→ 67（2026-07-02），新增 26 个端点：
 
 - `POST /profile/reset` / `GET /profile/assessment-status` / `PUT /profile/background`（profile 重置与背景）
 - `POST /resource/{id}/favorite`（资源收藏）
@@ -279,7 +278,7 @@ backend/
 | 表名 | 用途 | 索引 |
 |------|------|------|
 | `students` | **学生/管理员**（student_no + password_hash + role + is_active + last_login） | `student_no` UNIQUE + `idx_students_role` + `idx_students_is_active` |
-| `student_profiles` | **7 维** JSONB 画像（理解力/记忆力/应用转化/想象力/专注力/学习节奏/知识广度 + confidence） | `idx_student_profiles_student_id` |
+| `student_profiles` | **7 维** JSONB 画像（comprehension/memory/application/imagination/focus/knowledge_base/learning_goal + confidence） | `idx_student_profiles_student_id` |
 | `document_chunks` | RAG 文档分块（embedding JSONB 占位） | — |
 | `resources` | 生成的学习资源 | `idx_resources_student_id` |
 | `learning_paths` | DAG 学习路径 | `idx_learning_paths_student_id` |
@@ -288,7 +287,7 @@ backend/
 | `chat_sessions` | 聊天会话 | `idx_chat_sessions_student_id` |
 | `chat_messages` | 聊天消息 | `idx_chat_messages_session_id` |
 | `learning_records` | 学习行为记录（F5 评估） | `idx_learning_records_student_id` + `idx_learning_records_action` + `idx_learning_records_created_at` |
-| `learning_activity_logs` | 学习行为日志（wyy 独占） | — |
+| `learning_activity_logs` | 学习行为日志 | — |
 | `evaluation_reports` | **预生成评估报告缓存**（Celery daily 4 点跑） | `idx_evaluation_reports_student_id` + 复合索引 `(student_id, report_date)` |
 
 ## 认证与权限
@@ -306,7 +305,7 @@ backend/
 - Dockerfile 已存在但未实际使用，docker-compose.yml 只配了 postgres/redis/minio，**实际后端本地裸跑**
 - Celery 异步任务**已配置**（`app/core/celery_config.py` + `app/tasks/evaluation_tasks.py`），daily 4 点跑 `generate_daily_reports`；当前**未启动 worker**，评估 API 仍走实时生成
 - PowerShell `$2b$` 变量插值：bcrypt 哈希不能直接在 PowerShell 命令行传，**用 `scripts/init_admin.py` 绕开**
-- `LearningRecord` 已在 `models/__init__.py` 导出（2026-06-13 修复）
+- `student_profiles.last_analyzed_at` 列缺失会导致 profile/me 等 API 报 500 错误，需执行：`ALTER TABLE student_profiles ADD COLUMN last_analyzed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL`
 - 后端端口**必须 8001**（不要 8000：Windows 端口僵尸 socket 坑）。改端口要同步改 `frontend/src/lib/api.ts:5` 的 `BASE_URL`
 
 ## 测试
@@ -317,24 +316,23 @@ cd backend
 # ⭐ 端到端冒烟测试 (9 API 验证，七次 9/9 PASS)
 python -m tests.smoke_test
 
-# 单元 + 集成（**114** 个 pytest 测试）
+# 单元 + 集成（**129** 个 pytest 测试）
 pytest tests/ -v
 ```
 
 **实际测试文件**（`backend/tests/`）：
 
-| 文件 | 大小 | 用途 | 测试数 |
-|------|------|------|--------|
-| ⭐ `smoke_test.py` | 13.3 KB | **端到端冒烟**，9 API 全 200 | — |
-| `test_agents.py` | 7.7 KB | Agent 单元测试 | 27 |
-| `test_anti_hallucination.py` | 4.3 KB | 防幻觉三层（PatternDetector / SourceValidator / LLMValidator） | 19 |
-| `test_api.py` | 2.3 KB | API 最小集成测试 | 10 |
-| `test_json_parser.py` | 2.1 KB | JSON 解析工具 | 11 |
-| `test_message_bus.py` | 5.7 KB | MessageBus pub/sub | 12 |
-| `test_state_graph.py` | 7.5 KB | StateGraph 节点/边/conditional_route | 24 |
-| `test_strip_think.py` | 2.2 KB | think 标签过滤 | 11 |
-| `debug_*.py` | 6 个 | 调试脚本（exercise / mindmap / path / resource） | — |
-| **合计** | | | **114** |
+| 文件 | 测试数 |
+|------|--------|
+| `smoke_test.py` | 端到端冒烟，9 API 全 200 |
+| `test_agents.py` | 32 |
+| `test_anti_hallucination.py` | 22 |
+| `test_api.py` | 10 |
+| `test_json_parser.py` | 11 |
+| `test_message_bus.py` | 15 |
+| `test_state_graph.py` | 27 |
+| `test_strip_think.py` | 12 |
+| **合计** | **129** |
 
 最新测试报告见 `../SMOKE_TEST_REPORT.md`。
 

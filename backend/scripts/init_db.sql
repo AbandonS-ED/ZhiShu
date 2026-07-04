@@ -64,21 +64,6 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS resources (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    student_id UUID NOT NULL,
-    course_id UUID,
-    title VARCHAR(500) NOT NULL,
-    resource_type VARCHAR(50) NOT NULL,
-    content JSONB NOT NULL,
-    knowledge_point VARCHAR(200),
-    difficulty INTEGER DEFAULT 50,
-    is_favorited BOOLEAN DEFAULT FALSE,
-    is_preset BOOLEAN DEFAULT FALSE,
-    metadata JSONB DEFAULT '{}',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
 CREATE TABLE IF NOT EXISTS learning_paths (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id UUID NOT NULL,
@@ -91,42 +76,6 @@ CREATE TABLE IF NOT EXISTS learning_paths (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
-CREATE TABLE IF NOT EXISTS exercises (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    student_id UUID NOT NULL,
-    resource_id UUID,
-    exercise_type VARCHAR(50) NOT NULL,
-    question VARCHAR(2000) NOT NULL,
-    options JSONB,
-    answer VARCHAR(2000) NOT NULL,
-    explanation VARCHAR(2000),
-    difficulty INTEGER DEFAULT 50,
-    knowledge_point VARCHAR(200),
-    student_answer VARCHAR(2000),
-    is_correct FLOAT,
-    source VARCHAR(20) DEFAULT 'ai',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS exercise_bank (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    question VARCHAR(2000) NOT NULL,
-    exercise_type VARCHAR(50) NOT NULL,
-    options JSONB,
-    answer VARCHAR(2000) NOT NULL,
-    explanation VARCHAR(2000),
-    difficulty INTEGER DEFAULT 50,
-    knowledge_point VARCHAR(200),
-    source VARCHAR(20) DEFAULT 'admin',
-    is_active BOOLEAN DEFAULT true,
-    created_by UUID,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-    updated_at TIMESTAMP WITH TIME ZONE
-);
-CREATE INDEX IF NOT EXISTS idx_exercise_bank_kp ON exercise_bank(knowledge_point);
-CREATE INDEX IF NOT EXISTS idx_exercise_bank_type ON exercise_bank(exercise_type);
-CREATE INDEX IF NOT EXISTS idx_exercise_bank_active ON exercise_bank(is_active);
 
 CREATE TABLE IF NOT EXISTS chat_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -166,9 +115,7 @@ CREATE INDEX IF NOT EXISTS idx_learning_records_created_at ON learning_records(c
 
 -- 5. 常用查询索引（student_id 在 5+ 张表频繁查询）
 CREATE INDEX IF NOT EXISTS idx_student_profiles_student_id ON student_profiles(student_id);
-CREATE INDEX IF NOT EXISTS idx_resources_student_id ON resources(student_id);
 CREATE INDEX IF NOT EXISTS idx_learning_paths_student_id ON learning_paths(student_id);
-CREATE INDEX IF NOT EXISTS idx_exercises_student_id ON exercises(student_id);
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_student_id ON chat_sessions(student_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id);
 
@@ -195,11 +142,10 @@ CREATE TABLE IF NOT EXISTS evaluation_reports (
 CREATE INDEX IF NOT EXISTS idx_evaluation_reports_student_date ON evaluation_reports(student_id, report_date);
 
 -- 6. 完成
-\echo '✅ 数据库 zhishu 初始化完成，共 11 张表 + 16 个索引'
+\echo '✅ 数据库 zhishu 初始化完成'
 \echo '   students / student_profiles / document_chunks'
-\echo '   resources / learning_paths / exercises / exercise_bank'
-\echo '   chat_sessions / chat_messages / learning_records'
-\echo '   learning_activity_logs'
+\echo '   learning_paths / chat_sessions / chat_messages'
+\echo '   learning_records / learning_activity_logs / evaluation_reports'
 
 -- 7. 初始化默认管理员账号（密码: admin123）
 -- bcrypt 哈希: $2b$12$aUqTTt5KCfd1zGXqZoQaieRPYuoNXKCM/do3wrjcEK4yCqEij/yUS

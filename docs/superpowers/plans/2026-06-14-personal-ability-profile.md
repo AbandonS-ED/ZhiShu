@@ -2,7 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the old 6-dimension learning profile with a new 5-dimension personal ability profile (理解力/记忆力/应用转化/想象力/专注力), with AI-guided initial assessment.
+**Goal:** Replace the old 6-dimension learning profile with a new 7-dimension personal ability profile (comprehension/memory/application/imagination/focus/knowledge_base/learning_goal), with AI-guided initial assessment.
+> **状态同步**: 2026-07-02 — ✅ **已完成**（7 维画像 + SSE 流式评估 + Initial Assessment Agent）
 
 **Architecture:** Backend FastAPI + SQLAlchemy stores one `StudentProfile` row per student with 5-dimension JSONB. A lightweight `InitialAssessmentAgent` guides a conversation-based Q&A to evaluate each dimension. Frontend shows a pentagon radar chart.
 

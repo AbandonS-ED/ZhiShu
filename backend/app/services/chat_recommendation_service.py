@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from app.models.student_profile import StudentProfile
 from app.models.learning_record import LearningRecord
-from app.models.exercise import Exercise
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
 from app.models.learning_path import LearningPath
@@ -147,20 +146,21 @@ class ChatRecommendationService:
         # 4. 题库正确率缺口 (weight 0.15)
         ex_result = await db.execute(
             select(
-                Exercise.knowledge_point,
-                func.avg(Exercise.is_correct).label("avg_correct"),
+                LearningRecord.knowledge_point,
+                func.avg(LearningRecord.score).label("avg_score"),
             )
             .where(
-                Exercise.student_id == sid,
-                Exercise.knowledge_point.isnot(None),
-                Exercise.is_correct.isnot(None),
+                LearningRecord.student_id == sid,
+                LearningRecord.knowledge_point.isnot(None),
+                LearningRecord.action == "exercise",
+                LearningRecord.score.isnot(None),
             )
-            .group_by(Exercise.knowledge_point)
+            .group_by(LearningRecord.knowledge_point)
         )
         for row in ex_result.all():
-            kp, avg = row.knowledge_point, row.avg_correct
-            if kp and avg is not None and avg < 0.6:
-                candidates[kp] = max(candidates.get(kp, 0), 0.15 * (1 - avg))
+            kp, avg = row.knowledge_point, row.avg_score
+            if kp and avg is not None and avg < 60:
+                candidates[kp] = max(candidates.get(kp, 0), 0.15 * (1 - avg / 100))
 
         # 5. 学习路径当前阶段 (weight 0.10)
         path_result = await db.execute(

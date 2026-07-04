@@ -251,8 +251,6 @@ code, .mono { font-family: 'JetBrains Mono', monospace; font-weight: 400; }
 .msg-action-btn:hover{color:var(--ink);border-color:var(--ink-4);background:var(--bg)}
 .msg-action-btn svg{width:11px;height:11px}
 .res-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.res-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--surface);border-radius:8px;font-size:11.5px;color:var(--ink-2);font-weight:500;cursor:pointer;transition:all .2s;border:1px solid var(--line)}
-.res-chip:hover{border-color:var(--ink-4);background:var(--bg);transform:translateY(-1px)}
 .res-chip .chip-icon{width:22px;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
 .chip-explain{background:var(--info-soft);color:var(--info)}
 .chip-mindmap{background:var(--success-soft);color:var(--success)}
@@ -304,9 +302,6 @@ code, .mono { font-family: 'JetBrains Mono', monospace; font-weight: 400; }
 .knowledge-pills{display:flex;flex-wrap:wrap;gap:5px}
 .kp{padding:4px 10px;border-radius:6px;font-size:11px;background:var(--accent-soft);color:var(--ink-2);font-weight:500;cursor:default;transition:all .15s}
 .kp:hover{background:var(--warm-soft);color:var(--warm)}
-.gen-resource{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line-2);font-size:12px;color:var(--ink-2)}
-.gen-resource:last-child{border-bottom:none}
-.gen-resource .gr-dot{width:5px;height:5px;border-radius:50%;background:var(--ink-3);flex-shrink:0}
 .gen-resource .gr-status{margin-left:auto;font-size:10px;font-weight:600}
 .gs-done{color:var(--success)}
 .gs-running{color:var(--warm)}
@@ -406,7 +401,6 @@ code, .mono { font-family: 'JetBrains Mono', monospace; font-weight: 400; }
 .hist-body .hb-changes span{font-size:10px;padding:2px 7px;border-radius:5px;background:var(--accent-soft);color:var(--ink-2);font-weight:500}
 
 /* ═══ RESOURCES ═══ */
-.res-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
 .search-wrap{position:relative;flex:1;min-width:220px;max-width:360px}
 .search-wrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--ink-4);pointer-events:none}
 .search-input{width:100%;padding:9px 14px 9px 36px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:13px;font-family:'Inter',sans-serif;background:var(--surface);color:var(--ink);outline:none;transition:all .2s var(--ease)}
@@ -424,16 +418,6 @@ code, .mono { font-family: 'JetBrains Mono', monospace; font-weight: 400; }
 .stats-bar{display:flex;gap:16px;margin-bottom:18px;font-size:12.5px;color:var(--ink-3)}
 .stats-bar .sb-count{font-weight:600;color:var(--ink)}
 .stats-bar .sb-sep{color:var(--ink-4)}
-.res-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.res-grid.list-view{grid-template-columns:1fr}
-.res-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:all .3s var(--ease);opacity:0;animation:cardIn .4s var(--ease) forwards;position:relative}
-.res-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
-.res-card:nth-child(1){animation-delay:.03s}
-.res-card:nth-child(2){animation-delay:.06s}
-.res-card:nth-child(3){animation-delay:.09s}
-.res-card:nth-child(4){animation-delay:.12s}
-.res-card:nth-child(5){animation-delay:.15s}
-.res-card:nth-child(6){animation-delay:.18s}
 @keyframes cardIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 .rc-header{padding:18px 20px 0;display:flex;align-items:flex-start;gap:12px}
@@ -797,7 +781,6 @@ code, .mono { font-family: 'JetBrains Mono', monospace; font-weight: 400; }
 /* ═══ RESPONSIVE ═══ */
 @media(max-width:1200px){
   .stats{grid-template-columns:repeat(2,1fr)}
-  .res-grid{grid-template-columns:repeat(2,1fr)}
   .dash-grid{grid-template-columns:1fr}
   .chat-side{display:none}
   .prof-layout{grid-template-columns:1fr}
@@ -813,7 +796,6 @@ code, .mono { font-family: 'JetBrains Mono', monospace; font-weight: 400; }
 @media(max-width:768px){
   .sidebar{display:none}
   .stats{grid-template-columns:1fr}
-  .res-grid{grid-template-columns:1fr}
   .weak-grid{grid-template-columns:1fr}
   .stats-row{grid-template-columns:1fr}
   .stats-strip{grid-template-columns:repeat(2,1fr)}
@@ -1693,12 +1675,6 @@ body:has(.login-page){
 
 /* ═══ RESOURCES REDESIGN — REC FEED + PHASE BUTTON ═══ */
 
-/* Tab 切换 */
-.resources-tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--line);padding-bottom:0}
-.tab-btn{padding:8px 18px;border:none;border-bottom:2px solid transparent;background:transparent;font-size:13.5px;color:var(--ink-3);cursor:pointer;transition:all .15s;border-radius:var(--r-xs) var(--r-xs) 0 0;margin-bottom:-1px}
-.tab-btn:hover{color:var(--ink)}
-.tab-btn.active{color:var(--warm);border-bottom-color:var(--warm);font-weight:600}
-
 /* SmartInput */
 .smart-input-wrap{display:flex;flex-direction:column;gap:6px;margin-bottom:20px}
 .smart-input-row{display:flex;gap:8px}
@@ -1750,12 +1726,21 @@ body:has(.login-page){
 .phase-btn-error{background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger)}
 .phase-btn-error:hover{opacity:.85}
 .phase-icon{font-size:13px}
-.phase-progress-bar{height:3px;background:var(--line);border-radius:2px;overflow:hidden}
+.phase-progress-bar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;display:flex}
 .phase-progress-fill{height:100%;background:var(--warm);transition:width .3s}
+/* 多 Agent 分段进度条 */
+.phase-agent-segment{height:100%;min-width:0;transition:width .5s ease}
 .phase-info{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--ink-3);padding:0 2px}
 .phase-agent{font-size:11px}
 .phase-msg{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .phase-pct{flex-shrink:0}
+
+/* RecCard 拓展菜单 */
+.rec-extend-menu{margin-top:12px;padding:12px 14px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-sm);display:flex;flex-direction:column;gap:10px}
+.rec-extend-header{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink)}
+.rec-extend-options{display:flex;flex-wrap:wrap;gap:8px}
+.rec-extend-btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:var(--r-xs);font-size:12px;font-weight:500;cursor:pointer;border:none;transition:opacity .15s}
+.rec-extend-btn:hover{opacity:.82}
 
 /* LearningPage */
 .learn-page{padding:24px;max-width:860px;margin:0 auto}

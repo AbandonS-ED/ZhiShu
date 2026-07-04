@@ -9,7 +9,6 @@ from sqlalchemy import select, desc
 from app.models.student_profile import StudentProfile
 from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
-from app.models.exercise import Exercise
 from app.models.learning_record import LearningRecord
 from app.services.llm_factory import get_llm_client
 from app.core.profile_dimensions import DIM_CN
@@ -108,17 +107,21 @@ class BehaviorAnalysisAgent:
                 "time": row.created_at.isoformat() if row.created_at else None,
             })
         
-        # 最近 5 道练习
+        # 最近 5 条练习记录
         ex_result = await db.execute(
-            select(Exercise.question, Exercise.is_correct, Exercise.knowledge_point)
-            .where(Exercise.student_id == student_id)
-            .order_by(desc(Exercise.created_at))
+            select(LearningRecord.knowledge_point, LearningRecord.score, LearningRecord.detail)
+            .where(
+                LearningRecord.student_id == student_id,
+                LearningRecord.action == "exercise",
+            )
+            .order_by(desc(LearningRecord.created_at))
             .limit(5)
         )
         for row in ex_result.all():
+            detail = row.detail or {}
             data["recent_exercises"].append({
-                "question": row.question[:100] if row.question else "",
-                "correct": row.is_correct,
+                "question": detail.get("question", "")[:100] if isinstance(detail, dict) else "",
+                "correct": (row.score or 0) >= 60,
                 "knowledge_point": row.knowledge_point,
             })
         

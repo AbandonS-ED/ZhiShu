@@ -8,7 +8,7 @@
 
 | 荣 | 耻 |
 |---|----|
-| 以认真查询为荣 | 以聘猜接口为耻 |
+| 以认真查询为荣 | 以瞎猜接口为耻 |
 | 以寻求确认为荣 | 以模糊执行为耻 |
 | 以人类确认为荣 | 以臆想业务为耻 |
 | 以复用现有为荣 | 以创造接口为耻 |
@@ -54,7 +54,7 @@ cd backend && celery -A app.core.celery_config worker --loglevel=info
 cd backend && celery -A app.core.celery_config beat --loglevel=info
 
 # 测试
-cd backend && python -m pytest tests/ -v          # 114 pytest
+cd backend && python -m pytest tests/ -v          # 129 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
 cd frontend && npm run build                       # 18 页面
@@ -107,6 +107,7 @@ cd frontend && npm run build                       # 18 页面
 | 登录页无法滚动 | body `overflow:hidden` 导致注册表单超长时无法滚动 | `body:has(.login-page){overflow:auto}` CSS 选择器自动解除 |
 | 验证码按钮样式丑 | 复用 `.submit-btn` 全黑大按钮与输入框不协调 | 新增 `.code-row` + `.code-btn` 独立样式，深色背景与提交按钮统一 |
 | 注册表单展开生硬 | `register-extras` 直接 `display:none/block` 切换无过渡 | 改为 `max-height:0→600px` + `opacity:0→1` 平滑动画 |
+| `student_profiles.last_analyzed_at` 列缺失 | 查询 profile 时 500 Internal Server Error | `ALTER TABLE student_profiles ADD COLUMN last_analyzed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL` |
 
 ## 提交规范
 

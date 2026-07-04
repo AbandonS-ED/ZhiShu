@@ -1,7 +1,7 @@
 # 智枢 (SmartHub) - 前端项目
 
 > 多智能体学习资源生成系统 · 前端部分（学生端 9 页 + 管理后台 9 页）
-> 最后更新：2026-07-02（代码审计 + 文档同步版本）
+> 最后更新：2026-07-02（文档同步版本）
 
 ## 技术栈
 
@@ -39,14 +39,14 @@ src/
 │       ├── paths/          # /admin/paths 学习路径
 │       ├── chats/          # /admin/chats 对话记录
 │       ├── documents/      # /admin/documents 知识库
-│       └── agents/         # /admin/agents Agent 监控（10 Agent）
+│       └── agents/         # /admin/agents Agent 监控（9 Agent）
 ├── components/
 │   ├── layout/                # 学生端 Sidebar + Header
 │   └── RobotIcon.tsx          # ⭐ 极简机器人 SVG（替换 🤖 emoji）
 ├── hooks/
 │   └── usePageTimer.ts        # ⭐ 页面停留计时器（自动上报 learning_records）
 ├── lib/
-│   ├── api.ts                 # API 客户端（10 模块 + auth，自动带 token；SSE 委托 sse.ts）
+│   ├── api.ts                 # API 客户端（auth/chat/resource/path/profile/dashboard/evaluation/tutor/mindmap/admin，自动带 token；SSE 委托 sse.ts）
 │   ├── sse.ts                 # ⭐ 统一 SSE 工具（createEventStream + 3 次重试 + 指数退避 + 120s 超时）
 │   ├── student.ts             # student_id 本地存储（zhishu_student）
 │   ├── utils.ts               # cn() + escapeHtml() + markdownToHtml() + extractAnswer() + showToast()
@@ -75,16 +75,16 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 | 路由 | 页面 | 功能 | 后端联调 |
 |------|------|------|----------|
 | `/` | 仪表盘 | 统计卡片 + 最近活动 + 快速开始 + 课程进度 | ✅ 数据聚合 |
-| `/login` | 登录/注册 | Tab 切换 + 密码校验 + 自动跳转 | ✅ **JWT 认证** |
+| `/login` | 登录/注册 | Tab 切换 + 密码校验 + 手机验证码 + 自动跳转 | ✅ **JWT 认证** |
 | `/duihua` | 智能对话 | 多轮对话 + Agent 进度展示 + 推荐问题 + 会话管理 | ✅ **SSE 流式** (真逐 token) |
-| `/profile` | 学习画像 | Chart.js 雷达图 + 5 维详情（理解力/记忆力/应用转化/想象力/专注力 + confidence）+ 知识点掌握度 + 薄弱环节 + AI 弹窗 | ✅ AI 流式评估 |
+| `/profile` | 学习画像 | Chart.js 雷达图 + 7 维详情（comprehension/memory/application/imagination/focus/knowledge_base/learning_goal + confidence）+ 知识点掌握度 + 薄弱环节 + AI 弹窗 | ✅ AI 流式评估 |
 | `/resources` | 资源中心 | 资源卡片 + 搜索/筛选 + 网格/列表视图 + 收藏 + 详情模态框 | ✅ **SSE 流式** |
 | `/path` | 学习路径 | DAG 图谱(SVG 边) + 概览统计 + 详情面板 + 每日计划 | ✅ **SSE 流式** |
 | `/tiku` | 练习题库 | 选择/判断/简答/编程 + 即时反馈 + 进度环形图 + 知识点分析 | ✅ **SSE 流式** (dual-format) |
-| `/pinggu` | 学习评估 | 评分环形动画 + 六维进度条 + 趋势折线图 + 正确率柱状图 + **LLM 评估报告**（优势/弱项/易错区 + 5 维画像 + 7 天趋势） | ✅ AI 评估 |
+| `/pinggu` | 学习评估 | 评分环形动画 + 六维进度条 + 趋势折线图 + 正确率柱状图 + **LLM 评估报告**（优势/弱项/易错区 + 7 维画像 + 7 天趋势） | ✅ AI 评估 |
 | `/setting` | 账号设置 | 个人信息编辑 + 修改密码 | ✅ auth API |
 
-### 管理后台（9 个页面，1:1 复刻 houtai.html）
+### 管理后台（9 个页面）
 
 | 路由 | 页面 | 功能 | Token |
 |------|------|------|-------|
@@ -97,10 +97,6 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 | `/admin/chats` | 对话记录 | 表格 + 对话详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/documents` | 知识库 | 表格 + 类型筛选 + **批量删除** | 硬编码 |
 | `/admin/agents` | Agent 监控 | 9 Agent 集群卡片 + 调用统计 + 错误率 | 硬编码 |
-
-> 管理后台 exercises 页面已接入 `admin_exercises` API（CRUD + 批量导入），其余页面数据为模板硬编码（演示用）。
-
-端到端测试（7 次 9/9 PASS）见 `../SMOKE_TEST_REPORT.md`。
 
 ## 开发规范
 

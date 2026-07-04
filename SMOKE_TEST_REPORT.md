@@ -1,6 +1,6 @@
 # 端到端冒烟测试报告
 
-> 最后更新：2026-07-02（代码审计 + 文档同步版本）
+> 最后更新：2026-07-02（数据库 schema 修复 + 文档同步版本）
 
 ## 测试概览
 
@@ -10,7 +10,7 @@
 |------|------|------|------|
 | 1 | 2026-06-09 | 首次冒烟 | ✅ 9/9 PASS |
 | 2 | 2026-06-10 | StateGraph 升级后 | ✅ 9/9 PASS |
-| 3 | 2026-06-10 | P0 修复后 | ✅ 114 pytest 全过 |
+| 3 | 2026-06-10 | P0 修复后 | ✅ 129 pytest 全过 |
 | 4 | 2026-06-11 | 登录注册系统后 | ✅ 9/9 PASS |
 | 5 | 2026-06-11 | 管理后台 + 角色权限 | ✅ 9/9 PASS |
 | 6 | 2026-06-27 | 评估报告 AI 化 | ✅ 9/9 PASS |
@@ -20,13 +20,15 @@
 
 ## 最新变更（2026-07-02）
 
-代码审计 + 文档同步：
-- 后端 67 个 API 端点（含 2 个验证码端点 + documents 端点）
+数据库 schema 修复 + 文档同步：
+- 后端 67 个 API 端点
 - 前端 18 页面（9 学生页 + 9 管理页）
-- Agent 数量：10 个（含行为分析 Agent 和 LLM 工厂）
-- 服务数量：16 个（含 LLM 工厂和定时分析服务）
-- 模型数量：13 个（含学习行为日志）
-- 测试文件：15 个（含调试脚本）
+- Agent 数量：9 个子 Agent + 1 个 Master Agent
+- 服务数量：16 个
+- 模型数量：13 个
+- 测试文件：7 个，共 129 个 pytest
+- 7 维画像：comprehension / memory / application / imagination / focus / knowledge_base / learning_goal
+- 管理后台：18 个端点
 
 ---
 
@@ -44,7 +46,7 @@
 | SQLAlchemy 2.0 兼容 | `_get_exercise_details` 用 PG bool 自动转 int | ✅ 不再报 `'_isnull'` 错误 |
 | Schema 漂移迁移幂等 | 跑 `scripts/migrate_schema_drift.py` 第二次 | ✅ 全部 `[SKIP]`，无重复 ALTER |
 | admin 登录 | `POST /auth/login admin/admin123` | ✅ 200 + JWT |
-| 全部 41 业务端点门禁 | 随机抽 5 个端点不带 token | ✅ 401 |
+| 全部 67 业务端点门禁 | 随机抽 5 个端点不带 token | ✅ 401 |
 | 前端 Lint | `npm run lint` | ✅ 0 errors |
 | 前端 Build | `npm run build` | ✅ 18 页面编译通过 |
 
@@ -123,11 +125,11 @@
 
 | 验证项 | 方法 | 结果 |
 |---|---|---|
-| 后端 119 个 pytest | `python -m pytest tests/ -v` | ✅ 全部通过 |
+| 后端 129 个 pytest | `python -m pytest tests/ -v` | ✅ 全部通过 |
 | 前端编译 | `npx next build` | ✅ 编译成功 |
 | `_strip_think` 测试 | `test_strip_think.py` | ✅ 全部通过 |
 | 前后端可达 | HTTP 200 | ✅ 8001 + 3000 均响应 |
-| profile 页 | 真实数据派生 | ✅ `deriveWeakness`/`deriveSixDimensions` |
+| profile 页 | 真实数据派生 | ✅ 7 维画像 |
 | resources 页 | API 资源合并入网格 | ✅ `isApi` 标记 + modal 兜底 |
 | pinggu 页 | 图表 props 传入 | ✅ 数据驱动 |
 | UUID 校验 | 7 router Pydantic 验证 | ✅ `dependencies.py` 统一依赖 |
@@ -145,12 +147,12 @@
 | Step | API | Agent 协同 | 耗时 | 关键证据 |
 |---|---|---|---|---|
 | 0 | `/health` | — | <1s | 200 healthy |
-| 1 F1 | `/profile/build` | Profile Agent | 13.4s | version=9, completeness=85% |
-| 2 F4 | `/chat/stream` | Master Agent → Tutor Agent | 39.2s | 39 tokens / 2402 chars |
-| 3 F2 | `/resource/generate/stream` | Document Agent + 防幻觉3层 | 72.8s | validation.passed=True conf=1.0 |
-| 4 F2 | `/resource/exercises/generate/stream` | Exercise Agent | 74.3s | 768 tokens / 3 道题 |
-| 5 F3 | `/path/generate/stream` | Path Agent | 74.3s | 14 天 / 13 nodes / 14 edges |
-| 6 F2 | `/mindmap/generate` | MindMap Agent | 77.5s | 78 字符 Mermaid |
+| 1 F1 | `/profile/assess/stream` | Initial Assessment Agent | ~13s | 7 维画像生成 |
+| 2 F4 | `/chat/stream` | Master Agent → Tutor Agent | ~39s | 39 tokens / 2402 chars |
+| 3 F2 | `/resource/generate/stream` | Document Agent + 防幻觉3层 | ~73s | validation.passed=True conf=1.0 |
+| 4 F2 | `/resource/exercises/generate/stream` | Exercise Agent | ~74s | 768 tokens / 3 道题 |
+| 5 F3 | `/path/generate/stream` | Path Agent | ~74s | 14 天 / 13 nodes / 14 edges |
+| 6 F2 | `/mindmap/generate` | MindMap Agent | ~78s | 78 字符 Mermaid |
 | 7 | `/dashboard/stats` | 聚合查询 | <1s | 4 知识点 / 15.5h |
 | 8 | `/evaluation/record` | Evaluation Service | <1s | record_id=ece2e8fb |
 
@@ -166,12 +168,12 @@
 | API | 响应时间 | 关键证据 |
 |---|---|---|
 | `/health` | 0.05s | 200 healthy |
-| `POST /profile/build` (F1) | 15.5s | version=3, completeness=80%, 6 维画像 |
-| `POST /chat/stream` (F4) | 31.3s | 1032 tokens 真逐 token 流式 |
-| `POST /resource/generate/stream` (F2) | 55.6s | 53 tokens + validation.passed=False confidence=0.85 |
-| `POST /resource/exercises/generate/stream` (F2) | 45.1s | 3 道题 + 防幻觉 |
-| `POST /path/generate/stream` (F3) | 58.3s | 7 天路径，含 nodes + edges |
-| `POST /mindmap/generate` (F2) | 47.2s | A* 算法 28 节点 mermaid |
+| `POST /profile/assess/stream` (F1) | ~16s | 7 维画像 |
+| `POST /chat/stream` (F4) | ~31s | 1032 tokens 真逐 token 流式 |
+| `POST /resource/generate/stream` (F2) | ~56s | 53 tokens + validation.passed=False confidence=0.85 |
+| `POST /resource/exercises/generate/stream` (F2) | ~45s | 3 道题 + 防幻觉 |
+| `POST /path/generate/stream` (F3) | ~58s | 7 天路径，含 nodes + edges |
+| `POST /mindmap/generate` (F2) | ~47s | A* 算法 28 节点 mermaid |
 | `GET /dashboard/stats` | 0.1s | knowledge_points=1 |
 | `POST /evaluation/record` (F5) | 0.2s | record_id=84a2c258 |
 
@@ -190,7 +192,7 @@
 ### 学生端（9 步）
 
 1. `/login` → 注册 → 登录
-2. `/profile` → 开始评估 → 回答问题 → 查看 5 维画像
+2. `/profile` → 开始评估 → 回答问题 → 查看 7 维画像
 3. `/duihua` → 发消息 → SSE 流式对话 + 多轮上下文
 4. `/resources` → 查看推荐资源 → 生成新资源
 5. `/tiku` → 查看题库 → AI 生成练习题

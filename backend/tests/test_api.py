@@ -35,20 +35,6 @@ async def test_profile_get(client):
 
 
 @pytest.mark.asyncio
-async def test_resource_list(client):
-    student_id = str(uuid.uuid4())
-    response = await client.get(f"/api/v1/resource/list?student_id={student_id}")
-    assert response.status_code == 200
-
-
-@pytest.mark.asyncio
-async def test_exercise_list(client):
-    student_id = str(uuid.uuid4())
-    response = await client.get(f"/api/v1/resource/exercises/{student_id}")
-    assert response.status_code == 200
-
-
-@pytest.mark.asyncio
 async def test_path_list(client):
     student_id = str(uuid.uuid4())
     response = await client.get(f"/api/v1/path/{student_id}")

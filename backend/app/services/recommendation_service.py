@@ -8,8 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 from app.models.learning_record import LearningRecord
 from app.models.student_profile import StudentProfile
-from app.models.resource import Resource
-from app.models.exercise import Exercise
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
 from app.models.learning_path import LearningPath
@@ -23,13 +21,6 @@ COLD_START_KPS = [
     "神经网络基础", "卷积神经网络", "循环神经网络", "自然语言处理",
     "计算机视觉", "强化学习", "人工智能伦理",
 ]
-
-# 各阶段资源类型映射
-PHASE_RESOURCE_TYPES = {
-    "learn": ["knowledge", "mindmap", "audio"],
-    "practice": ["exercise"],
-    "review": ["code", "knowledge"],
-}
 
 
 class RecommendationService:
@@ -56,15 +47,11 @@ class RecommendationService:
         scored = []
         for kp, kp_data in candidates.items():
             score, reason_type, reason = await self._score_kp(kp, kp_data, db, sid)
-            existing = await self._get_existing_resources(db, sid, kp)
             scored.append({
                 "knowledge_point": kp,
                 "reason": reason,
                 "reason_type": reason_type,
                 "priority_score": round(score, 3),
-                "suggested_phases": self._suggest_phases(existing),
-                "existing_resources": existing,
-                "estimated_minutes": self._estimate_minutes(existing),
             })
 
         # 4. 排序返回
@@ -79,14 +66,6 @@ class RecommendationService:
             .where(LearningRecord.student_id == sid)
         )
         if r1.scalar() > 0:
-            return False
-
-        # 检查 exercises
-        r2 = await db.execute(
-            select(func.count(Exercise.id))
-            .where(Exercise.student_id == sid)
-        )
-        if r2.scalar() > 0:
             return False
 
         # 检查 chat_sessions
@@ -116,18 +95,6 @@ class RecommendationService:
         for (kp,) in lr_result.all():
             if kp:
                 candidates.setdefault(kp, {"sources": []})["sources"].append("record")
-
-        # 从 exercises 收集
-        ex_result = await db.execute(
-            select(Exercise.knowledge_point)
-            .where(
-                Exercise.student_id == sid,
-                Exercise.knowledge_point.isnot(None),
-            )
-        )
-        for (kp,) in ex_result.all():
-            if kp:
-                candidates.setdefault(kp, {"sources": []})["sources"].append("exercise")
 
         # 从 chat_messages 收集（ILIKE 关键词匹配）
         chat_result = await db.execute(
@@ -221,17 +188,18 @@ class RecommendationService:
     async def _accuracy_gap(self, db: AsyncSession, sid: uuid.UUID, kp: str) -> float:
         """该 KP 的答题正确率缺口"""
         result = await db.execute(
-            select(func.avg(Exercise.is_correct))
+            select(func.avg(LearningRecord.score))
             .where(
-                Exercise.student_id == sid,
-                Exercise.knowledge_point == kp,
-                Exercise.is_correct.isnot(None),
+                LearningRecord.student_id == sid,
+                LearningRecord.knowledge_point == kp,
+                LearningRecord.action == "exercise",
+                LearningRecord.score.isnot(None),
             )
         )
         avg = result.scalar()
         if avg is None:
             return 0.5  # 无数据，中立
-        return 1 - avg
+        return 1 - (avg / 100)
 
     async def _path_recency_bonus(self, db: AsyncSession, sid: uuid.UUID, kp: str) -> float:
         """该 KP 是否在最近7天的学习路径中出现"""
@@ -275,45 +243,6 @@ class RecommendationService:
         else:
             return "evaluation", f"建议按学习计划推进该知识点"
 
-    async def _get_existing_resources(
-        self, db: AsyncSession, sid: uuid.UUID, kp: str
-    ) -> dict[str, bool]:
-        """查询某 KP 各阶段是否已有资源"""
-        result = await db.execute(
-            select(Resource.resource_type)
-            .where(
-                Resource.student_id == sid,
-                Resource.knowledge_point == kp,
-            )
-        )
-        types = [r for (r,) in result.all()]
-        return {
-            "learn": any(t in PHASE_RESOURCE_TYPES["learn"] for t in types),
-            "practice": any(t in PHASE_RESOURCE_TYPES["practice"] for t in types),
-            "review": any(t in PHASE_RESOURCE_TYPES["review"] for t in types),
-        }
-
-    def _suggest_phases(self, existing: dict[str, bool]) -> list[str]:
-        """根据已有资源情况建议下一个阶段"""
-        if not existing["learn"]:
-            return ["learn"]
-        if not existing["practice"]:
-            return ["learn", "practice"]
-        if not existing["review"]:
-            return ["learn", "practice", "review"]
-        return ["learn", "practice", "review"]
-
-    def _estimate_minutes(self, existing: dict[str, bool]) -> int:
-        """估算完成该 KP 学习包所需时间（分钟）"""
-        total = 0
-        if not existing["learn"]:
-            total += 15
-        if not existing["practice"]:
-            total += 10
-        if not existing["review"]:
-            total += 5
-        return max(total, 5)
-
     def _cold_start_recommendations(self, limit: int) -> list[dict]:
         """冷启动：返回通识课大纲推荐"""
         cold_kps = COLD_START_KPS[:limit]
@@ -327,9 +256,6 @@ class RecommendationService:
                 "reason": reasons[i],
                 "reason_type": "cold_start",
                 "priority_score": round(0.9 - i * 0.04, 3),
-                "suggested_phases": ["learn", "practice", "review"],
-                "existing_resources": {"learn": False, "practice": False, "review": False},
-                "estimated_minutes": 25,
             }
             for i, kp in enumerate(cold_kps)
         ]

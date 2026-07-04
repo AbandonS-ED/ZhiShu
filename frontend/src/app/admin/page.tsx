@@ -38,9 +38,8 @@ function SkeletonCard() {
 export default function AdminDashboardPage() {
   const router = useRouter()
   const [stats, setStats] = useState<AdminStats>({
-    total_users: 0, admin_count: 0, total_resources: 0, total_exercises: 0,
+    total_users: 0, admin_count: 0, total_exercises: 0,
     total_paths: 0, total_chats: 0, total_documents: 0, today_active: 0,
-    today_new_resources: 0,
   })
   const [trends, setTrends] = useState<AdminTrends>({ labels: [], registrations: [], resources: [] })
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -85,20 +84,6 @@ export default function AdminDashboardPage() {
 
           <div className="admin-st">
             <div className="admin-st-t">
-              <div className="admin-st-l">资源总数</div>
-              <div className="admin-st-i" style={{ background: 'var(--warm-soft)', color: 'var(--warm)' }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
-              </div>
-            </div>
-            <div className="admin-st-v" style={{ color: 'var(--warm)' }}>{stats.total_resources}</div>
-            <div className="admin-st-s">今日新增 <span style={{ color: 'var(--success)', fontWeight: 600 }}>+{stats.today_new_resources}</span></div>
-          </div>
-
-          <div className="admin-st">
-            <div className="admin-st-t">
               <div className="admin-st-l">练习题</div>
               <div className="admin-st-i" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -133,12 +118,7 @@ export default function AdminDashboardPage() {
             {loading ? <div style={{ height: 120, opacity: 0.3 }} /> : <BarChart data={trends.registrations} labels={trends.labels} color={CHART_COLORS[0]} />}
           </div>
         </div>
-        <div className="admin-cd">
-          <div className="admin-cd-h"><h3>7天资源生成趋势</h3></div>
-          <div className="admin-cd-b">
-            {loading ? <div style={{ height: 120, opacity: 0.3 }} /> : <BarChart data={trends.resources} labels={trends.labels} color={CHART_COLORS[1]} />}
-          </div>
-        </div>
+
       </div>
 
       <div className="admin-cd" style={{ marginTop: 12 }}>
@@ -151,7 +131,6 @@ export default function AdminDashboardPage() {
                   <th>学号</th>
                   <th>姓名</th>
                   <th>角色</th>
-                  <th>资源数</th>
                   <th>最近登录</th>
                 </tr>
               </thead>
@@ -161,12 +140,11 @@ export default function AdminDashboardPage() {
                     <td><code style={{ fontSize: 11 }}>{u.student_no}</code></td>
                     <td style={{ fontWeight: 500 }}>{u.name}</td>
                     <td style={{ fontSize: 11.5, color: u.role === 'admin' ? 'var(--warm)' : 'var(--ink-2)' }}>{u.role}</td>
-                    <td style={{ fontWeight: 500 }}>{u.resource_count}</td>
                     <td style={{ fontSize: 11.5 }}>{u.last_login ? new Date(u.last_login).toLocaleDateString() : '-'}</td>
                   </tr>
                 ))}
                 {users.length === 0 && !loading && (
-                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: 20, color: 'var(--ink-2)' }}>暂无数据</td></tr>
+                  <tr><td colSpan={4} style={{ textAlign: 'center', padding: 20, color: 'var(--ink-2)' }}>暂无数据</td></tr>
                 )}
               </tbody>
             </table>

@@ -21,7 +21,6 @@ export function usePageTimer(action: string, knowledgePoint?: string) {
         evaluationApi.recordAction({
           student_id: studentId,
           action,
-          resource_type: 'page',
           knowledge_point: knowledgePoint || action,
           duration_seconds: elapsed,
         }).catch(() => {})

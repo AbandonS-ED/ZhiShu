@@ -15,7 +15,6 @@ from app.models.student import Student
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
 from app.models.student_profile import StudentProfile
-from app.models.exercise import Exercise
 from app.agents.master_agent import master_agent
 from app.agents.exercise_agent import exercise_agent
 from app.services.llm_factory import get_llm_client
@@ -374,19 +373,6 @@ async def _handle_single_agent_stream(
             "confidence": validation.confidence,
         }
 
-        # 保存到资源中心
-        from app.models.resource import Resource
-        resource = Resource(
-            id=uuid.uuid4(),
-            student_id=uuid.UUID(student_id),
-            title=f"{kp} 学习材料",
-            resource_type="knowledge",
-            content=result,
-            knowledge_point=kp,
-        )
-        db.add(resource)
-        await db.commit()
-
         result_data = {"type": "document", "data": result}
 
     elif intent == "mindmap":
@@ -411,18 +397,6 @@ async def _handle_single_agent_stream(
                 yield f"data: {json.dumps({'type': 'token', 'content': new_content}, ensure_ascii=False)}\n\n"
 
         result = mindmap_agent._parse_response(stream_text)
-
-        # 保存到资源中心
-        resource = Resource(
-            id=uuid.uuid4(),
-            student_id=uuid.UUID(student_id),
-            title=f"{kp} 思维导图",
-            resource_type="mindmap",
-            content=result,
-            knowledge_point=kp,
-        )
-        db.add(resource)
-        await db.commit()
 
         result_data = {"type": "mindmap", "data": result}
 
@@ -475,77 +449,6 @@ async def _handle_single_agent_stream(
         else:
             result = exercise_agent._parse_response(stream_text)
 
-        # 保存练习题到 DB（含去重）
-        from app.models.exercise import Exercise
-        from difflib import SequenceMatcher
-        exercises_data = result.get("exercises", [])
-        saved_count = 0
-
-        # 加载已有题目用于去重
-        existing_result = await db.execute(
-            select(Exercise.question)
-            .where(Exercise.student_id == uuid.UUID(student_id))
-            .where(Exercise.knowledge_point == kp)
-        )
-        existing_questions = [row[0] for row in existing_result.all() if row[0]]
-
-        for ex_data in exercises_data:
-            question = ex_data.get("question", "")
-            # 去重
-            is_dup = False
-            for eq in existing_questions:
-                if SequenceMatcher(None, question, eq).ratio() > 0.85:
-                    is_dup = True
-                    break
-            if is_dup:
-                continue
-
-            ex_type = ex_data.get("type", "short_answer")
-            if ex_type not in ("choice", "judge", "short_answer", "coding"):
-                ex_type = "short_answer"
-            answer = ex_data.get("answer", "")
-            if ex_type == "choice":
-                for ch in answer:
-                    if "A" <= ch <= "Z":
-                        answer = ch
-                        break
-            elif ex_type == "judge":
-                if answer.strip().lower() in ("正确", "对", "true", "t", "✔", "√", "是", "yes"):
-                    answer = "正确"
-                elif answer.strip().lower() in ("错误", "错", "false", "f", "✗", "✘", "否", "no"):
-                    answer = "错误"
-            exercise = Exercise(
-                id=uuid.uuid4(),
-                student_id=uuid.UUID(student_id),
-                exercise_type=ex_type,
-                question=question,
-                options=ex_data.get("options"),
-                answer=answer,
-                explanation=ex_data.get("explanation", ""),
-                difficulty=ex_data.get("difficulty", 50),
-                knowledge_point=kp,
-            )
-            db.add(exercise)
-            saved_count += 1
-            existing_questions.append(question)
-        await db.commit()
-
-        # 限容：每个知识点最多 20 道 AI 题
-        from sqlalchemy import delete as sql_delete
-        subq = (
-            select(Exercise.id)
-            .where(Exercise.student_id == uuid.UUID(student_id))
-            .where(Exercise.knowledge_point == kp)
-            .order_by(Exercise.created_at.desc())
-            .offset(20)
-        )
-        await db.execute(sql_delete(Exercise).where(Exercise.id.in_(subq)))
-        await db.commit()
-
-        # 追加跳转链接到 result
-        if saved_count > 0:
-            result["jump_link"] = f"[👉 点击前往题库作答](/tiku?kp={kp})"
-
         result_data = {"type": "exercise", "data": result}
 
     elif intent == "path":
@@ -580,18 +483,6 @@ async def _handle_single_agent_stream(
             student_profile=student_profile,
             resource_type="audio",
         )
-
-        # 保存到资源中心
-        resource = Resource(
-            id=uuid.uuid4(),
-            student_id=uuid.UUID(student_id),
-            title=f"{kp} 音频脚本",
-            resource_type="audio",
-            content=result,
-            knowledge_point=kp,
-        )
-        db.add(resource)
-        await db.commit()
 
         result_data = {"type": "audio", "data": result}
 
@@ -673,74 +564,6 @@ async def _handle_state_graph_stream(
     final_response = final_state.get("final_response", "任务处理完成。")
     final_response = _strip_think(final_response)  # 去掉 <think> 标签
     resources = final_state.get("resources", [])
-
-    # exercise 意图：保存题目到 DB + 追加跳转链接
-    intent = final_state.get("intent", "")
-    if intent == "exercise":
-        from difflib import SequenceMatcher
-        er = final_state.get("exercise_result", {})
-        exercises_data = er.get("exercises", [])
-        kp = _extract_knowledge_point(req.message)
-        saved_count = 0
-        if exercises_data:
-            existing_result = await db.execute(
-                select(Exercise.question)
-                .where(Exercise.student_id == uuid.UUID(req.student_id))
-                .where(Exercise.knowledge_point == kp)
-            )
-            existing_questions = [row[0] for row in existing_result.all() if row[0]]
-            for ex_data in exercises_data:
-                question = ex_data.get("question", "")
-                # 去重
-                is_dup = False
-                for eq in existing_questions:
-                    if SequenceMatcher(None, question, eq).ratio() > 0.85:
-                        is_dup = True
-                        break
-                if is_dup:
-                    continue
-                ex_type = ex_data.get("type", "short_answer")
-                if ex_type not in ("choice", "judge", "short_answer", "coding"):
-                    ex_type = "short_answer"
-                answer = ex_data.get("answer", "")
-                if ex_type == "choice":
-                    for ch in answer:
-                        if "A" <= ch <= "Z":
-                            answer = ch
-                            break
-                elif ex_type == "judge":
-                    if answer.strip().lower() in ("正确", "对", "true", "t", "✔", "√", "是", "yes"):
-                        answer = "正确"
-                    elif answer.strip().lower() in ("错误", "错", "false", "f", "✗", "✘", "否", "no"):
-                        answer = "错误"
-                exercise = Exercise(
-                    id=uuid.uuid4(),
-                    student_id=uuid.UUID(req.student_id),
-                    exercise_type=ex_type,
-                    question=question,
-                    options=ex_data.get("options"),
-                    answer=answer,
-                    explanation=ex_data.get("explanation", ""),
-                    difficulty=ex_data.get("difficulty", 50),
-                    knowledge_point=kp,
-                )
-                db.add(exercise)
-                saved_count += 1
-                existing_questions.append(question)
-            await db.commit()
-            # 限容：每个知识点最多 20 道 AI 题
-            from sqlalchemy import delete as sql_delete
-            subq = (
-                select(Exercise.id)
-                .where(Exercise.student_id == uuid.UUID(req.student_id))
-                .where(Exercise.knowledge_point == kp)
-                .order_by(Exercise.created_at.desc())
-                .offset(20)
-            )
-            await db.execute(sql_delete(Exercise).where(Exercise.id.in_(subq)))
-            await db.commit()
-        if saved_count > 0:
-            final_response += f"\n\n[👉 点击前往题库作答](/tiku?kp={kp})"
 
     # 切片推 token（让前端实时看到内容，更小的切片让显示更平滑）
     chunk_size = 8

@@ -12,8 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from app.models.learning_record import LearningRecord
 from app.models.student_profile import StudentProfile
-from app.models.resource import Resource
-from app.models.exercise import Exercise
 from app.models.learning_path import LearningPath
 from app.models.student import Student
 
@@ -214,24 +212,20 @@ class EvaluationService:
         )
         profile = profile_result.scalar_one_or_none()
 
-        # 资源统计
-        resource_result = await db.execute(
-            select(func.count(Resource.id))
-            .where(Resource.student_id == uuid.UUID(student_id))
-        )
-        total_resources = resource_result.scalar_one() or 0
-
-        # 练习统计
+        # 练习统计（基于 LearningRecord）
         exercise_result = await db.execute(
             select(
-                func.count(Exercise.id),
-                func.avg(Exercise.is_correct)
+                func.count(LearningRecord.id),
+                func.avg(LearningRecord.score)
             )
-            .where(Exercise.student_id == uuid.UUID(student_id))
+            .where(
+                LearningRecord.student_id == uuid.UUID(student_id),
+                LearningRecord.action == "exercise",
+            )
         )
         exercise_stats = exercise_result.one()
         total_exercises = exercise_stats[0] or 0
-        avg_score = float(exercise_stats[1] or 0)
+        avg_score = float(exercise_stats[1] or 0) / 100 if exercise_stats[1] else 0
 
         # 获取练习详情（用于 LLM 分析）
         exercise_details = await self._get_exercise_details(db, student_id)
@@ -276,9 +270,8 @@ class EvaluationService:
             "student_id": student_id,
             "generated_at": datetime.now().isoformat(),  # 使用本地时间
             "summary": {
-                "total_resources": total_resources,
                 "total_exercises": total_exercises,
-                "avg_score": round(avg_score, 1),
+                "avg_score": round(avg_score * 100, 1),
                 "total_actions": stats["total_actions"],
                 "total_duration_minutes": stats["total_duration_minutes"],
                 "path_progress": f"{completed_nodes}/{total_nodes}",
@@ -336,33 +329,32 @@ class EvaluationService:
         sid = uuid.UUID(student_id)
         since = datetime.utcnow() - timedelta(days=30)
 
-        # 按知识点统计正确/错误数
-        # SQLAlchemy 2.0 中 func.sum(bool) 在 PG 上自动转 0/1，无需 case()
+        # 按知识点统计练习次数和平均分
         result = await db.execute(
             select(
-                Exercise.knowledge_point,
-                func.count(Exercise.id).label("total"),
-                func.sum(Exercise.is_correct).label("correct_count"),
+                LearningRecord.knowledge_point,
+                func.count(LearningRecord.id).label("total"),
+                func.avg(LearningRecord.score).label("avg_score"),
             )
             .where(
-                Exercise.student_id == sid,
-                Exercise.knowledge_point.isnot(None),
-                Exercise.created_at >= since,
+                LearningRecord.student_id == sid,
+                LearningRecord.knowledge_point.isnot(None),
+                LearningRecord.action == "exercise",
+                LearningRecord.created_at >= since,
             )
-            .group_by(Exercise.knowledge_point)
+            .group_by(LearningRecord.knowledge_point)
         )
 
         details = {}
         for row in result.fetchall():
             kp = row[0]
             total = row[1] or 0
-            correct_count = row[2] or 0
-            error_count = total - correct_count
-            error_rate = error_count / total if total > 0 else 0
+            avg_score = float(row[2] or 0)
+            error_rate = max(0, 1 - avg_score / 100) if avg_score > 0 else 0
             details[kp] = {
                 "total": total,
-                "correct_count": correct_count,
-                "error_count": error_count,
+                "correct_count": int(total * (1 - error_rate)),
+                "error_count": int(total * error_rate),
                 "error_rate": round(error_rate, 2),
             }
 
@@ -375,26 +367,28 @@ class EvaluationService:
         recent_start = now - timedelta(days=7)
         prev_start = now - timedelta(days=14)
 
-        # 近7天正确率
+        # 近7天练习平均分
         recent_result = await db.execute(
-            select(func.avg(Exercise.is_correct))
+            select(func.avg(LearningRecord.score))
             .where(
-                Exercise.student_id == sid,
-                Exercise.created_at >= recent_start,
+                LearningRecord.student_id == sid,
+                LearningRecord.action == "exercise",
+                LearningRecord.created_at >= recent_start,
             )
         )
-        recent_score = float(recent_result.scalar_one() or 0)
+        recent_score = float(recent_result.scalar_one() or 0) / 100
 
-        # 之前7天正确率
+        # 之前7天练习平均分
         prev_result = await db.execute(
-            select(func.avg(Exercise.is_correct))
+            select(func.avg(LearningRecord.score))
             .where(
-                Exercise.student_id == sid,
-                Exercise.created_at >= prev_start,
-                Exercise.created_at < recent_start,
+                LearningRecord.student_id == sid,
+                LearningRecord.action == "exercise",
+                LearningRecord.created_at >= prev_start,
+                LearningRecord.created_at < recent_start,
             )
         )
-        prev_score = float(prev_result.scalar_one() or 0)
+        prev_score = float(prev_result.scalar_one() or 0) / 100
 
         # 近7天学习时长
         recent_duration_result = await db.execute(

@@ -1,8 +1,8 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import profile, resource, path, tutor, chat, mindmap, dashboard, evaluation, auth
-from app.api import admin_exercises, admin
+from app.api import profile, path, tutor, chat, mindmap, dashboard, evaluation, auth
+from app.api import admin
 from app.core.config import settings
 from app.core.database import init_db
 from app.services.llm_factory import get_llm_client
@@ -50,7 +50,6 @@ app.add_middleware(
 )
 
 app.include_router(profile.router, prefix="/api/v1/profile", tags=["学习画像"])
-app.include_router(resource.router, prefix="/api/v1/resource", tags=["资源生成"])
 app.include_router(path.router, prefix="/api/v1/path", tags=["学习路径"])
 app.include_router(tutor.router, prefix="/api/v1/tutor", tags=["智能辅导"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["聊天"])
@@ -59,7 +58,6 @@ app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["仪表�
 app.include_router(evaluation.router, prefix="/api/v1/evaluation", tags=["效果评估"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["认证"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["管理端"])
-app.include_router(admin_exercises.router, prefix="/api/v1/admin/exercises", tags=["管理端-题库"])
 
 @app.get("/")
 async def root():

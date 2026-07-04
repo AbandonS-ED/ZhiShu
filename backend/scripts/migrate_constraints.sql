@@ -38,30 +38,6 @@ BEGIN
     END IF;
 END $$;
 
--- resources.student_id → students.id
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'fk_resources_student_id'
-    ) THEN
-        ALTER TABLE resources
-            ADD CONSTRAINT fk_resources_student_id
-            FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE;
-    END IF;
-END $$;
-
--- exercises.student_id → students.id
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'fk_exercises_student_id'
-    ) THEN
-        ALTER TABLE exercises
-            ADD CONSTRAINT fk_exercises_student_id
-            FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE;
-    END IF;
-END $$;
-
 -- learning_paths.student_id → students.id
 DO $$
 BEGIN

@@ -1,6 +1,6 @@
 # 个人底层能力画像重构方案
 
-> **状态同步**: 2026-06-28 — 5 维画像重构已完成。本文档作为重构动机存档。
+> **状态同步**: 2026-07-02 — 7 维画像（comprehension/memory/application/imagination/focus/knowledge_base/learning_goal）已完成。本文档作为重构动机存档。
 
 ## 动机
 

@@ -1,7 +1,7 @@
 # 多智能体协同升级方案 — LangGraph StateGraph
 
 > 基于赛题 A3 需求 + 当前代码现状，将 Master Agent 从"if-else 路由"升级为真多智能体编排。
-> **最后更新**：2026-06-28 — 实际实现：**10 节点** StateGraph（不是 13），见 `backend/app/agents/master_agent.py`。
+> **最后更新**：2026-07-02 — 实际实现：**10 节点** StateGraph（intent_recognition → task_planning → conditional_route → 6 Agent → result_aggregation → response_generation），9 个子 Agent 已全部落地。
 
 ---
 
