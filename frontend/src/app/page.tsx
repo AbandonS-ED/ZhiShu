@@ -126,6 +126,12 @@ export default function Home() {
                       <p>
                         {act.type === 'chat' ? (
                           <>对话：{act.content ? `"${act.content.slice(0, 30)}${act.content.length > 30 ? '...' : ''}"` : '新消息'}</>
+                        ) : act.type === 'exercise' ? (
+                          <>做了题：<strong>{act.title || '练习题'}</strong></>
+                        ) : act.type === 'study' ? (
+                          <>自习了 <strong>{act.title || '番茄钟'}</strong></>
+                        ) : act.type === 'path' ? (
+                          <>生成了路径：<strong>{act.title || '学习路径'}</strong></>
                         ) : (
                           <>学习了 <strong>{act.title || '新资源'}</strong></>
                         )}
