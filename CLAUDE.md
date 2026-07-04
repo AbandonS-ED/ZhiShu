@@ -26,7 +26,7 @@
 ```
 ZhiShu/
 ├── frontend/                        # Next.js 前端
-│   ├── src/app/                     # 页面路由 (9 学生页 + 9 管理页)
+│   ├── src/app/                     # 页面路由 (10 学生页 + 9 管理页)
 │   ├── src/components/              # 共享组件 (Icon.tsx + RobotIcon.tsx + layout/)
 │   ├── src/lib/                     # 工具库 (api.ts + sse.ts + admin/)
 │   ├── src/stores/appStore.ts       # Zustand 全局状态
