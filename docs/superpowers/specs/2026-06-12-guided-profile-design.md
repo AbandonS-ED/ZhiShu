@@ -4,7 +4,7 @@
 > 状态：设计阶段
 > 负责人：Claude Code
 >
-> **状态同步**: 2026-07-04 — 引导对话 5 维画像已实装为 `initial_assessment_agent.py`，详见 `backend/app/agents/`。自习模式 v1.5 上线后 focus 维度可由行为分析自动更新。本设计文档保留作为历史规格参考。
+> **状态同步**: 2026-06-28 — 引导对话 5 维画像已实装为 `initial_assessment_agent.py`，详见 `backend/app/agents/`。本设计文档保留作为历史规格参考。
 
 ---
 

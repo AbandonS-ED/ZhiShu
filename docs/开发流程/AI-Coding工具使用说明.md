@@ -1,6 +1,6 @@
 # 智枢 (SmartHub) — AI Coding 工具使用说明
 
-> ⚠️ **PARTIALLY DEPRECATED · 2026-06-09**（最后同步：2026-07-04 — LangGraph StateGraph 10 节点已实现 / shadcn/ui 仍 0 引用，结论不变 / 自习模式 v1.5 上线 TF.js + MoveNet）
+> ⚠️ **PARTIALLY DEPRECATED · 2026-06-09**（最后同步：2026-06-28 — 实际 LangGraph StateGraph 10 节点 / shadcn/ui 仍 0 引用，结论不变）
 >
 > 本文档 §4 关键代码片段（LangGraph Master Agent + pgvector RAG）和 §3.6 前端开发阶段（提到 shadcn/ui）描述的代码 / 架构**与实际不符**：
 >

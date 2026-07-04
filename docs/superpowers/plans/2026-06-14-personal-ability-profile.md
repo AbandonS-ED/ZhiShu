@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python FastAPI, SQLAlchemy 2.0 async, Next.js 14, SVG radar chart
 
-> **状态同步**: 2026-07-04 — 5 维画像（理解力/记忆力/应用转化/想象力/专注力 + confidence）已实装，见 `backend/app/agents/initial_assessment_agent.py` + `frontend/src/app/profile/page.tsx` Chart.js 雷达图；自习模式 v1.5 上线后 focus 专注力维度由 behavior_analysis_agent 自动联动。本计划档保留作为历史实现记录。
+> **状态同步**: 2026-06-28 — 5 维画像（理解力/记忆力/应用转化/想象力/专注力 + confidence）已实装，见 `backend/app/agents/initial_assessment_agent.py` + `frontend/src/app/profile/page.tsx` Chart.js 雷达图。本计划档保留作为历史实现记录。
 
 ---
 

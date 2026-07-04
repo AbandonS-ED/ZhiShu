@@ -1,7 +1,7 @@
 # 多智能体协同升级方案 — LangGraph StateGraph
 
 > 基于赛题 A3 需求 + 当前代码现状，将 Master Agent 从"if-else 路由"升级为真多智能体编排。
-> **最后更新**：2026-07-04 — 实际实现：**10 节点** StateGraph（不是 13），见 `backend/app/agents/master_agent.py`；自习模式 v1.5 上线（TF.js + MoveNet + 零后端改动）
+> **最后更新**：2026-06-28 — 实际实现：**10 节点** StateGraph（不是 13），见 `backend/app/agents/master_agent.py`。
 
 ---
 
