@@ -2,6 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { getStudentId } from '@/lib/student'
+import dynamic from 'next/dynamic'
+
+const Line = dynamic(() => import('react-chartjs-2').then(m => m.Line), { ssr: false })
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip } from 'chart.js'
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip)
 
 interface Activity {
   type: string
@@ -17,6 +22,11 @@ interface Course {
   status: string
 }
 
+interface DailyMinute {
+  date: string
+  minutes: number
+}
+
 interface Stats {
   knowledge_points: number
   knowledge_points_trend: string
@@ -26,9 +36,14 @@ interface Stats {
   accuracy_trend: string
   path_progress: string
   path_progress_trend: string
+  today_minutes: number
+  daily_study_minutes: DailyMinute[]
+  streak_days: number
   recent_activities: Activity[]
   recent_chats: Activity[]
 }
+
+const DAILY_GOAL = 60 // 目标每日 60 分钟
 
 export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null)
@@ -52,14 +67,15 @@ export default function Home() {
     accuracy_trend: '',
     path_progress: '0%',
     path_progress_trend: '',
+    today_minutes: 0,
+    daily_study_minutes: [],
+    streak_days: 0,
     recent_activities: [],
     recent_chats: [],
   }
 
   // 合并活动和聊天记录，按时间排序
-  const allActivities: Activity[] = [...s.recent_activities, ...s.recent_chats]
-    .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
-    .slice(0, 5)
+  const allActivities: Activity[] = s.recent_activities || []
 
   function formatTime(iso: string): string {
     if (!iso) return ''
@@ -77,9 +93,53 @@ export default function Home() {
     return d.toLocaleDateString('zh-CN')
   }
 
+  // 进度环参数
+  const todayPct = Math.min(s.today_minutes / DAILY_GOAL * 100, 100)
+  const circ = 2 * Math.PI * 42 // 周长
+  const offset = circ - (circ * todayPct / 100)
+
+  // 7 天折线图数据
+  const chartLabels = s.daily_study_minutes.map(d => {
+    const dt = new Date(d.date)
+    return `${dt.getMonth() + 1}/${dt.getDate()}`
+  })
+  const chartData = s.daily_study_minutes.map(d => d.minutes)
+
   return (
     <>
       <div className="page active" id="pg-dashboard">
+        {/* 顶部 Hero：今日 + Streak */}
+        <div className="dash-hero">
+          <div className="dash-hero-ring">
+            <svg width="100" height="100" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="42" fill="none" stroke="var(--bg-subtle)" strokeWidth="8" />
+              <circle cx="50" cy="50" r="42" fill="none"
+                stroke={todayPct >= 100 ? 'var(--success)' : 'var(--warm)'}
+                strokeWidth="8" strokeLinecap="round"
+                strokeDasharray={circ} strokeDashoffset={offset}
+                style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke-dashoffset 1s ease' }} />
+            </svg>
+            <div className="dash-hero-ring-val">
+              <div className="dash-hero-ring-num">{s.today_minutes}</div>
+              <div className="dash-hero-ring-unit">分钟</div>
+            </div>
+          </div>
+          <div className="dash-hero-info">
+            <div className="dash-hero-title">
+              {s.today_minutes >= DAILY_GOAL ? '今日目标已达成 !' : `今日已学 ${s.today_minutes} 分钟`}
+            </div>
+            <div className="dash-hero-sub">
+              目标 {DAILY_GOAL} 分钟 · {todayPct >= 100 ? '超额完成' : `还差 ${DAILY_GOAL - s.today_minutes} 分钟`}
+            </div>
+            <div className="dash-hero-streak">
+              <span className="streak-fire">🔥</span>
+              <span className="streak-num">{s.streak_days}</span>
+              <span className="streak-label">天连续学习</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 4 个核心指标 */}
         <div className="stats">
           <div className="stat">
             <div className="num">{s.knowledge_points}</div>
@@ -104,10 +164,56 @@ export default function Home() {
         </div>
 
         <div className="dash-grid">
+          {/* 7 天学习趋势折线图 */}
+          <div className="card" style={{ gridColumn: 'span 2' }}>
+            <div className="card-hd">
+              <h3>7 天学习趋势</h3>
+              <span className="tag tag-dark">本周</span>
+            </div>
+            <div className="card-bd" style={{ height: 180, padding: '8px 12px' }}>
+              {chartData.some(v => v > 0) ? (
+                <Line
+                  data={{
+                    labels: chartLabels,
+                    datasets: [{
+                      data: chartData,
+                      borderColor: 'var(--warm)',
+                      backgroundColor: 'rgba(196,122,58,0.08)',
+                      borderWidth: 2,
+                      pointRadius: 4,
+                      pointBackgroundColor: 'var(--warm)',
+                      pointBorderColor: '#fff',
+                      pointBorderWidth: 2,
+                      fill: true,
+                      tension: 0.3,
+                    }],
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                      x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#a8a29e' } },
+                      y: { beginAtZero: true, grid: { color: '#e7e5e4' }, ticks: { font: { size: 11 }, color: '#a8a29e', callback: (v: any) => `${v}m` } },
+                    },
+                    plugins: {
+                      legend: { display: false },
+                      tooltip: { backgroundColor: 'rgba(28,25,23,0.92)', titleFont: { size: 12 }, bodyFont: { size: 13 }, padding: 10, cornerRadius: 8, callbacks: { label: (ctx: any) => ` ${ctx.raw} 分钟` } },
+                    },
+                  }}
+                />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--ink-3)', fontSize: 13 }}>
+                  暂无学习数据，开始学习后将显示趋势图
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 最近活动 */}
           <div className="card">
             <div className="card-hd">
               <h3>最近活动</h3>
-              <span className="tag tag-dark">Today</span>
+              <span className="tag tag-dark">7 天</span>
             </div>
             <div className="card-bd">
               {allActivities.length === 0 ? (
@@ -125,13 +231,15 @@ export default function Home() {
                     <div className="act-body">
                       <p>
                         {act.type === 'chat' ? (
-                          <>对话：{act.content ? `"${act.content.slice(0, 30)}${act.content.length > 30 ? '...' : ''}"` : '新消息'}</>
+                          <>对话：{act.content ? `"${act.content.slice(0, 25)}${act.content.length > 25 ? '...' : ''}"` : '新消息'}</>
                         ) : act.type === 'exercise' ? (
                           <>做了题：<strong>{act.title || '练习题'}</strong></>
                         ) : act.type === 'study' ? (
                           <>自习了 <strong>{act.title || '番茄钟'}</strong></>
                         ) : act.type === 'path' ? (
-                          <>生成了路径：<strong>{act.title || '学习路径'}</strong></>
+                          <>生成路径：<strong>{act.title || '学习路径'}</strong></>
+                        ) : act.type === 'profile' ? (
+                          <>更新画像：<strong>{act.title || '学习画像'}</strong></>
                         ) : (
                           <>学习了 <strong>{act.title || '新资源'}</strong></>
                         )}
@@ -144,6 +252,7 @@ export default function Home() {
             </div>
           </div>
 
+          {/* 快速开始 */}
           <div className="card">
             <div className="card-hd">
               <h3>快速开始</h3>
@@ -182,6 +291,7 @@ export default function Home() {
             </div>
           </div>
 
+          {/* 课程进度 */}
           <div className="card" style={{ gridColumn: 'span 2' }}>
             <div className="card-hd">
               <h3>课程进度</h3>

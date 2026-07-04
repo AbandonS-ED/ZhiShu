@@ -416,6 +416,9 @@ export interface DashboardStats {
   accuracy_trend: string
   path_progress: string
   path_progress_trend: string
+  today_minutes: number
+  daily_study_minutes: Array<{ date: string; minutes: number }>
+  streak_days: number
   recent_activities: Array<{
     type: string
     title: string
