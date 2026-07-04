@@ -98,6 +98,7 @@ interface ReportData {
   absentCount: number
   focusSeconds: number
   longestFocusSeconds: number
+  longestDistractedSeconds: number
   patrolHistory: PatrolRecord[]
   completed: boolean
   cameraEnabled: boolean
@@ -125,6 +126,8 @@ export default function StudyPage() {
   const lastLabelRef = useRef<StudyLabel>('focus')
   const currentFocusStreakRef = useRef<number>(0)
   const longestFocusStreakRef = useRef<number>(0)
+  const currentDistractedStreakRef = useRef<number>(0)
+  const longestDistractedStreakRef = useRef<number>(0)
   const patrolHistoryRef = useRef<PatrolRecord[]>([])
   const focusCountRef = useRef(0)
   const distractedCountRef = useRef(0)
@@ -152,8 +155,13 @@ export default function StudyPage() {
       distractedCountRef.current += 1
       setDistractedCount(distractedCountRef.current)
       currentFocusStreakRef.current = 0
+      currentDistractedStreakRef.current += intervalSec
+      if (currentDistractedStreakRef.current > longestDistractedStreakRef.current) {
+        longestDistractedStreakRef.current = currentDistractedStreakRef.current
+      }
     } else {
       currentFocusStreakRef.current = 0
+      currentDistractedStreakRef.current = 0
     }
     lastLabelRef.current = label
 
@@ -244,6 +252,8 @@ export default function StudyPage() {
     distractedCountRef.current = 0
     currentFocusStreakRef.current = 0
     longestFocusStreakRef.current = 0
+    currentDistractedStreakRef.current = 0
+    longestDistractedStreakRef.current = 0
     lastLabelRef.current = 'focus'
     patrolHistoryRef.current = []
     setPatrolCount(0)
@@ -310,6 +320,7 @@ export default function StudyPage() {
           distracted_count: distractedCnt,
           absent_count: absentCount,
           longest_focus_streak_seconds: longestFocusStreakRef.current,
+          longest_distracted_streak_seconds: longestDistractedStreakRef.current,
           completed,
           duration_minutes: duration,
           camera_enabled: cameraEnabled,
@@ -327,6 +338,7 @@ export default function StudyPage() {
       absentCount,
       focusSeconds,
       longestFocusSeconds: longestFocusStreakRef.current,
+      longestDistractedSeconds: longestDistractedStreakRef.current,
       patrolHistory: [...patrolHistoryRef.current],
       completed,
       cameraEnabled,
@@ -587,6 +599,10 @@ export default function StudyPage() {
             <span className="r-label">最长连续专注</span>
             <span className="r-value good">{formatSeconds(report.longestFocusSeconds)}</span>
           </div>
+          <div className="report-row">
+            <span className="r-label">最长连续走神</span>
+            <span className="r-value warn">{formatSeconds(report.longestDistractedSeconds)}</span>
+          </div>
         </div>
 
         {report.cameraEnabled && report.patrolHistory.length > 0 && (
@@ -668,7 +684,7 @@ export default function StudyPage() {
  */
 const StreamVideo = forwardRef<HTMLVideoElement, { stream: MediaStream | null }>(
   function StreamVideo({ stream }, ref) {
-    const videoRef = useRef<HTMLVideoElement>(null)
+    const videoRef = useRef<HTMLVideoElement | null>(null)
 
     // stream 变化时同步 srcObject 并 play
     useEffect(() => {
