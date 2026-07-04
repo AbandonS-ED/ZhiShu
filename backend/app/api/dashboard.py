@@ -196,15 +196,39 @@ async def get_dashboard_stats(
         "path":         {"type": "path",       "title": "生成学习路径",  "color": "#10B981"},
         "profile":      {"type": "profile",    "title": "更新学习画像",  "color": "#EC4899"},
         "chat":         {"type": "chat",       "title": "智能对话",      "color": "#8a9ba8"},
+        "evaluation":   {"type": "resource",   "title": "评估学习",      "color": "#F59E0B"},
+        "resource":     {"type": "resource",   "title": "学习资源",      "color": "#059669"},
+        "assessment":   {"type": "profile",    "title": "画像评估",      "color": "#EC4899"},
+        "study_focus":  {"type": "study",      "title": "专注自习",      "color": "#6366F1"},
     }
 
     for rec in recent_records:
-        meta = ACTION_MAP.get(rec.action, {"type": rec.action, "title": rec.action, "color": "#78716C"})
+        meta = ACTION_MAP.get(rec.action)
+        if not meta:
+            # 未知 action：尝试翻译，不显示英文
+            if "study" in rec.action:
+                meta = {"type": "study", "title": "自习学习", "color": "#6366F1"}
+            elif "resource" in rec.action or "view" in rec.action:
+                meta = {"type": "resource", "title": "学习资源", "color": "#059669"}
+            elif "exercise" in rec.action or "quiz" in rec.action:
+                meta = {"type": "exercise", "title": "做练习题", "color": "#F59E0B"}
+            elif "profile" in rec.action or "assess" in rec.action:
+                meta = {"type": "profile", "title": "学习画像", "color": "#EC4899"}
+            elif "path" in rec.action:
+                meta = {"type": "path", "title": "学习路径", "color": "#10B981"}
+            elif "chat" in rec.action:
+                meta = {"type": "chat", "title": "智能对话", "color": "#8a9ba8"}
+            else:
+                meta = {"type": "resource", "title": "学习记录", "color": "#78716C"}
+
         title = meta["title"]
-        if rec.knowledge_point:
+        # 拼接知识点（过滤掉英文技术 key）
+        if rec.knowledge_point and not rec.knowledge_point.isascii():
             title = f"{title}：{rec.knowledge_point}"
         elif rec.resource_type:
-            title = f"{title}（{rec.resource_type}）"
+            type_zh = {"resource": "资源", "exercise": "练习", "path": "路径", "chat": "对话", "evaluation": "评估"}.get(rec.resource_type)
+            if type_zh:
+                title = f"{title}（{type_zh}）"
         activities.append({
             "type": meta["type"],
             "title": title,
