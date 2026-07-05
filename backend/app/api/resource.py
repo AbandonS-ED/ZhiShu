@@ -15,6 +15,9 @@ from app.models.resource import Resource
 from app.models.student_profile import StudentProfile
 from app.agents.resource_creator_agent import resource_creator_agent
 from app.agents.review_agent import review_agent
+from app.agents.document_agent import document_agent
+from app.agents.exercise_agent import exercise_agent
+from app.services.anti_hallucination import anti_hallucination
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -59,6 +62,12 @@ class ManualCreateRequest(BaseModel):
 class ReviewRequest(BaseModel):
     content: dict
     knowledge_point: str
+
+
+class LearningPackageRequest(BaseModel):
+    student_id: str
+    knowledge_point: str
+    phase: str
 
 
 # ====================================================================
@@ -362,3 +371,161 @@ async def delete_resource(
     await db.commit()
 
     return {"status": "ok", "message": "资源已删除"}
+
+
+# ====================================================================
+# 7. GET /learning-package — 获取学习包（按阶段）
+# ====================================================================
+
+@router.get("/learning-package")
+async def get_learning_package(
+    student_id: uuid.UUID = Depends(valid_student_id),
+    knowledge_point: str = "",
+    phase: str = "learn",
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    """获取某个知识点的学习包（按阶段）"""
+    if user.id != student_id:
+        raise HTTPException(status_code=403, detail="只能查看自己的数据")
+    if not knowledge_point:
+        raise HTTPException(status_code=400, detail="knowledge_point 不能为空")
+
+    type_map = {
+        "learn": ["knowledge", "mindmap", "audio"],
+        "practice": ["exercise"],
+        "review": ["code", "knowledge"],
+    }
+    allowed_types = type_map.get(phase, ["knowledge"])
+
+    result = await db.execute(
+        select(Resource)
+        .where(
+            Resource.student_id == student_id,
+            Resource.knowledge_point == knowledge_point,
+            Resource.resource_type.in_(allowed_types),
+        )
+        .order_by(Resource.created_at.desc())
+    )
+    resources = result.scalars().all()
+
+    # 各阶段完成状态
+    all_types_result = await db.execute(
+        select(Resource.resource_type)
+        .where(
+            Resource.student_id == student_id,
+            Resource.knowledge_point == knowledge_point,
+        )
+    )
+    all_types = [r for (r,) in all_types_result.all()]
+    progress = {
+        "learn": any(t in all_types for t in ["knowledge", "mindmap", "audio"]),
+        "practice": "exercise" in all_types,
+        "review": any(t in all_types for t in ["code", "knowledge"]),
+    }
+
+    next_phase = None
+    if phase == "learn" and progress["learn"]:
+        next_phase = "practice"
+    elif phase == "practice" and progress["practice"]:
+        next_phase = "review"
+
+    return {
+        "knowledge_point": knowledge_point,
+        "phase": phase,
+        "resources": [
+            {
+                "resource_id": str(r.id),
+                "type": r.resource_type,
+                "title": r.title,
+                "content": r.content,
+                "difficulty": r.difficulty,
+            }
+            for r in resources
+        ],
+        "next_phase": next_phase,
+        "progress": progress,
+    }
+
+
+# ====================================================================
+# 8. POST /learning-package/generate/stream — 生成学习包
+# ====================================================================
+
+@router.post("/learning-package/generate/stream")
+async def generate_learning_package_stream(
+    req: LearningPackageRequest,
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    """生成某个 KP 某个阶段的学习包"""
+    if str(user.id) != req.student_id:
+        raise HTTPException(status_code=403, detail="只能操作自己的学习数据")
+
+    # 获取画像
+    profile_result = await db.execute(
+        select(StudentProfile)
+        .where(StudentProfile.student_id == uuid.UUID(req.student_id))
+        .limit(1)
+    )
+    profile = profile_result.scalar_one_or_none()
+    student_profile = profile.dimensions if profile else None
+
+    phase = req.phase
+    type_map = {"learn": "knowledge", "practice": "exercise", "review": "code"}
+    resource_type = type_map.get(phase, "knowledge")
+
+    # 生成内容
+    content = {}
+    if phase == "learn":
+        content = await document_agent.generate(
+            knowledge_point=req.knowledge_point,
+            student_profile=student_profile,
+            resource_type="all",
+        )
+    elif phase == "practice":
+        content = await exercise_agent.generate(
+            knowledge_point=req.knowledge_point,
+            student_profile=student_profile,
+            exercise_type="all",
+            count=5,
+        )
+    elif phase == "review":
+        content = await document_agent.generate(
+            knowledge_point=req.knowledge_point,
+            student_profile=student_profile,
+            resource_type="code",
+        )
+
+    # 防幻觉验证
+    text_to_validate = content.get("knowledge", "") or content.get("code", "") or str(content)
+    if text_to_validate:
+        validation = await anti_hallucination.validate(
+            content=text_to_validate,
+            knowledge_point=req.knowledge_point,
+        )
+        content["validation"] = {
+            "passed": validation.passed,
+            "issues": validation.issues,
+            "confidence": validation.confidence,
+        }
+
+    # 保存资源
+    resource = Resource(
+        id=uuid.uuid4(),
+        student_id=uuid.UUID(req.student_id),
+        title=f"{req.knowledge_point} - {phase}",
+        resource_type=resource_type,
+        content=content,
+        knowledge_point=req.knowledge_point,
+        difficulty=50,
+    )
+    db.add(resource)
+    await db.commit()
+
+    return {
+        "resource_id": str(resource.id),
+        "knowledge_point": req.knowledge_point,
+        "phase": phase,
+        "content": content,
+    }

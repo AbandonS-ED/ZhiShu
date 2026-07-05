@@ -382,6 +382,30 @@ export const resourceApi = {
 
   delete: (resourceId: string) =>
     request<{ message: string }>(`/resource/${resourceId}`, { method: 'DELETE' }),
+
+  getLearningPackage: (student_id: string, knowledge_point: string, phase: string) =>
+    request<{
+      knowledge_point: string
+      phase: string
+      resources: Array<Record<string, unknown>>
+      next_phase: string | null
+      progress: { learn: boolean; practice: boolean; review: boolean }
+    }>(`/resource/learning-package?student_id=${student_id}&knowledge_point=${encodeURIComponent(knowledge_point)}&phase=${phase}`),
+
+  generateLearningPackage: (
+    student_id: string,
+    knowledge_point: string,
+    phase: string
+  ) =>
+    request<{
+      resource_id: string
+      knowledge_point: string
+      phase: string
+      content: Record<string, unknown>
+    }>('/resource/learning-package/generate/stream', {
+      method: 'POST',
+      body: JSON.stringify({ student_id, knowledge_point, phase }),
+    }),
 }
 
 // ===== Evaluation =====

@@ -41,6 +41,9 @@ export interface ResourceItem {
   difficulty: number
   is_favorited: boolean
   is_preset?: boolean
+  mermaid?: string
+  exercises?: ExerciseItem[]
+  duration_minutes?: number
   created_at: string
 }
 
@@ -67,4 +70,14 @@ export interface ManualCreateRequest {
 export interface ReviewRequest {
   content: ResourceContent
   knowledge_point: string
+}
+
+export type PhaseType = 'learn' | 'practice' | 'review'
+
+export interface LearningPackage {
+  knowledge_point: string
+  phase: PhaseType
+  resources: ResourceItem[]
+  next_phase: PhaseType | null
+  progress: { learn: boolean; practice: boolean; review: boolean }
 }
