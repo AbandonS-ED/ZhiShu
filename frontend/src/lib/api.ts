@@ -203,6 +203,37 @@ export const chatApi = {
     ),
 }
 
+// ===== Exercise =====
+
+export const exerciseApi = {
+  generateStream(
+    student_id: string,
+    knowledge_point: string,
+    onEvent: (e: ChatEvent) => void,
+    count = 5,
+    exercise_type = 'all'
+  ): () => void {
+    return createEventStream(`${BASE_URL}/resource/exercises/generate/stream`, { student_id, knowledge_point, count, exercise_type }, onEvent)
+  },
+  generate: (
+    student_id: string,
+    knowledge_point: string,
+    count = 5,
+    exercise_type = 'all'
+  ) =>
+    request<{ knowledge_point: string; count: number; exercises: Exercise[] }>(
+      '/resource/exercises/generate',
+      {
+        method: 'POST',
+        body: JSON.stringify({ student_id, knowledge_point, count, exercise_type }),
+      }
+    ),
+  list: (student_id: string) =>
+    request<Array<Exercise & { created_at: string }>>(
+      `/resource/exercises/${student_id}`
+    ),
+}
+
 // ===== Path =====
 export interface PathNode {
   id: string
@@ -409,6 +440,8 @@ export const evaluationApi = {
   recordAction: (data: {
     student_id: string
     action: string
+    resource_type?: string
+    resource_id?: string
     knowledge_point?: string
     score?: number
     duration_seconds?: number
