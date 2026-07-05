@@ -48,13 +48,20 @@ const DAILY_GOAL = 60 // 目标每日 60 分钟
 export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [courses, setCourses] = useState<Course[]>([])
+  const [hasProfile, setHasProfile] = useState(false)
+  const [resourceCount, setResourceCount] = useState(0)
+  const [loadingUser, setLoadingUser] = useState(true)
 
   useEffect(() => {
     const sid = getStudentId()
     if (!sid) return
-    import('@/lib/api').then(({ dashboardApi }) => {
+    import('@/lib/api').then(({ dashboardApi, profileApi, resourceApi }) => {
       dashboardApi.getStats(sid).then(setStats).catch(console.error)
       dashboardApi.getCourses(sid).then((data) => setCourses(data.courses)).catch(console.error)
+      Promise.all([
+        profileApi.getMe().then((p) => setHasProfile(!!p)).catch(() => {}),
+        resourceApi.list(sid).then((r) => setResourceCount(Array.isArray(r) ? r.length : 0)).catch(() => {}),
+      ]).finally(() => setLoadingUser(false))
     })
   }, [])
 
@@ -259,6 +266,41 @@ export default function Home() {
               <span className="tag tag-warm">Quick</span>
             </div>
             <div className="card-bd">
+              {/* 根据用户状态推荐最合适的入口 */}
+              {loadingUser ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: 'var(--bg)', borderRadius: 8, marginBottom: 12, fontSize: 13, color: 'var(--ink-4)' }}>
+                  <div className="skeleton" style={{ width: 20, height: 20, borderRadius: 4 }} />
+                  <div style={{ flex: 1 }}>
+                    <div className="skeleton" style={{ width: '60%', height: 14, borderRadius: 4, marginBottom: 4 }} />
+                    <div className="skeleton" style={{ width: '40%', height: 10, borderRadius: 4 }} />
+                  </div>
+                </div>
+              ) : !hasProfile ? (
+                <a className="rec-cta" href="/duihua">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="1.8"><circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 1 0-16 0" /></svg>
+                  <div>
+                    <div className="rec-title">完成首次对话，生成你的学习画像</div>
+                    <div className="rec-sub">系统会根据你的回答推荐学习内容</div>
+                  </div>
+                </a>
+              ) : resourceCount === 0 ? (
+                <a className="rec-cta" href="/resources">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                  <div>
+                    <div className="rec-title">你的资源中心还是空的，去看看</div>
+                    <div className="rec-sub">系统会根据你的画像推荐学习资源</div>
+                  </div>
+                </a>
+              ) : (
+                <a className="rec-cta" href="/zixi">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="1.8"><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></svg>
+                  <div>
+                    <div className="rec-title">继续自习，专注学习 {resourceCount} 个资源</div>
+                    <div className="rec-sub">摄像头监控你的专注状态，番茄钟式学习</div>
+                  </div>
+                </a>
+              )}
+              {/* 其他快捷入口 */}
               <div className="qa-grid">
                 <a className="qa" href="/duihua">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">

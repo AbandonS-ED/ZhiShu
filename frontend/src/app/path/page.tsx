@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { pathApi, evaluationApi, type PathNode as ApiPathNode, type PathEdge as ApiPathEdge } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { usePageTimer } from '@/hooks/usePageTimer'
@@ -63,6 +64,7 @@ function getStatusColor(status: string) {
 
 // ═══ MAIN PAGE ═══
 export default function PathPage() {
+  const router = useRouter()
   const [paths, setPaths] = useState<PathData[]>([])
   const [currentPath, setCurrentPath] = useState<PathData | null>(null)
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
@@ -450,7 +452,7 @@ export default function PathPage() {
                   {layoutNodes.map((n, i) => {
                     const st = getNodeStatus(n.difficulty)
                     return (
-                      <div key={n.id} className={`g-node${selectedNode === n.id ? ' selected' : ''}`} style={{ left: `${n.x}px`, top: `${n.y}px`, animation: `cardIn .4s var(--ease) ${i * 0.04}s forwards`, opacity: 0 }} onClick={() => setSelectedNode(n.id)}>
+                      <div key={n.id} className={`g-node${selectedNode === n.id ? ' selected' : ''}`} style={{ left: `${n.x}px`, top: `${n.y}px`, animation: `cardIn .4s var(--ease) ${i * 0.04}s forwards`, opacity: 0, cursor: 'pointer' }} onClick={() => setSelectedNode(n.id)}>
                         <div className={`gn-dot ${st}`}>{st === 'done' ? '✓' : st === 'active' ? '►' : st === 'weak' ? '!' : i + 1}</div>
                         <div className="gn-body">
                           <h4>{n.label}</h4>
@@ -502,21 +504,21 @@ export default function PathPage() {
                 <div className="dp-row">
                   <span className="dp-label">关联资源</span>
                   <div className="dp-resources">
-                    <button className="dp-res-btn" onClick={() => window.location.href = `/duihua?msg=讲解${selectedData.label}`}><Icon name="doc" size={16} /> 讲解</button>
-                    <button className="dp-res-btn" onClick={() => window.location.href = `/duihua?msg=画${selectedData.label}思维导图`}><Icon name="map" size={16} /> 导图</button>
-                    <button className="dp-res-btn" onClick={() => window.location.href = `/duihua?msg=出5道${selectedData.label}练习题`}><Icon name="edit" size={16} /> 练习</button>
+                    <button className="dp-res-btn" onClick={() => router.push(`/resources/learn/${encodeURIComponent(selectedData.label)}?phase=learn`)}><Icon name="doc" size={16} /> 学习</button>
+                    <button className="dp-res-btn" onClick={() => router.push(`/resources/learn/${encodeURIComponent(selectedData.label)}?phase=practice`)}><Icon name="edit" size={16} /> 练习</button>
+                    <button className="dp-res-btn" onClick={() => router.push(`/resources/learn/${encodeURIComponent(selectedData.label)}?phase=review`)}><Icon name="map" size={16} /> 复习</button>
                   </div>
                 </div>
               </div>
               <div className="dp-actions">
-                <button className="btn btn-solid" onClick={() => window.location.href = `/duihua?msg=讲解${selectedData.label}`}>开始学习</button>
+                <button className="btn btn-solid" onClick={() => router.push(`/resources/learn/${encodeURIComponent(selectedData.label)}?phase=learn`)}>开始学习</button>
               </div>
             </div>
           ) : (
             <div className="detail-panel">
               <div className="detail-placeholder">
                 <div className="dp-icon"><Icon name="point" size={24} /></div>
-                <p>点击计划图中的节点<br />查看知识点详情</p>
+                <p>点击计划图中的节点<br />查看知识点详情，或直接开始学习</p>
               </div>
             </div>
           )}

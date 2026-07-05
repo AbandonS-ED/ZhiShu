@@ -191,6 +191,11 @@ code, .mono { font-family: 'JetBrains Mono', monospace; font-weight: 400; }
 .qa{display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg);border:1px solid transparent;border-radius:var(--r-sm);cursor:pointer;transition:all .2s var(--ease);font-size:12.5px;color:var(--ink-2)}
 .qa:hover{border-color:var(--line);background:var(--surface);transform:translateY(-1px)}
 .qa svg{width:16px;height:16px;opacity:.4}
+.rec-cta{display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--brand-soft);border:1px solid var(--brand);border-radius:var(--r-sm);margin-bottom:12px;text-decoration:none;color:var(--ink);font-size:13px;transition:all .2s var(--ease)}
+.rec-cta:hover{background:var(--brand)}
+.rec-cta svg{width:20px;height:20px;flex-shrink:0}
+.rec-cta .rec-title{font-weight:500}
+.rec-cta .rec-sub{font-size:11px;color:var(--ink-4);margin-top:2}
 .prog-item{margin-bottom:14px}
 .prog-item:last-child{margin-bottom:0}
 .prog-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px}

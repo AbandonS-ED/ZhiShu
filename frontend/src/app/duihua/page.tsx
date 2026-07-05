@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { chatApi, profileApi, evaluationApi, resourceApi, type StudentProfile } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
-import { escapeHtml, markdownToHtml, extractAnswer } from '@/lib/utils'
+import { escapeHtml, markdownToHtml, extractAnswer, showToast } from '@/lib/utils'
 import { usePageTimer } from '@/hooks/usePageTimer'
 import Icon from '@/components/Icon'
 
@@ -370,7 +370,7 @@ export default function DuihuaPage() {
               })
               setGenResources((prev) => [...prev, { name: `${userMsg} · 文档`, status: 'done' }])
               resourceApi.saveFromChat(studentId, `${userMsg} 学习材料`, 'knowledge', { knowledge: data.knowledge || '' }, userMsg)
-                .then(() => resourceApi.list(studentId).then(setDbResources))
+                .then(() => { resourceApi.list(studentId).then(setDbResources); showToast('已保存到资源中心') })
                 .catch(() => {})
             }
             // 如果没有 token 内容（非流式 Agent），渲染完整结果
@@ -384,7 +384,7 @@ export default function DuihuaPage() {
                 setGenResources((prev) => [...prev, { name: `${userMsg} · 思维导图`, status: 'done' }])
                 // 自动保存到资源中心
                 resourceApi.saveFromChat(studentId, `${userMsg} 思维导图`, 'mindmap', { mermaid_code: data.mermaid || data.code || '' }, userMsg)
-                  .then(() => resourceApi.list(studentId).then(setDbResources))
+                  .then(() => { resourceApi.list(studentId).then(setDbResources); showToast('已保存到资源中心') })
                   .catch(() => {})
               } else if (resultData.type === 'path') {
                 html = `<p>📚 路径: ${data.title || ''}</p><p>${data.description || ''}</p><p>共 ${data.nodes?.length || 0} 个知识点</p>`
