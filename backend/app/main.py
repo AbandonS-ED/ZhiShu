@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import profile, path, tutor, chat, mindmap, dashboard, evaluation, auth
+from app.api import profile, path, tutor, chat, mindmap, dashboard, evaluation, auth, resource
 from app.api import admin
 from app.core.config import settings
 from app.core.database import init_db
@@ -58,6 +58,7 @@ app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["仪表�
 app.include_router(evaluation.router, prefix="/api/v1/evaluation", tags=["效果评估"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["认证"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["管理端"])
+app.include_router(resource.router, prefix="/api/v1/resource", tags=["资源生成"])
 
 @app.get("/")
 async def root():

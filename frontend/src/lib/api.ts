@@ -4,6 +4,31 @@ const BASE_URL = 'http://localhost:8001/api/v1'
 
 import type { Resource, ResourceContent, Exercise } from '@/types'
 export type { Resource, ResourceContent, Exercise }
+import type { AISourceCreateRequest, ManualCreateRequest, ReviewRequest, ResourceItem, ReviewResult } from '@/app/resources/types'
+export type { AISourceCreateRequest, ManualCreateRequest, ReviewRequest, ResourceItem, ReviewResult }
+
+export interface SaveResourceRequest {
+  student_id: string
+  title: string
+  resource_type: string
+  content: {
+    knowledge?: string
+    code?: string
+    mermaid_code?: string
+    exercises?: Array<{
+      type: string
+      question: string
+      options?: string[]
+      answer: string
+      explanation?: string
+      difficulty?: number
+    }>
+    message?: string
+  }
+  knowledge_point?: string
+  difficulty?: number
+}
+
 import { createEventStream, type ChatEvent } from './sse'
 import { clearStudentIdCache } from './student'
 
@@ -284,6 +309,48 @@ export const dashboardApi = {
     request<DashboardStats>(`/dashboard/stats?student_id=${student_id}`),
   getCourses: (student_id: string = '00000000-0000-0000-0000-000000000001') =>
     request<{ courses: CourseProgress[] }>(`/dashboard/courses?student_id=${student_id}`),
+}
+
+// ===== Resource =====
+export const resourceApi = {
+  createStream: (data: AISourceCreateRequest) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
+    return fetch(`${BASE_URL}/resource/create/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data),
+    })
+  },
+
+  createManual: (data: ManualCreateRequest) =>
+    request<ResourceItem>('/resource/create/manual', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  review: (data: ReviewRequest) =>
+    request<ReviewResult>('/resource/review', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  list: (studentId: string) =>
+    request<ResourceItem[]>(`/resource/list?student_id=${studentId}`),
+
+  save: (data: SaveResourceRequest) =>
+    request<ResourceItem>('/resource/save', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  toggleFavorite: (resourceId: string) =>
+    request<{ is_favorited: boolean }>(`/resource/${resourceId}/favorite`, { method: 'POST' }),
+
+  delete: (resourceId: string) =>
+    request<{ message: string }>(`/resource/${resourceId}`, { method: 'DELETE' }),
 }
 
 // ===== Evaluation =====

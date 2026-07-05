@@ -25,8 +25,13 @@
 
 ```
 ZhiShu/
-├── frontend/                        # Next.js 前端
-│   ├── src/app/                     # 页面路由 (10 学生页 + 9 管理页)
+├── frontend/                        # Next.js 前端 (21 页面)
+│   ├── src/app/                     # 页面路由 (12 学生页 + 9 管理页)
+│   │   ├── resources/               # 资源中心
+│   │   │   ├── page.tsx             # 资源列表 (AI 生成 + 手动创建)
+│   │   │   ├── my-resources/        # 我的资源 (过滤系统自动生成)
+│   │   │   ├── [id]/                # 资源详情 (标签页 + 练习题)
+│   │   │   └── components/          # 资源组件 (ResourceCard + CreateModal + ResourceProgress)
 │   ├── src/components/              # 共享组件 (Icon.tsx + RobotIcon.tsx + layout/)
 │   ├── src/lib/                     # 工具库 (api.ts + sse.ts + admin/)
 │   ├── src/stores/appStore.ts       # Zustand 全局状态
@@ -34,7 +39,7 @@ ZhiShu/
 │   └── src/hooks/usePageTimer.ts    # 页面停留计时器
 ├── backend/                         # FastAPI 后端
 │   ├── app/main.py                  # 应用入口 + 路由注册
-│   ├── app/api/                     # 12 个路由模块 (67 端点)
+│   ├── app/api/                     # 12 个路由模块 (68 端点)
 │   ├── app/agents/                  # 9 个 Agent + StateGraph 编排
 │   ├── app/services/                # 16 个服务模块
 │   ├── app/models/                  # 13 个数据模型
@@ -88,7 +93,7 @@ cd backend && celery -A app.core.celery_config beat --loglevel=info
 cd backend && python -m pytest tests/ -v          # 129 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
-cd frontend && npm run build                       # 18 页面
+cd frontend && npm run build                       # 21 页面
 ```
 
 ## 架构要点

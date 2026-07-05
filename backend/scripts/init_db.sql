@@ -141,11 +141,64 @@ CREATE TABLE IF NOT EXISTS evaluation_reports (
 );
 CREATE INDEX IF NOT EXISTS idx_evaluation_reports_student_date ON evaluation_reports(student_id, report_date);
 
+CREATE TABLE IF NOT EXISTS resources (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL REFERENCES students(id),
+    course_id UUID,
+    title VARCHAR(200) NOT NULL,
+    resource_type VARCHAR(20) NOT NULL,
+    content JSONB NOT NULL DEFAULT '{}',
+    knowledge_point VARCHAR(200),
+    difficulty INTEGER DEFAULT 50,
+    is_favorited BOOLEAN DEFAULT false,
+    is_preset BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_resources_student_id ON resources(student_id);
+CREATE INDEX IF NOT EXISTS idx_resources_knowledge_point ON resources(knowledge_point);
+
+CREATE TABLE IF NOT EXISTS exercises (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL REFERENCES students(id),
+    resource_id UUID REFERENCES resources(id),
+    exercise_type VARCHAR(20) NOT NULL,
+    question TEXT NOT NULL,
+    options JSONB,
+    answer TEXT NOT NULL,
+    explanation TEXT,
+    difficulty INTEGER DEFAULT 50,
+    knowledge_point VARCHAR(200),
+    student_answer TEXT,
+    is_correct BOOLEAN,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_exercises_student_id ON exercises(student_id);
+CREATE INDEX IF NOT EXISTS idx_exercises_resource_id ON exercises(resource_id);
+
+CREATE TABLE IF NOT EXISTS exercise_bank (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    question TEXT NOT NULL,
+    exercise_type VARCHAR(20) NOT NULL,
+    options JSONB,
+    answer TEXT NOT NULL,
+    explanation TEXT,
+    difficulty INTEGER DEFAULT 50,
+    knowledge_point VARCHAR(200),
+    source VARCHAR(50) DEFAULT 'manual',
+    is_active BOOLEAN DEFAULT true,
+    created_by VARCHAR(50),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_exercise_bank_knowledge_point ON exercise_bank(knowledge_point);
+CREATE INDEX IF NOT EXISTS idx_exercise_bank_is_active ON exercise_bank(is_active);
+
 -- 6. 完成
 \echo '✅ 数据库 zhishu 初始化完成'
 \echo '   students / student_profiles / document_chunks'
 \echo '   learning_paths / chat_sessions / chat_messages'
 \echo '   learning_records / learning_activity_logs / evaluation_reports'
+\echo '   resources / exercises / exercise_bank'
 
 -- 7. 初始化默认管理员账号（密码: admin123）
 -- bcrypt 哈希: $2b$12$aUqTTt5KCfd1zGXqZoQaieRPYuoNXKCM/do3wrjcEK4yCqEij/yUS
