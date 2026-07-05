@@ -4,6 +4,31 @@ const BASE_URL = 'http://localhost:8001/api/v1'
 
 import type { Resource, ResourceContent, Exercise } from '@/types'
 export type { Resource, ResourceContent, Exercise }
+import type { AISourceCreateRequest, ManualCreateRequest, ReviewRequest, ResourceItem, ReviewResult } from '@/app/resources/types'
+export type { AISourceCreateRequest, ManualCreateRequest, ReviewRequest, ResourceItem, ReviewResult }
+
+export interface SaveResourceRequest {
+  student_id: string
+  title: string
+  resource_type: string
+  content: {
+    knowledge?: string
+    code?: string
+    mermaid_code?: string
+    exercises?: Array<{
+      type: string
+      question: string
+      options?: string[]
+      answer: string
+      explanation?: string
+      difficulty?: number
+    }>
+    message?: string
+  }
+  knowledge_point?: string
+  difficulty?: number
+}
+
 import { createEventStream, type ChatEvent } from './sse'
 import { clearStudentIdCache } from './student'
 
@@ -11,17 +36,21 @@ export type { ChatEvent }
 
 // 学习包生成 SSE 事件类型
 export interface GenerationEvent {
-  type: 'progress' | 'token' | 'result' | 'error' | 'done' | 'validation'
+  type: 'progress' | 'token' | 'result' | 'error' | 'done'
+    | 'agent_result' | 'agent_error' | 'extend_menu' | 'validation'
   progress?: number
   message?: string
   current_agent?: string
   content?: string
-  data?: {
-    resource_id?: string
-    knowledge_point?: string
-    phase?: string
-    content?: Record<string, unknown>
-  }
+  // agent_result / agent_error
+  agent?: string
+  variant?: string
+  error?: string
+  data?: Record<string, unknown>
+  // extend_menu
+  options?: { key: string; label: string; desc: string }[]
+  saved_resources?: { agent: string; resource_id: string; variant: string }[]
+  // result (backward compat)
   passed?: boolean
   confidence?: number
   issues?: string[]
@@ -174,169 +203,6 @@ export const chatApi = {
     ),
 }
 
-// ===== Resource =====
-
-export const resourceApi = {
-  generateStream(
-    student_id: string,
-    knowledge_point: string,
-    onEvent: (e: ChatEvent) => void,
-    resource_type = 'all'
-  ): () => void {
-    return createEventStream(`${BASE_URL}/resource/generate/stream`, { student_id, knowledge_point, resource_type }, onEvent)
-  },
-  generate: (student_id: string, knowledge_point: string, resource_type = 'all') =>
-    request<Resource>('/resource/generate', {
-      method: 'POST',
-      body: JSON.stringify({ student_id, knowledge_point, resource_type }),
-    }),
-  list: (student_id: string) =>
-    request<Array<{
-      resource_id: string;
-      title: string;
-      resource_type: string;
-      knowledge_point: string;
-      content: Record<string, unknown>;
-      difficulty: number;
-      is_favorited: boolean;
-      created_at: string;
-    }>>(`/resource/list?student_id=${student_id}`),
-  favorite: (resource_id: string) =>
-    request<{ resource_id: string; is_favorited: boolean }>(
-      `/resource/${resource_id}/favorite`,
-      { method: 'POST' }
-    ),
-  batchGenerate: (student_id: string, knowledge_points: string[], resource_type = 'all') =>
-    request<{
-      total: number;
-      success: number;
-      results: Array<{ resource_id?: string; knowledge_point: string; status: string; message?: string }>;
-    }>('/resource/batch-generate', {
-      method: 'POST',
-      body: JSON.stringify({ student_id, knowledge_points, resource_type }),
-    }),
-  saveFromChat: (student_id: string, title: string, resource_type: string, content: Record<string, unknown>, knowledge_point: string) =>
-    request<{ resource_id: string; title: string; message: string }>('/resource/save-from-chat', {
-      method: 'POST',
-      body: JSON.stringify({ student_id, title, resource_type, content, knowledge_point }),
-    }),
-
-  // ── 推荐 + 学习包（新功能）───────────────────────────────
-  getRecommendations: (student_id: string, limit = 10) =>
-    request<{ recommendations: Array<{
-      knowledge_point: string
-      reason: string
-      reason_type: string
-      priority_score: number
-      suggested_phases: string[]
-      existing_resources: { learn: boolean; practice: boolean; review: boolean }
-      estimated_minutes: number
-    }> }>('/resource/recommendations', {
-      method: 'POST',
-      body: JSON.stringify({ student_id, limit }),
-    }),
-
-  getLearningPackage: (student_id: string, knowledge_point: string, phase: string) =>
-    request<{
-      knowledge_point: string
-      phase: string
-      resources: Array<Record<string, unknown>>
-      next_phase: string | null
-      progress: { learn: boolean; practice: boolean; review: boolean }
-    }>(`/resource/learning-package?student_id=${student_id}&knowledge_point=${encodeURIComponent(knowledge_point)}&phase=${phase}`),
-
-  // 生成学习包（JSON 完整返回）
-  generateLearningPackage: (
-    student_id: string,
-    knowledge_point: string,
-    phase: string
-  ) =>
-    request<{
-      resource_id: string
-      knowledge_point: string
-      phase: string
-      content: Record<string, unknown>
-    }>('/resource/learning-package/generate/stream', {
-      method: 'POST',
-      body: JSON.stringify({ student_id, knowledge_point, phase }),
-    }),
-
-  // SSE 流式生成学习包
-  generateLearningPackageStream(
-    student_id: string,
-    knowledge_point: string,
-    phase: string,
-    onEvent: (e: GenerationEvent) => void
-  ): () => void {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 300_000) // 5min
-    const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
-    fetch(`${BASE_URL}/resource/learning-package/generate/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ student_id, knowledge_point, phase }),
-      signal: controller.signal,
-    })
-      .then(async (res) => {
-        if (!res.ok || !res.body) throw new Error(`SSE ${res.status}`)
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try { onEvent(JSON.parse(line.slice(6))) } catch {}
-            }
-          }
-        }
-      })
-      .catch((err) => {
-        if (err.name !== 'AbortError') onEvent({ type: 'error', message: err.message })
-      })
-      .finally(() => clearTimeout(timeout))
-    return () => { clearTimeout(timeout); controller.abort() }
-  },
-}
-
-// ===== Exercise =====
-
-export const exerciseApi = {
-  generateStream(
-    student_id: string,
-    knowledge_point: string,
-    onEvent: (e: ChatEvent) => void,
-    count = 5,
-    exercise_type = 'all'
-  ): () => void {
-    return createEventStream(`${BASE_URL}/resource/exercises/generate/stream`, { student_id, knowledge_point, count, exercise_type }, onEvent)
-  },
-  generate: (
-    student_id: string,
-    knowledge_point: string,
-    count = 5,
-    exercise_type = 'all'
-  ) =>
-    request<{ knowledge_point: string; count: number; exercises: Exercise[] }>(
-      '/resource/exercises/generate',
-      {
-        method: 'POST',
-        body: JSON.stringify({ student_id, knowledge_point, count, exercise_type }),
-      }
-    ),
-  list: (student_id: string) =>
-    request<Array<Exercise & { created_at: string }>>(
-      `/resource/exercises/${student_id}`
-    ),
-}
-
 // ===== Path =====
 export interface PathNode {
   id: string
@@ -445,6 +311,48 @@ export const dashboardApi = {
     request<{ courses: CourseProgress[] }>(`/dashboard/courses?student_id=${student_id}`),
 }
 
+// ===== Resource =====
+export const resourceApi = {
+  createStream: (data: AISourceCreateRequest) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('zhishu_token') : null
+    return fetch(`${BASE_URL}/resource/create/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(data),
+    })
+  },
+
+  createManual: (data: ManualCreateRequest) =>
+    request<ResourceItem>('/resource/create/manual', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  review: (data: ReviewRequest) =>
+    request<ReviewResult>('/resource/review', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  list: (studentId: string) =>
+    request<ResourceItem[]>(`/resource/list?student_id=${studentId}`),
+
+  save: (data: SaveResourceRequest) =>
+    request<ResourceItem>('/resource/save', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  toggleFavorite: (resourceId: string) =>
+    request<{ is_favorited: boolean }>(`/resource/${resourceId}/favorite`, { method: 'POST' }),
+
+  delete: (resourceId: string) =>
+    request<{ message: string }>(`/resource/${resourceId}`, { method: 'DELETE' }),
+}
+
 // ===== Evaluation =====
 export interface EvaluationStats {
   total_actions: number
@@ -459,7 +367,6 @@ export interface EvaluationReport {
   student_id: string
   generated_at: string
   summary: {
-    total_resources: number
     total_exercises: number
     avg_score: number
     total_actions: number
@@ -502,8 +409,6 @@ export const evaluationApi = {
   recordAction: (data: {
     student_id: string
     action: string
-    resource_type?: string
-    resource_id?: string
     knowledge_point?: string
     score?: number
     duration_seconds?: number
@@ -611,13 +516,11 @@ async function adminRequest<T>(path: string, options: RequestInit = {}): Promise
 export interface AdminStats {
   total_users: number
   admin_count: number
-  total_resources: number
   total_exercises: number
   total_paths: number
   total_chats: number
   total_documents: number
   today_active: number
-  today_new_resources: number
 }
 
 export interface AdminTrends {
@@ -633,20 +536,8 @@ export interface AdminUser {
   email: string
   role: string
   is_active: boolean
-  resource_count: number
   exercise_count: number
   last_login: string | null
-  created_at: string | null
-}
-
-export interface AdminResource {
-  id: string
-  student_id: string
-  student_name: string
-  title: string
-  knowledge_point: string
-  resource_type: string
-  is_favorited: boolean
   created_at: string | null
 }
 
@@ -708,12 +599,6 @@ export const adminApi = {
     adminRequest<{ message: string }>(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteStudent: (id: string) =>
     adminRequest<{ message: string }>(`/admin/users/${id}`, { method: 'DELETE' }),
-  getResources: (page = 1, pageSize = 20, studentId?: string, search?: string) => {
-    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
-    if (studentId) params.set('student_id', studentId)
-    if (search) params.set('search', search)
-    return adminRequest<{ items: AdminResource[]; total: number; page: number; page_size: number }>(`/admin/resources?${params}`)
-  },
   getPaths: (page = 1, pageSize = 20, studentId?: string) => {
     const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
     if (studentId) params.set('student_id', studentId)

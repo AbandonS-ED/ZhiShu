@@ -8,7 +8,7 @@
 
 | 荣 | 耻 |
 |---|----|
-| 以认真查询为荣 | 以聘猜接口为耻 |
+| 以认真查询为荣 | 以瞎猜接口为耻 |
 | 以寻求确认为荣 | 以模糊执行为耻 |
 | 以人类确认为荣 | 以臆想业务为耻 |
 | 以复用现有为荣 | 以创造接口为耻 |
@@ -54,10 +54,10 @@ cd backend && celery -A app.core.celery_config worker --loglevel=info
 cd backend && celery -A app.core.celery_config beat --loglevel=info
 
 # 测试
-cd backend && python -m pytest tests/ -v          # 114 pytest
+cd backend && python -m pytest tests/ -v          # 129 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
-cd frontend && npm run build                       # 18 页面
+cd frontend && npm run build                       # 21 页面
 ```
 
 ## 关键架构事实
@@ -69,7 +69,7 @@ cd frontend && npm run build                       # 18 页面
 - **题库出题**: StateGraph exercise 意图 → 保存到 `exercises` 表（去重 + 限容 20 道/知识点）→ 回复追加 `[👉 点击前往题库作答](/tiku?kp=xxx)`
 - **防幻觉**: 6 Agent 接 `validate()`（Document/Exercise 走三层，其他走 `skip_llm=True` 快速模式）
 - **RAG**: `document_parser → text_chunker → embedding → vector_store.search → reranker`
-- **认证**: bcrypt + JWT（HS256，7 天），全 **67** 端点 `Depends(get_current_user)` 门禁
+- **认证**: bcrypt + JWT（HS256，7 天），全 **68** 端点 `Depends(get_current_user)` 门禁
 - **手机验证码**: 内存存储 + 5 分钟有效期，控制台 print 模拟短信，注册时校验
 - **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，18 管理端点（含 9 Agent 监控 + 文档管理 + 用户删除）
 - **Agent 监控**: `agent_metrics.py` 内存计数器 + `threading.Lock` 线程安全，30s 自动刷新
@@ -79,7 +79,7 @@ cd frontend && npm run build                       # 18 页面
 - **SVG 图标集**: `components/Icon.tsx` 40+ 个图标，统一 `stroke="currentColor"` 风格
 - **统一 SSE 工具**: `frontend/src/lib/sse.ts` + `backend/app/core/sse_utils.py`，含 3 次重试 + 指数退避 + 120s 超时
 - **评估报告**: 优先读 `evaluation_reports` 缓存表；无缓存则实时调 LLM 生成；Celery 每天 4 点预生成
-- **资源中心**: 推荐 Feed + 三阶段学习包（Learn/Practice/Review）+ `recommendation_service.py` 多维度打分推荐
+- **资源中心**: AI 生成 + 手动创建 + 进度动画（4步骤+倒计时）+ 保存功能 + 我的资源（过滤系统自动生成）+ 资源详情（标签页+练习题答案）
 - **一键启停**: `start.ps1` + `stop.ps1`，杀所有 python/node 进程解决孤儿 socket
 
 ## 踩过的坑（不修会卡住）
@@ -107,6 +107,7 @@ cd frontend && npm run build                       # 18 页面
 | 登录页无法滚动 | body `overflow:hidden` 导致注册表单超长时无法滚动 | `body:has(.login-page){overflow:auto}` CSS 选择器自动解除 |
 | 验证码按钮样式丑 | 复用 `.submit-btn` 全黑大按钮与输入框不协调 | 新增 `.code-row` + `.code-btn` 独立样式，深色背景与提交按钮统一 |
 | 注册表单展开生硬 | `register-extras` 直接 `display:none/block` 切换无过渡 | 改为 `max-height:0→600px` + `opacity:0→1` 平滑动画 |
+| `student_profiles.last_analyzed_at` 列缺失 | 查询 profile 时 500 Internal Server Error | `ALTER TABLE student_profiles ADD COLUMN last_analyzed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL` |
 
 ## 提交规范
 

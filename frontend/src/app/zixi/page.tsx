@@ -170,7 +170,6 @@ export default function StudyPage() {
     evaluationApi.recordAction({
       student_id: studentId,
       action: 'study_patrol',
-      resource_type: 'study',
       knowledge_point: 'study_focus',
       detail: { label, confidence, elapsed_seconds: elapsed },
     }).catch(() => { /* 静默 */ })
@@ -241,7 +240,7 @@ export default function StudyPage() {
       await evaluationApi.recordAction({
         student_id: studentId,
         action: 'study_session_start',
-        resource_type: 'study',
+        
         knowledge_point: 'study_focus',
         detail: { camera_enabled: cameraEnabled, difficulty },
       })
@@ -308,7 +307,7 @@ export default function StudyPage() {
       await evaluationApi.recordAction({
         student_id: studentId,
         action: 'study_session_end',
-        resource_type: 'study',
+        
         knowledge_point: 'study_focus',
         duration_seconds: focusSeconds,
         detail: {

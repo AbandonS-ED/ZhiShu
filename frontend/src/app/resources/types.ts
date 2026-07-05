@@ -1,59 +1,70 @@
-// resources 页面专用类型（与 src/types/index.ts 完全隔离）
-
-export type PhaseType = 'learn' | 'practice' | 'review'
-
-export interface RecItem {
-  knowledge_point: string
-  reason: string
-  reason_type: 'evaluation' | 'chat' | 'tiku' | 'path' | 'cold_start'
-  priority_score: number
-  suggested_phases: PhaseType[]
-  existing_resources: { learn: boolean; practice: boolean; review: boolean }
-  estimated_minutes: number
+export interface ReviewDimension {
+  score: number
+  issues: string[]
+  suggestions: string[]
 }
 
-export interface LearningPackage {
-  knowledge_point: string
-  phase: PhaseType
-  resources: ResourceItem[]
-  next_phase: PhaseType | null
-  progress: { learn: boolean; practice: boolean; review: boolean }
+export interface ReviewResult {
+  overall_score: number
+  passed: boolean
+  dimensions: {
+    content_quality: ReviewDimension
+    knowledge_accuracy: ReviewDimension
+    format_check: ReviewDimension
+    learning_suggestions: ReviewDimension
+  }
+  summary: string
 }
 
-export interface ResourceItem {
-  resource_id: string
-  type: 'explanation' | 'mindmap' | 'audio' | 'exercise' | 'code' | 'summary_card'
-  title?: string
-  content?: string
-  mermaid?: string
-  exercises?: ExerciseItem[]
+export interface ResourceContent {
+  knowledge?: string
   code?: string
-  duration_minutes?: number
-  created_at?: string
-  validation?: { passed: boolean; confidence: number; issues: string[] }
+  mermaid_code?: string
+  exercises?: ExerciseItem[]
 }
 
 export interface ExerciseItem {
+  type: 'choice' | 'judge' | 'short_answer' | 'coding'
   question: string
   options?: string[]
   answer: string
   explanation?: string
-  type?: string
+  difficulty?: number
 }
 
-export interface GenerationEvent {
-  type: 'progress' | 'token' | 'result' | 'error' | 'done' | 'validation'
-  progress?: number
-  message?: string
-  current_agent?: string
-  content?: string
-  data?: {
-    resource_id?: string
-    knowledge_point?: string
-    phase?: string
-    content?: Record<string, unknown>
-  }
-  passed?: boolean
-  confidence?: number
-  issues?: string[]
+export interface ResourceItem {
+  resource_id: string
+  title: string
+  resource_type: string
+  knowledge_point: string
+  content: ResourceContent
+  difficulty: number
+  is_favorited: boolean
+  is_preset?: boolean
+  created_at: string
+}
+
+export interface CreateMessage {
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: number
+}
+
+export interface AISourceCreateRequest {
+  student_id: string
+  message: string
+  conversation_history?: CreateMessage[]
+}
+
+export interface ManualCreateRequest {
+  student_id: string
+  title: string
+  resource_type: string
+  content: ResourceContent
+  knowledge_point: string
+}
+
+export interface ReviewRequest {
+  content: ResourceContent
+  knowledge_point: string
 }

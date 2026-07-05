@@ -19,7 +19,6 @@ class IntentType(str, Enum):
     TUTOR = "tutor"
     MINDMAP = "mindmap"
     AUDIO = "audio"
-    RESOURCE_GENERATE = "resource_generate"
     LEARN_AND_PRACTICE = "learn_and_practice"
     FULL_COURSE = "full_course"
     MULTI_CHAT = "multi_chat"

@@ -67,6 +67,12 @@ const zixiSvg = (
   </svg>
 )
 
+const bookmarkSvg = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+  </svg>
+)
+
 const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Overview',
@@ -80,6 +86,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { href: '/duihua', label: '智能对话', tag: 'AI', svg: chatSvg },
       { href: '/profile', label: '学习画像', svg: userSvg },
       { href: '/resources', label: '资源中心', svg: bookSvg },
+      { href: '/resources/my-resources', label: '我的资源', svg: bookmarkSvg },
       { href: '/path', label: '学习计划', svg: pathSvg },
       { href: '/tiku', label: '练习题库', svg: checkSvg },
       { href: '/pinggu', label: '学习评估', svg: evalSvg },

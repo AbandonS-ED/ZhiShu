@@ -177,8 +177,6 @@ export default function PathPage() {
           evaluationApi.recordAction({
             student_id: getStudentId(),
             action: 'generate',
-            resource_type: 'path',
-            resource_id: data.path_id,
             detail: { total_days: data.total_days, topics },
           }).catch(() => {})
         }

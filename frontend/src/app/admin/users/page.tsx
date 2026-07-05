@@ -44,7 +44,6 @@ export default function UsersPage() {
     const ok = confirm(
       `确认删除用户「${user.name}」（${user.student_no}）？\n\n` +
       `关联数据将一并删除：\n` +
-      `· 学习资源 ${user.resource_count} 个\n` +
       `· 练习题 ${user.exercise_count} 个\n\n` +
       `此操作不可恢复！`
     )
@@ -114,7 +113,6 @@ export default function UsersPage() {
                   <th>学号</th>
                   <th>姓名</th>
                   <th>角色</th>
-                  <th>资源数</th>
                   <th>题数</th>
                   <th>状态</th>
                   <th>最近登录</th>
@@ -128,7 +126,6 @@ export default function UsersPage() {
                     <td><code style={{ fontSize: 11 }}>{u.student_no}</code></td>
                     <td style={{ fontWeight: 500 }}>{u.name}</td>
                     <td style={{ fontSize: 11.5, color: u.role === 'admin' ? 'var(--warm)' : 'var(--ink-2)' }}>{u.role}</td>
-                    <td style={{ fontWeight: 500 }}>{u.resource_count}</td>
                     <td style={{ fontWeight: 500 }}>{u.exercise_count}</td>
                     <td>
                       <span className={`admin-tag ${u.is_active ? 'admin-tag-green' : 'admin-tag-red'}`}>
@@ -150,7 +147,7 @@ export default function UsersPage() {
                   </tr>
                 ))}
                 {users.length === 0 && !loading && (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', padding: 20, color: 'var(--ink-2)' }}>暂无用户</td></tr>
+                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: 20, color: 'var(--ink-2)' }}>暂无用户</td></tr>
                 )}
               </tbody>
             </table>
@@ -183,7 +180,6 @@ export default function UsersPage() {
               <p>邮箱: {modal.user.email || '-'}</p>
               <p>角色: {modal.user.role}</p>
               <p>状态: {modal.user.is_active ? '活跃' : '禁用'}</p>
-              <p>资源数: {modal.user.resource_count}</p>
               <p>题数: {modal.user.exercise_count}</p>
               <p>最近登录: {modal.user.last_login ? new Date(modal.user.last_login).toLocaleString() : '-'}</p>
             </div>

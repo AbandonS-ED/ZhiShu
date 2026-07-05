@@ -161,18 +161,23 @@ async def get_my_profile(
         }
 
     dims = profile.dimensions or {}
+    all_dims = ["comprehension", "memory", "application", "imagination", "focus", "knowledge_base", "learning_goal"]
     scores = {}
-    for k, v in dims.items():
-        if isinstance(v, dict) and "score" in v:
-            scores[k] = v["score"]
-        elif isinstance(v, (int, float)):
-            scores[k] = v
+    confidences = {}
+    for k in all_dims:
+        if k in dims and isinstance(dims[k], dict):
+            scores[k] = dims[k].get("score", 50)
+            confidences[k] = dims[k].get("confidence", 0)
+        elif k in dims and isinstance(dims[k], (int, float)):
+            scores[k] = dims[k]
+            confidences[k] = 0
+        else:
+            scores[k] = 0
+            confidences[k] = 0
 
     return {
         "dimensions": scores,
-        "confidence": {
-            k: v.get("confidence", 0) for k, v in dims.items() if isinstance(v, dict)
-        } if dims else {},
+        "confidence": confidences,
         "background": profile.background or {},
         "assessment_status": profile.assessment_status or "pending",
     }

@@ -153,83 +153,6 @@ async def step3_chat_stream(client: httpx.AsyncClient) -> None:
     ok(f"SSE stream 200 in {dur:.1f}s, {len(tokens)} tokens, {len(results)} result(s)")
 
 
-async def step4_resource_stream(client: httpx.AsyncClient) -> None:
-    header("Step 3: F2 Resource Stream (POST /resource/generate/stream)")
-    payload = {
-        "student_id": STUDENT_ID,
-        "knowledge_point": "卷积神经网络 CNN",
-        "resource_type": "all",
-    }
-    t0 = time.time()
-    try:
-        events = await collect_sse_events(client, "/resource/generate/stream", payload)
-    except Exception as e:
-        bad(f"SSE error in {time.time()-t0:.1f}s: {e}")
-        return
-
-    dur = time.time() - t0
-    tokens = [e for e in events if e.get("type") == "token"]
-    results = [e for e in events if e.get("type") == "result"]
-    progress = [e for e in events if e.get("type") == "progress"]
-    errors = [e for e in events if e.get("type") == "error"]
-
-    info(f"progress events: {len(progress)} ({[p.get('progress') for p in progress]})")
-    info(f"token events: {len(tokens)} ({sum(len(t.get('content','')) for t in tokens)} chars)")
-    if results:
-        rd = results[0].get("data", {}).get("content", {})
-        val = rd.get("validation", {})
-        info(f"validation: passed={val.get('passed')}, confidence={val.get('confidence')}, issues={len(val.get('issues', []))}")
-    if errors:
-        bad(f"server error: {errors[0].get('message', '?')[:200]}")
-        return
-    if not tokens and not progress:
-        bad("no progress or token events")
-        return
-    val_summary = "N/A"
-    if results:
-        rd = results[0].get("data", {}).get("content", {})
-        val = rd.get("validation", {})
-        if val:
-            val_summary = f"passed={val.get('passed')}, conf={val.get('confidence')}"
-    ok(f"SSE stream 200 in {dur:.1f}s, {len(tokens)} tokens, {len(progress)} progress, validation={val_summary}")
-
-
-async def step5_exercise_stream(client: httpx.AsyncClient) -> None:
-    header("Step 4: F2 Exercise Stream (POST /resource/exercises/generate/stream)")
-    payload = {
-        "student_id": STUDENT_ID,
-        "knowledge_point": "梯度下降",
-        "count": 3,
-        "exercise_type": "all",
-    }
-    t0 = time.time()
-    try:
-        events = await collect_sse_events(client, "/resource/exercises/generate/stream", payload)
-    except Exception as e:
-        bad(f"SSE error in {time.time()-t0:.1f}s: {e}")
-        return
-
-    dur = time.time() - t0
-    tokens = [e for e in events if e.get("type") == "token"]
-    results = [e for e in events if e.get("type") == "result"]
-    progress = [e for e in events if e.get("type") == "progress"]
-
-    info(f"token events: {len(tokens)}")
-    info(f"progress events: {len(progress)}")
-    if results:
-        exs = results[0].get("data", {}).get("exercises", [])
-        info(f"exercises generated: {len(exs)}")
-        for i, ex in enumerate(exs[:3], 1):
-            info(f"  {i}. [{ex.get('type', '?')}] {ex.get('question', '')[:50]}")
-    if not results:
-        bad("no result event (exercises not generated)")
-        return
-    if not results[0].get("data", {}).get("exercises"):
-        bad("result event has 0 exercises (LLM/parse failure)")
-        return
-    ok(f"SSE stream 200 in {dur:.1f}s, {len(tokens)} tokens, {len(results[0].get('data', {}).get('exercises', []))} exercises")
-
-
 async def step6_path_stream(client: httpx.AsyncClient) -> None:
     header("Step 5: F3 Path Stream (POST /path/generate/stream)")
     payload = {
@@ -332,12 +255,10 @@ async def main() -> int:
             ("0.health", step1_health),
             ("1.profile_build", step2_profile_build),
             ("2.chat_stream", step3_chat_stream),
-            ("3.resource_stream", step4_resource_stream),
-            ("4.exercise_stream", step5_exercise_stream),
-            ("5.path_stream", step6_path_stream),
-            ("6.mindmap", step9_mindmap),
-            ("7.dashboard", step7_dashboard),
-            ("8.evaluation_record", step8_evaluation_record),
+            ("3.path_stream", step6_path_stream),
+            ("4.mindmap", step9_mindmap),
+            ("5.dashboard", step7_dashboard),
+            ("6.evaluation_record", step8_evaluation_record),
         ]
 
         for name, fn in steps:

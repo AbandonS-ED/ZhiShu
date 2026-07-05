@@ -1,23 +1,22 @@
 import uuid
-from sqlalchemy import Column, String, DateTime, Integer, Boolean, func
+from datetime import datetime, timezone
+from sqlalchemy import Column, String, Text, Boolean, Integer, DateTime
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.core.database import Base
 
-
 class ExerciseBank(Base):
-    """公共题库表 — 管理员录入的题目"""
     __tablename__ = "exercise_bank"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    question = Column(String(2000), nullable=False)
-    exercise_type = Column(String(50), nullable=False)  # choice/judge/short_answer/coding
+    question = Column(Text, nullable=False)
+    exercise_type = Column(String(20), nullable=False)
     options = Column(JSONB, nullable=True)
-    answer = Column(String(2000), nullable=False)
-    explanation = Column(String(2000), nullable=True)
+    answer = Column(Text, nullable=False)
+    explanation = Column(Text, nullable=True)
     difficulty = Column(Integer, default=50)
-    knowledge_point = Column(String(200), nullable=True)
-    source = Column(String(20), default="admin")  # admin/ai
+    knowledge_point = Column(String(200), nullable=True, index=True)
+    source = Column(String(50), default="manual")
     is_active = Column(Boolean, default=True)
-    created_by = Column(UUID(as_uuid=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=True)
+    created_by = Column(String(50), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

@@ -11,7 +11,6 @@ from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
-from app.models.exercise import Exercise
 from app.models.learning_record import LearningRecord
 from app.agents.behavior_analysis_agent import behavior_analysis_agent
 
@@ -153,19 +152,7 @@ class ScheduledAnalysisService:
         if chat_count.scalar_one_or_none():
             return True
 
-        # 检查新练习
-        ex_count = await db.execute(
-            select(Exercise.id)
-            .where(
-                Exercise.student_id == student_id,
-                Exercise.created_at > since,
-            )
-            .limit(1)
-        )
-        if ex_count.scalar_one_or_none():
-            return True
-
-        # 检查新学习记录
+        # 检查新学习记录（包括练习）
         lr_count = await db.execute(
             select(LearningRecord.id)
             .where(

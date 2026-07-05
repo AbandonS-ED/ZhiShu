@@ -468,13 +468,7 @@ export default function PingguPage() {
           </div>
           <div className="st-trend trend-up">↑ 本周</div>
         </div>
-        <div className="st-card">
-          <div className="st-label">生成资源</div>
-          <div className="st-val">
-            {evalReport ? evalReport.summary?.total_resources || 0 : 0}
-          </div>
-          <div className="st-trend trend-up">↑ 本周</div>
-        </div>
+
       </div>
 
       {/* Trend Charts */}

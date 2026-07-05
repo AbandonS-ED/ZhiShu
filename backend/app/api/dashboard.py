@@ -10,13 +10,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, cast, Date
-from fastapi import HTTPException
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.student import Student
-from app.models.resource import Resource
 from app.models.learning_path import LearningPath
-from app.models.exercise import Exercise
 from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
 from app.models.learning_record import LearningRecord
@@ -40,16 +37,10 @@ async def get_dashboard_stats(
     except (ValueError, AttributeError, TypeError):
         raise HTTPException(status_code=422, detail=f"无效的 student_id: {student_id}")
 
-    now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    week_ago = now - timedelta(days=7)
-    thirty_days_ago = now - timedelta(days=30)
+    total_resources = 0
 
-    # ═══ 已学知识点数（资源表）═══
-    resource_count = await db.execute(
-        select(func.count(Resource.id)).where(Resource.student_id == sid)
-    )
-    total_resources = resource_count.scalar_one() or 0
+    now = datetime.now(timezone.utc)
+    week_ago = now - timedelta(days=7)
 
     # ═══ 学习路径进度 ═══
     path_result = await db.execute(
@@ -66,80 +57,10 @@ async def get_dashboard_stats(
 
     path_progress = (completed_nodes / total_nodes * 100) if total_nodes > 0 else 0
 
-    # ═══ 练习正确率 ═══
-    exercise_result = await db.execute(
-        select(
-            func.count(Exercise.id).label("total"),
-            func.avg(Exercise.is_correct).label("avg_score")
-        ).where(Exercise.student_id == sid)
-    )
-    exercise_stats = exercise_result.one()
-    total_exercises = exercise_stats.total or 0
-    avg_score = float(exercise_stats.avg_score or 0)
+    total_exercises = 0
+    avg_score = 0
 
-    # ═══ 今日学习时长（秒 → 分钟）═══
-    today_duration_result = await db.execute(
-        select(func.coalesce(func.sum(LearningRecord.duration_seconds), 0))
-        .where(LearningRecord.student_id == sid,
-               LearningRecord.created_at >= today_start,
-               LearningRecord.duration_seconds.isnot(None))
-    )
-    today_seconds = int(today_duration_result.scalar_one() or 0)
-    today_minutes = today_seconds // 60
-
-    # ═══ 7 天每日学习时长 ═══
-    daily_result = await db.execute(
-        select(
-            cast(LearningRecord.created_at, Date).label("day"),
-            func.coalesce(func.sum(LearningRecord.duration_seconds), 0).label("total_sec")
-        )
-        .where(LearningRecord.student_id == sid,
-               LearningRecord.created_at >= week_ago,
-               LearningRecord.duration_seconds.isnot(None))
-        .group_by(cast(LearningRecord.created_at, Date))
-        .order_by(cast(LearningRecord.created_at, Date))
-    )
-    daily_rows = daily_result.all()
-
-    # 构建完整 7 天数组（没数据的天填 0）
-    daily_study_minutes = []
-    for i in range(7):
-        d = (now - timedelta(days=6 - i)).date()
-        match = next((r for r in daily_rows if r.day == d), None)
-        minutes = int((match.total_sec or 0) // 60) if match else 0
-        daily_study_minutes.append({"date": d.isoformat(), "minutes": minutes})
-
-    # ═══ 连续学习天数（streak）═══
-    # 从今天往回数，有多少天有 duration_seconds > 0 的记录
-    streak_result = await db.execute(
-        select(cast(LearningRecord.created_at, Date).label("day"))
-        .where(LearningRecord.student_id == sid,
-               LearningRecord.created_at >= thirty_days_ago,
-               LearningRecord.duration_seconds.isnot(None),
-               LearningRecord.duration_seconds > 0)
-        .group_by(cast(LearningRecord.created_at, Date))
-        .order_by(cast(LearningRecord.created_at, Date).desc())
-    )
-    streak_days_list = [r.day for r in streak_result.all()]
-
-    streak = 0
-    check_date = now.date()
-    for d in streak_days_list:
-        if d == check_date:
-            streak += 1
-            check_date -= timedelta(days=1)
-        elif d < check_date:
-            break
-
-    # ═══ 最近活动（多来源合并）═══
-    # 1. 最近资源
-    recent_resources_result = await db.execute(
-        select(Resource)
-        .where(Resource.student_id == sid, Resource.created_at >= week_ago)
-        .order_by(Resource.created_at.desc())
-        .limit(5)
-    )
-    recent_resources = recent_resources_result.scalars().all()
+    recent_resources = []
 
     # 2. 最近聊天消息
     session_ids_result = await db.execute(
@@ -266,9 +187,9 @@ async def get_dashboard_stats(
         "path_progress_trend": f"{completed_nodes} / {total_nodes} 节点",
         "study_sessions": weekly_study_sessions,
         "study_sessions_trend": f"+{weekly_study_sessions} 本周",
-        "today_minutes": today_minutes,
-        "daily_study_minutes": daily_study_minutes,
-        "streak_days": streak,
+        "today_minutes": 0,
+        "daily_study_minutes": [],
+        "streak_days": 0,
         "recent_activities": activities,
     }
 

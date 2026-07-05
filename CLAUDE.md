@@ -25,8 +25,13 @@
 
 ```
 ZhiShu/
-├── frontend/                        # Next.js 前端
-│   ├── src/app/                     # 页面路由 (10 学生页 + 9 管理页)
+├── frontend/                        # Next.js 前端 (21 页面)
+│   ├── src/app/                     # 页面路由 (12 学生页 + 9 管理页)
+│   │   ├── resources/               # 资源中心
+│   │   │   ├── page.tsx             # 资源列表 (AI 生成 + 手动创建)
+│   │   │   ├── my-resources/        # 我的资源 (过滤系统自动生成)
+│   │   │   ├── [id]/                # 资源详情 (标签页 + 练习题)
+│   │   │   └── components/          # 资源组件 (ResourceCard + CreateModal + ResourceProgress)
 │   ├── src/components/              # 共享组件 (Icon.tsx + RobotIcon.tsx + layout/)
 │   ├── src/lib/                     # 工具库 (api.ts + sse.ts + admin/)
 │   ├── src/stores/appStore.ts       # Zustand 全局状态
@@ -34,13 +39,13 @@ ZhiShu/
 │   └── src/hooks/usePageTimer.ts    # 页面停留计时器
 ├── backend/                         # FastAPI 后端
 │   ├── app/main.py                  # 应用入口 + 路由注册
-│   ├── app/api/                     # 12 个路由模块 (67 端点)
+│   ├── app/api/                     # 12 个路由模块 (68 端点)
 │   ├── app/agents/                  # 9 个 Agent + StateGraph 编排
 │   ├── app/services/                # 16 个服务模块
 │   ├── app/models/                  # 13 个数据模型
 │   ├── app/tasks/                   # Celery 异步任务
 │   └── app/core/                    # 核心模块 (配置/数据库/安全)
-├── tests/                           # 114 pytest + 冒烟测试
+├── tests/                           # 129 pytest + 冒烟测试
 ├── docs/                            # 设计文档
 ├── scripts/                         # 数据库初始化脚本
 ├── docker-compose.yml               # Docker 编排
@@ -85,10 +90,10 @@ cd backend && celery -A app.core.celery_config worker --loglevel=info
 cd backend && celery -A app.core.celery_config beat --loglevel=info
 
 # 测试
-cd backend && python -m pytest tests/ -v          # 114 pytest
+cd backend && python -m pytest tests/ -v          # 129 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
-cd frontend && npm run build                       # 18 页面
+cd frontend && npm run build                       # 21 页面
 ```
 
 ## 架构要点
@@ -105,7 +110,7 @@ intent_recognition → task_planning → conditional_route
 
 ### 7 维学生画像
 
-`student_profiles.dimensions` JSONB: `comprehension / memory / application / imagination / focus / learning_speed / knowledge_breadth`（理解力/记忆力/应用转化/想象力/专注力/学习节奏/知识广度），每个维度含 `score` (0-100) 和 `confidence` (0-1)，由 `initial_assessment_agent.py` 通过对话评估生成。
+`student_profiles.dimensions` JSONB: `comprehension / memory / application / imagination / focus / knowledge_base / learning_goal`（理解力/记忆力/应用转化/想象力/专注力/知识基础/学习目标），每个维度含 `score` (0-100) 和 `confidence` (0-1)，由 `initial_assessment_agent.py` 通过对话评估生成。
 
 ### 防幻觉 (N3 评分项)
 
@@ -176,7 +181,7 @@ study_patrol / study_session_end → learning_records
 Token: zhishu_admin_token (与学生端 zhishu_token 隔离)
 登录: /admin/login → 调用 /auth/login → 校验 role === 'admin' → 存 zhishu_admin_user
 题库 CRUD: admin_exercises.py 6 个端点 (列表/创建/批量导入/编辑/删除/知识点列表)
-管理端点: admin.py 12 个端点 (统计/趋势/用户CRUD/资源/路径/对话/文档/Agent 监控)
+管理端点: admin.py 18 个端点 (统计/趋势/用户CRUD/资源/路径/对话/文档/Agent 监控)
 Agent 监控: agent_metrics.py 内存计数器 (threading.Lock 线程安全)
 并行查询: get_stats 用 asyncio.gather() 并行 10 个计数查询
 N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
@@ -219,6 +224,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 资源中心重构 (推荐 Feed + 三阶段学习包)
 - ✅ 评估报告 AI 化 (LLM 生成 + 趋势分析 + 知识点统计)
 - ✅ 自习模式 v1.5 (TF.js + MoveNet + 3 状态机 + 物理摄像头过滤 + 横排布局)
+- ✅ `student_profiles.last_analyzed_at` 列缺失 → 已通过 `ALTER TABLE` 修复
 
 ### P2 — 清理项
 
@@ -250,6 +256,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 | 自习模式 callback ref | `<video ref={inline}>` 在倒计时每秒 re-render 时被 React 调用 ref(null) + ref(el)，触发 `play()` 重启视频 → 屏幕每秒闪烁黑屏 | 把 inline ref 改成 `useCallback` 稳定 + `useEffect([stream])` 只在 stream 真正变化时设 srcObject |
 | 自习模式摄像头选错 | Edge 默认枚举到 Iriun Webcam（虚拟摄像头驱动未启动 → 黑屏但 token 已授权） | `enumerateDevices()` + 启发式过滤虚拟摄像头关键词（Iriun / OBS Virtual / DroidCam 等），锁定 `deviceId.exact` |
 | 自习模式 useImperativeHandle 时序 | `useImperativeHandle` 在渲染期执行，`localRef.current` 仍为 null，导致父 ref 在第一次 render 后被设为 null | 改用 callback ref 直接在 mount 时设 srcObject，不依赖 useEffect 异步时机 |
+| `student_profiles.last_analyzed_at` 列缺失 | 查询 profile 时 500 Internal Server Error | `ALTER TABLE student_profiles ADD COLUMN last_analyzed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL` |
 
 ## 提交规范
 

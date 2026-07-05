@@ -38,7 +38,6 @@ class TestAgentState:
 
     def test_intent_type_enum(self):
         assert IntentType.DOCUMENT.value == "document"
-        assert IntentType.RESOURCE_GENERATE.value == "resource_generate"
         assert IntentType.FULL_COURSE.value == "full_course"
 
 
@@ -93,10 +92,6 @@ class TestMasterAgentGraph:
         result = _quick_route("\u8bb2\u89e3\u673a\u5668\u5b66\u4e60\u5e76\u51fa\u51e0\u9053\u9898")
         assert result == "learn_and_practice"
 
-    def test_quick_route_compound_resource(self):
-        from app.agents.master_agent import _quick_route
-        assert _quick_route("\u5e2e\u6211\u751f\u6210\u5b8c\u6574\u8d44\u6599") == "resource_generate"
-
     def test_quick_route_none(self):
         from app.agents.master_agent import _quick_route
         assert _quick_route("hello world") is None
@@ -112,18 +107,8 @@ class TestMasterAgentGraph:
         from app.agents.master_agent import TASK_TEMPLATES
         assert "document" in TASK_TEMPLATES
         assert "exercise" in TASK_TEMPLATES
-        assert "resource_generate" in TASK_TEMPLATES
         assert "learn_and_practice" in TASK_TEMPLATES
         assert "full_course" in TASK_TEMPLATES
-
-    def test_resource_generate_has_multiple_tasks(self):
-        from app.agents.master_agent import TASK_TEMPLATES
-        tasks = TASK_TEMPLATES["resource_generate"]
-        assert len(tasks) >= 3
-        agent_names = [t["agent"] for t in tasks]
-        assert "document_agent" in agent_names
-        assert "mindmap_agent" in agent_names
-        assert "exercise_agent" in agent_names
 
     def test_full_course_has_four_tasks(self):
         from app.agents.master_agent import TASK_TEMPLATES

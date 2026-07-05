@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { chatApi, profileApi, evaluationApi, resourceApi, type StudentProfile } from '@/lib/api'
+import { chatApi, profileApi, evaluationApi, type StudentProfile } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
-import { escapeHtml, markdownToHtml, extractAnswer, showToast } from '@/lib/utils'
+import { escapeHtml, markdownToHtml, extractAnswer } from '@/lib/utils'
 import { usePageTimer } from '@/hooks/usePageTimer'
 import Icon from '@/components/Icon'
 
@@ -55,11 +55,6 @@ interface Session {
   created_at: string
 }
 
-interface GenResource {
-  name: string
-  status: 'done' | 'running' | 'waiting'
-}
-
 const SESSION_STORAGE_KEY = 'zhishu_chat_session'
 
 const defaultSuggestions = [
@@ -78,8 +73,6 @@ export default function DuihuaPage() {
 
   const [sessions, setSessions] = useState<Session[]>([])
   const [profile, setProfile] = useState<StudentProfile | null>(null)
-  const [genResources, setGenResources] = useState<GenResource[]>([])
-  const [dbResources, setDbResources] = useState<Array<{ resource_id: string; title: string; knowledge_point: string; resource_type: string; created_at: string }>>([])
   const [suggestions, setSuggestions] = useState<Array<{ text: string; tag: string; tagClass: string; reason: string }>>([])
   const [loadingSuggestions, setLoadingSuggestions] = useState(true)
 
@@ -108,15 +101,13 @@ export default function DuihuaPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [sessions, profile, resources] = await Promise.all([
+        const [sessions, profile] = await Promise.all([
           chatApi.getSessions(studentId),
           profileApi.getMe(),
-          resourceApi.list(studentId)
         ])
         
         setSessions(sessions)
         setProfile(profile)
-        setDbResources(resources)
         
         // 自动恢复上次会话
         if (!loadedSessionRef.current) {
@@ -167,7 +158,6 @@ export default function DuihuaPage() {
     setSessionId(sid)
     localStorage.setItem(SESSION_STORAGE_KEY, sid)
     setMessages([])
-    setGenResources([])
     try {
       const msgs = await chatApi.getMessages(sid)
       setMessages(msgs.map((m) => {
@@ -232,7 +222,6 @@ export default function DuihuaPage() {
     setSessionId(null)
     localStorage.removeItem(SESSION_STORAGE_KEY)
     setMessages([])
-    setGenResources([])
   }
 
   // 删除会话
@@ -244,7 +233,6 @@ export default function DuihuaPage() {
       if (sessionId === sid) {
         setSessionId(null)
         setMessages([])
-        setGenResources([])
       }
     } catch {}
   }
@@ -323,7 +311,6 @@ export default function DuihuaPage() {
           evaluationApi.recordAction({
             student_id: studentId,
             action: 'chat',
-            resource_type: 'chat',
             knowledge_point: userMsg,
           }).catch(() => {})
           
@@ -358,7 +345,6 @@ export default function DuihuaPage() {
                 arr[arr.length - 1] = { role: 'assistant', content: renderedHtml, rendered: true }
                 return arr
               })
-              setGenResources((prev) => [...prev, { name: `${userMsg} · 练习题`, status: 'done' }])
             }
             // document 意图：显示知识内容（结构化数据，不依赖流式内容）
             else if (resultData.type === 'document' || data.knowledge) {
@@ -368,10 +354,6 @@ export default function DuihuaPage() {
                 arr[arr.length - 1] = { role: 'assistant', content: html, rendered: true }
                 return arr
               })
-              setGenResources((prev) => [...prev, { name: `${userMsg} · 文档`, status: 'done' }])
-              resourceApi.saveFromChat(studentId, `${userMsg} 学习材料`, 'knowledge', { knowledge: data.knowledge || '' }, userMsg)
-                .then(() => { resourceApi.list(studentId).then(setDbResources); showToast('已保存到资源中心') })
-                .catch(() => {})
             }
             // 如果没有 token 内容（非流式 Agent），渲染完整结果
             else if (!streamContent) {
@@ -381,14 +363,8 @@ export default function DuihuaPage() {
                 html = `<div>${markdownToHtml(ans)}${sug ? `<div style="margin-top:8px;padding:8px;background:#f0f8e8;border-radius:6px;font-size:12px">💡 ${markdownToHtml(sug)}</div>` : ''}</div>`
               } else if (resultData.type === 'mindmap') {
                 html = `<div><p>🧠 思维导图已生成：</p><pre style="background:#f5f5f5;padding:8px;border-radius:4px;font-size:12px;overflow-x:auto">${data.mermaid || data.code || ''}</pre></div>`
-                setGenResources((prev) => [...prev, { name: `${userMsg} · 思维导图`, status: 'done' }])
-                // 自动保存到资源中心
-                resourceApi.saveFromChat(studentId, `${userMsg} 思维导图`, 'mindmap', { mermaid_code: data.mermaid || data.code || '' }, userMsg)
-                  .then(() => { resourceApi.list(studentId).then(setDbResources); showToast('已保存到资源中心') })
-                  .catch(() => {})
               } else if (resultData.type === 'path') {
                 html = `<p>📚 路径: ${data.title || ''}</p><p>${data.description || ''}</p><p>共 ${data.nodes?.length || 0} 个知识点</p>`
-                setGenResources((prev) => [...prev, { name: `${userMsg} · 学习路径`, status: 'done' }])
               } else {
                 html = `<pre>${JSON.stringify(data, null, 2)}</pre>`
               }
@@ -609,7 +585,7 @@ export default function DuihuaPage() {
                           btn.style.color = 'var(--brand)'
                           btn.style.background = 'var(--brand-soft)'
                           if (dislikeBtn) { dislikeBtn.style.color = ''; dislikeBtn.style.background = ''; dislikeBtn.classList.remove('active') }
-                          evaluationApi.recordAction({ student_id: studentId, action: 'like', resource_type: 'chat', knowledge_point: 'feedback' }).catch(() => {})
+                          evaluationApi.recordAction({ student_id: studentId, action: 'like', knowledge_point: 'feedback' }).catch(() => {})
                         } else {
                           btn.style.color = ''
                           btn.style.background = ''
@@ -633,7 +609,7 @@ export default function DuihuaPage() {
                           btn.style.color = 'var(--danger)'
                           btn.style.background = 'var(--danger-soft)'
                           if (likeBtn) { likeBtn.style.color = ''; likeBtn.style.background = ''; likeBtn.classList.remove('active') }
-                          evaluationApi.recordAction({ student_id: studentId, action: 'dislike', resource_type: 'chat', knowledge_point: 'feedback' }).catch(() => {})
+                          evaluationApi.recordAction({ student_id: studentId, action: 'dislike', knowledge_point: 'feedback' }).catch(() => {})
                         } else {
                           btn.style.color = ''
                           btn.style.background = ''
@@ -751,26 +727,6 @@ export default function DuihuaPage() {
           </div>
         </div>
 
-        {/* 已生成资源 */}
-        <div className="side-card" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-          <div className="sc-hd">
-            <h3>已生成资源</h3>
-            <span className="tag tag-green">{dbResources.length} 个</span>
-          </div>
-          <div className="sc-bd" style={{ flex: 1, overflowY: 'auto' }}>
-            {dbResources.length === 0 ? (
-              <div style={{ fontSize: '12px', color: 'var(--ink-4)' }}>对话中生成的资源将实时显示</div>
-            ) : (
-              dbResources.slice(0, 10).map((r) => (
-                <div key={r.resource_id} className="gen-resource" style={{ cursor: 'pointer' }} onClick={() => window.open('/resources', '_blank')}>
-                  <div className="gr-dot" style={{ background: 'var(--success)' }}></div>
-                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title || r.knowledge_point}</span>
-                  <span className="gr-status gs-done" style={{ fontSize: 10 }}>{r.resource_type === 'knowledge' ? '文档' : r.resource_type === 'mindmap' ? '导图' : r.resource_type === 'code' ? '代码' : '资源'}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
       </div>
     </div>
   )
