@@ -105,6 +105,8 @@ export default function TikuPage() {
   const [revealed, setRevealed] = useState<Set<string>>(new Set())
   const [genInput, setGenInput] = useState('')
   const [genCount, setGenCount] = useState(5)
+  const [showCustomInput, setShowCustomInput] = useState(false)
+  const [customCountStr, setCustomCountStr] = useState('5')
   const [generating, setGenerating] = useState(false)
   const [genResult, setGenResult] = useState('')
   const [exercises, setExercises] = useState<Exercise[]>([])
@@ -401,7 +403,7 @@ export default function TikuPage() {
   return (
     <>
       {/* AI 生成面板 */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0', padding: 14, background: 'var(--brand-soft)', borderRadius: 10, border: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '12px 0', padding: '10px 14px', background: 'var(--brand-soft)', borderRadius: 10, border: '1px solid var(--border)' }}>
         <span style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}><RobotIcon size={18} /> AI 出题</span>
         <input
           value={genInput}
@@ -421,47 +423,124 @@ export default function TikuPage() {
           }}
         />
 
-        {/* Segmented count selector */}
-        <div style={{
-          display: 'inline-flex',
-          borderRadius: 'var(--r-xs, 6px)',
-          border: '1px solid var(--border)',
-          overflow: 'hidden',
-          background: 'var(--surface)',
-          flexShrink: 0,
-        }}>
-          {[5, 10, 15, 20].map((n, i) => {
-            const active = genCount === n
+        {/* 胶囊选择器 */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          {[3, 5, 10, 15].map(n => {
+            const active = genCount === n && !showCustomInput
             return (
               <button
                 key={n}
-                onClick={() => setGenCount(n)}
+                onClick={() => { setGenCount(n); setShowCustomInput(false) }}
                 disabled={generating}
                 style={{
-                  padding: '6px 14px',
-                  border: 'none',
-                  borderRight: i < 3 ? '1px solid var(--border)' : 'none',
+                  padding: '5px 12px',
+                  borderRadius: 20,
+                  border: active ? '1.5px solid var(--brand)' : '1.5px solid var(--border)',
                   background: active ? 'var(--brand)' : 'transparent',
                   color: active ? 'white' : 'var(--ink-2)',
-                  cursor: generating ? 'not-allowed' : 'pointer',
                   fontSize: 13,
                   fontWeight: active ? 600 : 400,
+                  cursor: generating ? 'not-allowed' : 'pointer',
                   transition: 'all 0.2s ease',
                   outline: 'none',
-                  position: 'relative',
-                  lineHeight: 1,
+                  lineHeight: 1.2,
                 }}
                 onMouseEnter={e => {
-                  if (!active) e.currentTarget.style.background = 'var(--bg-subtle, rgba(0,0,0,0.04))'
+                  if (!active && !generating) {
+                    e.currentTarget.style.borderColor = 'var(--brand)'
+                    e.currentTarget.style.color = 'var(--brand)'
+                  }
                 }}
                 onMouseLeave={e => {
-                  if (!active) e.currentTarget.style.background = 'transparent'
+                  if (!active) {
+                    e.currentTarget.style.borderColor = 'var(--border)'
+                    e.currentTarget.style.color = 'var(--ink-2)'
+                  }
                 }}
-              >
-                {n} 道
-              </button>
+              >{n} 道</button>
             )
           })}
+
+          {/* 自定义输入胶囊 */}
+          {showCustomInput ? (
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoFocus
+                value={customCountStr}
+                disabled={generating}
+                onChange={e => {
+                  const filtered = e.target.value.replace(/[^0-9]/g, '')
+                  setCustomCountStr(filtered)
+                }}
+                onBlur={() => {
+                  const v = parseInt(customCountStr, 10)
+                  if (!isNaN(v) && v >= 1 && v <= 30) setGenCount(v)
+                  setShowCustomInput(false)
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const v = parseInt(customCountStr, 10)
+                    if (!isNaN(v) && v >= 1 && v <= 30) setGenCount(v)
+                    setShowCustomInput(false)
+                    generateExercises()
+                  }
+                }}
+                style={{
+                  width: 52,
+                  padding: '5px 8px',
+                  borderRadius: 20,
+                  border: `1.5px solid ${parseInt(customCountStr, 10) > 30 ? '#ef4444' : 'var(--brand)'}`,
+                  background: 'var(--surface)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--ink-1)',
+                  textAlign: 'center',
+                  outline: 'none',
+                  boxShadow: parseInt(customCountStr, 10) > 30 ? '0 0 0 3px rgba(239,68,68,0.1)' : '0 0 0 3px rgba(99,102,241,0.1)',
+                }}
+              />
+              {parseInt(customCountStr, 10) > 30 && (
+                <div style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, whiteSpace: 'nowrap', fontSize: 11, color: '#ef4444', fontWeight: 500, zIndex: 10 }}>
+                  最多 30 道
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={() => { setCustomCountStr(String(genCount)); setShowCustomInput(true) }}
+              disabled={generating}
+              style={{
+                padding: '5px 10px',
+                borderRadius: 20,
+                border: '1.5px dashed var(--border)',
+                background: 'transparent',
+                color: 'var(--ink-3)',
+                fontSize: 12,
+                cursor: generating ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                outline: 'none',
+                lineHeight: 1,
+              }}
+              onMouseEnter={e => {
+                if (!generating) {
+                  e.currentTarget.style.borderColor = 'var(--brand)'
+                  e.currentTarget.style.color = 'var(--brand)'
+                }
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = 'var(--border)'
+                e.currentTarget.style.color = 'var(--ink-3)'
+              }}
+              title="自定义数量"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
+          )}
         </div>
 
         <button

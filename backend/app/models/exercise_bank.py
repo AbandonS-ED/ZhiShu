@@ -17,6 +17,6 @@ class ExerciseBank(Base):
     knowledge_point = Column(String(200), nullable=True, index=True)
     source = Column(String(50), default="manual")
     is_active = Column(Boolean, default=True)
-    created_by = Column(String(50), nullable=True)
+    created_by = Column(UUID(as_uuid=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

@@ -18,6 +18,9 @@ from app.agents.review_agent import review_agent
 from app.agents.document_agent import document_agent
 from app.agents.exercise_agent import exercise_agent
 from app.services.anti_hallucination import anti_hallucination
+from app.services.json_parser import parse_json_response
+from app.core.sse_utils import sse_stream_response, sse_progress, sse_result, sse_done, sse_error
+from app.models.exercise_bank import ExerciseBank
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -68,6 +71,22 @@ class LearningPackageRequest(BaseModel):
     student_id: str
     knowledge_point: str
     phase: str
+
+
+class ExerciseGenerateRequest(BaseModel):
+    student_id: str
+    knowledge_point: str
+    count: int = 5
+    exercise_type: str = "all"
+
+    @field_validator("student_id")
+    @classmethod
+    def _validate_uuid(cls, v: str) -> str:
+        try:
+            uuid.UUID(v)
+            return v
+        except (ValueError, AttributeError, TypeError):
+            raise ValueError(f"无效的 UUID: {v}")
 
 
 # ====================================================================
@@ -528,4 +547,101 @@ async def generate_learning_package_stream(
         "knowledge_point": req.knowledge_point,
         "phase": phase,
         "content": content,
+    }
+
+
+# ====================================================================
+# 10. POST /exercises/generate/stream — AI 出题（SSE 流式）
+# ====================================================================
+
+@router.post("/exercises/generate/stream")
+async def generate_exercises_stream(
+    req: ExerciseGenerateRequest,
+    user: Student = Depends(get_current_user),
+):
+    async def event_generator():
+        try:
+            yield sse_progress(0.2, "正在分析知识点...")
+
+            result = await exercise_agent.generate(
+                knowledge_point=req.knowledge_point,
+                student_profile=None,
+                exercise_type=req.exercise_type,
+                count=req.count,
+                variant="mixed",
+            )
+
+            exercises = result.get("exercises", [])
+            yield sse_progress(0.7, "正在防幻觉验证...")
+
+            # 保存到题库
+            from app.core.database import async_session
+            saved_count = 0
+            async with async_session() as save_db:
+                for ex in exercises:
+                    bank_item = ExerciseBank(
+                        question=ex.get("question", ""),
+                        exercise_type=ex.get("type", "choice"),
+                        options=ex.get("options"),
+                        answer=ex.get("answer", ""),
+                        explanation=ex.get("explanation", ""),
+                        difficulty=ex.get("difficulty", 50),
+                        knowledge_point=req.knowledge_point,
+                        source="ai",
+                        created_by=uuid.UUID(req.student_id),
+                    )
+                    save_db.add(bank_item)
+                    saved_count += 1
+                if saved_count > 0:
+                    await save_db.commit()
+
+            yield sse_progress(1.0, "生成完成")
+            yield sse_result({
+                "knowledge_point": req.knowledge_point,
+                "count": len(exercises),
+                "exercises": exercises,
+            })
+            yield sse_done()
+
+        except Exception as e:
+            logger.exception("[exercises/generate/stream] 异常")
+            yield sse_error(str(e))
+
+    return sse_stream_response(event_generator())
+
+
+# ====================================================================
+# 11. GET /exercises/pool — 获取题池（供题库页加载）
+# ====================================================================
+
+@router.get("/exercises/pool")
+async def get_exercise_pool(
+    student_id: str,
+    count: int = 30,
+    user: Student = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(ExerciseBank)
+        .where(ExerciseBank.is_active == True)
+        .order_by(ExerciseBank.created_at.desc())
+        .limit(count)
+    )
+    exercises = result.scalars().all()
+
+    return {
+        "exercises": [
+            {
+                "exercise_id": str(ex.id),
+                "type": ex.exercise_type,
+                "question": ex.question,
+                "options": ex.options,
+                "answer": ex.answer,
+                "explanation": ex.explanation,
+                "difficulty": ex.difficulty,
+                "knowledge_point": ex.knowledge_point,
+                "source": ex.source,
+            }
+            for ex in exercises
+        ]
     }

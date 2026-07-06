@@ -16,7 +16,7 @@
 | 前端 | Next.js (App Router) + Tailwind CSS + TypeScript | 14.2.5 | 本地 woff 字体，无 Google Fonts |
 | 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 | Python 3.11 |
 | Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 9 子 Agent |
-| LLM | 双客户端: MiniMaxClient (开发) / SparkClient (上线) | - | `LLM_PROVIDER=minimax\|spark` 切换 |
+| LLM | 三客户端: MimoClient (当前) / MiniMaxClient / SparkClient | - | `LLM_PROVIDER=mimo\|minimax\|spark` 切换 |
 | 向量库 | pgvector (JSONB 降级方案) | - | embedding 用 JSONB 占位 |
 | 数据库 | PostgreSQL 18 + Redis | - | 12 张表 |
 | 异步任务 | Celery (Redis broker) | - | 每日 4 点预生成评估报告 |
@@ -25,8 +25,8 @@
 
 ```
 ZhiShu/
-├── frontend/                        # Next.js 前端 (21 页面)
-│   ├── src/app/                     # 页面路由 (12 学生页 + 9 管理页)
+├── frontend/                        # Next.js 前端 (22 页面)
+│   ├── src/app/                     # 页面路由 (13 学生页 + 9 管理页)
 │   │   ├── resources/               # 资源中心
 │   │   │   ├── page.tsx             # 资源列表 (AI 生成 + 手动创建)
 │   │   │   ├── my-resources/        # 我的资源 (过滤系统自动生成)
@@ -39,9 +39,9 @@ ZhiShu/
 │   └── src/hooks/usePageTimer.ts    # 页面停留计时器
 ├── backend/                         # FastAPI 后端
 │   ├── app/main.py                  # 应用入口 + 路由注册
-│   ├── app/api/                     # 12 个路由模块 (68 端点)
+│   ├── app/api/                     # 12 个路由模块 (69 端点)
 │   ├── app/agents/                  # 9 个 Agent + StateGraph 编排
-│   ├── app/services/                # 16 个服务模块
+│   ├── app/services/                # 17 个服务模块
 │   ├── app/models/                  # 13 个数据模型
 │   ├── app/tasks/                   # Celery 异步任务
 │   └── app/core/                    # 核心模块 (配置/数据库/安全)
@@ -55,7 +55,7 @@ ZhiShu/
 
 ## 硬约束
 
-- **LLM**: 开发用 MiniMax-M3，`base_url` `https://api.minimax.chat/v1`（**没有 `i`**，不是 `minimaxi`）。比赛前切星火：`LLM_PROVIDER=spark` + `SPARK_API_KEY=xxx`。讯飞鉴权只用 `Authorization: Bearer {api_key}`，不拼 api_secret。
+- **LLM**: 当前用小米 MiMo v2.5（`LLM_PROVIDER=mimo`，`api-key` 头认证）。备选：MiniMax-M3（`minimax`）/ 讯飞星火 V4（`spark`）。比赛前切星火：`LLM_PROVIDER=spark` + `SPARK_API_KEY=xxx`。讯飞鉴权只用 `Authorization: Bearer {api_key}`，不拼 api_secret。
 - **禁用** Google Fonts / Vercel / Sentry / OpenAI（中国不可达）。字体走 `frontend/src/app/fonts/` 本地 woff + `next/font/local`。
 - **pip** 加 `-i https://pypi.tuna.tsinghua.edu.cn/simple`；npm 走 `frontend/.npmrc` 的 `registry.npmmirror.com`。
 - **端口**: 后端 **8001**（不要 8000），前端 3000。`api.ts:3` 的 `BASE_URL` 已同步。用 `start.ps1` 一键启动，`stop.ps1` 一键停止。
@@ -93,7 +93,7 @@ cd backend && celery -A app.core.celery_config beat --loglevel=info
 cd backend && python -m pytest tests/ -v          # 129 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
-cd frontend && npm run build                       # 21 页面
+cd frontend && npm run build                       # 22 页面
 ```
 
 ## 架构要点
@@ -155,6 +155,8 @@ study_patrol / study_session_end → learning_records
 | `/api/v1/path/generate/stream` | ✅ 真流式 | `type=token` 逐 token |
 | `/api/v1/profile/assess/stream` | ✅ 真流式 | `type=token` 逐 token |
 | `/api/v1/resource/learning-package/generate/stream` | ✅ 真流式 | `type=token` 逐 token |
+| `/api/v1/resource/exercises/generate/stream` | ✅ 真流式 | dual-format (题库出题) |
+| `/api/v1/resource/exercises/pool` | GET | 题池加载 |
 
 ### 数据库表关系 (12 张表)
 
@@ -170,7 +172,7 @@ study_patrol / study_session_end → learning_records
      POST /auth/register → 校验验证码 + bcrypt 哈希密码 + 手机号唯一 → 存入 students → 返回 JWT
 登录: POST /auth/login → bcrypt 校验密码 → 检查 is_active → 记录 last_login → 返回 JWT
 验证: Authorization: Bearer <token> → decode_token() → get_current_user() 依赖
-门禁: 67 个业务端点全部加 Depends(get_current_user) + student_id 所有权校验
+门禁: 69 个业务端点全部加 Depends(get_current_user) + student_id 所有权校验
 ```
 
 ### 管理后台系统
@@ -225,6 +227,12 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 评估报告 AI 化 (LLM 生成 + 趋势分析 + 知识点统计)
 - ✅ 自习模式 v1.5 (TF.js + MoveNet + 3 状态机 + 物理摄像头过滤 + 横排布局)
 - ✅ `student_profiles.last_analyzed_at` 列缺失 → 已通过 `ALTER TABLE` 修复
+- ✅ MiMo LLM 接入 (mimo_client.py + api-key 认证 + 流式/非流式)
+- ✅ MiMo 流式空 choices 容错 (chunk.choices is None 过滤)
+- ✅ exercise_agent MiMo 适配 (max_tokens 4096 + _parse_response 容错)
+- ✅ exercise_bank.created_by 类型修正 (String→UUID)
+- ✅ exercise 语言规则 (外语类题目可保留目标语言，解析必须中文)
+- ✅ 题库 UI 重设计 (胶囊选择器 + ✏️ 自定义输入 + 超30提示)
 
 ### P2 — 清理项
 
@@ -257,12 +265,16 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 | 自习模式摄像头选错 | Edge 默认枚举到 Iriun Webcam（虚拟摄像头驱动未启动 → 黑屏但 token 已授权） | `enumerateDevices()` + 启发式过滤虚拟摄像头关键词（Iriun / OBS Virtual / DroidCam 等），锁定 `deviceId.exact` |
 | 自习模式 useImperativeHandle 时序 | `useImperativeHandle` 在渲染期执行，`localRef.current` 仍为 null，导致父 ref 在第一次 render 后被设为 null | 改用 callback ref 直接在 mount 时设 srcObject，不依赖 useEffect 异步时机 |
 | `student_profiles.last_analyzed_at` 列缺失 | 查询 profile 时 500 Internal Server Error | `ALTER TABLE student_profiles ADD COLUMN last_analyzed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL` |
+| MiMo `api-key` 头认证 | 用 `Authorization: Bearer` 会 401 | MiMo 中国集群用 `api-key` 头，独立 `mimo_client.py` 实现 |
+| MiMo 流式空 choices | `choices[0]` IndexError | `_stream` 方法过滤 `choices is None or len==0` 的 chunk |
+| MiMo JSON 输出不完整 | max_tokens 太小导致截断 | exercise_agent max_tokens 2560→4096，_parse_response 加裸数组/缺字段容错 |
+| `exercise_bank.created_by` 类型 | UUID vs String(50) 不匹配 | 对齐 DB schema 为 `UUID` 类型 |
 
 ## 提交规范
 
 - `feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `test:` 开头
 - 涉及评分项 (流式/防幻觉/多智能体) 附 1-2 句说明
-- 前端改动需 `npm run lint` 0 errors + `npm run build` 18 页面通过
+- 前端改动需 `npm run lint` 0 errors + `npm run build` 22 页面通过
 - 比赛前**必做**: `.env` 改 `LLM_PROVIDER=spark` + 跑 `tests/smoke_test` 验证星火路径
 
 ## 写新功能前先看

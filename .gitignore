@@ -46,6 +46,7 @@ frontend/.eslintcache
 Thumbs.db
 desktop.ini
 $RECYCLE.BIN/
+.next/
 
 # ===== Claude Code 用户态（不该入库）=====
 .claude/

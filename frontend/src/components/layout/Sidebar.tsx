@@ -75,27 +75,32 @@ const bookmarkSvg = (
 
 const navGroups: { label: string; items: NavItem[] }[] = [
   {
-    label: 'Overview',
+    label: '主控台',
     items: [
       { href: '/', label: '仪表盘', svg: gridSvg },
     ],
   },
   {
-    label: 'Learning',
+    label: 'AI 学习',
     items: [
       { href: '/duihua', label: '智能对话', tag: 'AI', svg: chatSvg },
-      { href: '/profile', label: '学习画像', svg: userSvg },
-      { href: '/resources', label: '资源中心', svg: bookSvg },
-      { href: '/resources/my-resources', label: '我的资源', svg: bookmarkSvg },
+      { href: '/zixi', label: '自习模式', tag: 'NEW', svg: zixiSvg },
+    ],
+  },
+  {
+    label: '学习管理',
+    items: [
       { href: '/path', label: '学习计划', svg: pathSvg },
-      { href: '/tiku', label: '练习题库', svg: checkSvg },
+      { href: '/profile', label: '学习画像', svg: userSvg },
       { href: '/pinggu', label: '学习评估', svg: evalSvg },
     ],
   },
   {
-    label: 'Focus',
+    label: '资源',
     items: [
-      { href: '/zixi', label: '自习模式', tag: 'NEW', svg: zixiSvg },
+      { href: '/resources', label: '资源中心', svg: bookSvg },
+      { href: '/resources/my-resources', label: '我的资源', svg: bookmarkSvg },
+      { href: '/tiku', label: '练习题库', svg: checkSvg },
     ],
   },
 ]

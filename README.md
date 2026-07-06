@@ -24,7 +24,7 @@
 | 前端 | Next.js (App Router) + Tailwind CSS + TypeScript | 14.2.5 |
 | 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 |
 | Agent | LangGraph StateGraph (10 节点编排 + MessageBus 通信) | - |
-| LLM | 双客户端：MiniMax-M3 (开发) / 讯飞星火 V4 (上线) | - |
+| LLM | 三客户端：小米 MiMo v2.5 (当前) / MiniMax-M3 / 讯飞星火 V4 | - |
 | 数据库 | PostgreSQL 18 (12 张表) + Redis | - |
 | 向量库 | pgvector (JSONB 降级方案) | - |
 | 异步任务 | Celery (Redis broker) | - |
@@ -35,7 +35,7 @@
 
 ```
 ZhiShu/
-├── frontend/                      # Next.js 前端 (21 页面)
+├── frontend/                      # Next.js 前端 (22 页面)
 │   └── src/
 │       ├── app/                   # 页面路由
 │       │   ├── layout.tsx         # 根布局 (本地字体 + ClientShell)
@@ -70,7 +70,7 @@ ZhiShu/
 ├── backend/                       # FastAPI 后端
 │   └── app/
 │       ├── main.py                # 应用入口 + 路由注册
-│       ├── api/                   # 12 个路由模块 (68 端点)
+│       ├── api/                   # 12 个路由模块 (69 端点)
 │       ├── agents/                # 9 个 Agent + StateGraph 编排
 │       │   ├── master_agent.py    # LangGraph StateGraph 10 节点
 │       │   ├── state.py           # AgentState + IntentType
@@ -83,7 +83,7 @@ ZhiShu/
 │       │   ├── tutor_agent.py     # RAG 问答
 │       │   ├── audio_agent.py     # 音频脚本
 │       │   └── behavior_analysis_agent.py # 行为分析
-│       ├── services/              # 16 个服务模块
+│       ├── services/              # 17 个服务模块
 │       ├── models/                # 13 个数据模型
 │       ├── tasks/                 # Celery 异步任务
 │       └── core/                  # 核心模块 (配置/数据库/安全/Agent 指标)
@@ -125,7 +125,8 @@ python scripts/init_admin.py
 cp backend/.env.example backend/.env
 
 # 编辑 .env 填入你的 API Key
-# MINIMAX_API_KEY=your_key_here
+# MIMO_API_KEY=your_key_here  (当前用 MiMo v2.5)
+# 或切换到 MiniMax: LLM_PROVIDER=minimax + MINIMAX_API_KEY=your_key_here
 # 或切换到讯飞星火: LLM_PROVIDER=spark + SPARK_API_KEY=your_key_here
 ```
 
@@ -215,13 +216,14 @@ npm run build
 
 - **多智能体编排**: LangGraph StateGraph 10 节点 + 9 子 Agent 协同
 - **防幻觉机制**: PatternDetector + SourceValidator + LLMValidator 三层验证
-- **流式输出**: 7 个 SSE 端点 (对话/资源/练习/路径/画像评估/学习包)
+- **流式输出**: 8 个 SSE 端点 (对话/资源/练习/路径/画像评估/学习包/题库出题)
 - **RAG 管道**: 文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排
 - **统一 SSE 工具**: 前后端统一流式处理，支持重试 + 指数退避 + 120s 超时
 - **评估报告 AI 化**: LLM 生成自然语言报告 + 趋势分析 + 知识点掌握度统计
 - **推荐系统**: 基于画像/评估/对话/题库/路径的多维度打分推荐
 - **资源中心重构**: AI 生成 + 手动创建 + 进度动画（4步骤+倒计时）+ 保存功能 + 我的资源 + 资源详情
 - **管理后台**: 18 个管理端点 + Agent 监控 + 并行查询 + N+1 优化
+- **题库系统**: 题库 CRUD + AI 流式出题 + 题池采样 + MiMo 容错解析 (裸数组/缺字段/字符串难度)
 - **手机验证码**: 模拟短信服务（控制台输出），5 分钟有效期
 - **行为驱动画像**: 对话/练习/资源/路径学习自动更新 7 维画像
 - **自习模式**: TF.js + MoveNet 浏览器本地姿态检测（零上传）· 番茄钟专注 + 静默巡查 + 物理摄像头智能过滤 + 联动学习画像 focus 维度
@@ -232,7 +234,10 @@ npm run build
 |---|---|---|
 | `MINIMAX_API_KEY` | MiniMax API Key | - |
 | `SPARK_API_KEY` | 讯飞星火 API Key | - |
-| `LLM_PROVIDER` | LLM 选择 (minimax/spark) | minimax |
+| `MIMO_API_KEY` | 小米 MiMo API Key | - |
+| `MIMO_BASE_URL` | MiMo 中国集群地址 | https://token-plan-cn.xiaomimimo.com/v1 |
+| `MIMO_MODEL` | MiMo 模型名 | mimo-v2.5 |
+| `LLM_PROVIDER` | LLM 选择 (mimo/minimax/spark) | mimo |
 | `DATABASE_URL` | PostgreSQL 连接串 | postgresql+asyncpg://postgres:123456@localhost:5432/zhishu |
 | `REDIS_URL` | Redis 连接串 | redis://localhost:6379/0 |
 | `JWT_SECRET` | JWT 密钥 | your_jwt_secret_here |

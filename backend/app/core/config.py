@@ -13,13 +13,18 @@ class Settings(BaseSettings):
     MINIMAX_BASE_URL: str = "https://api.minimax.chat/v1"
     MINIMAX_MODEL: str = "MiniMax-M3"
 
+    # 小米 MiMo v2.5 (OpenAI 兼容格式)
+    MIMO_API_KEY: str = ""
+    MIMO_BASE_URL: str = "https://token-plan-cn.xiaomimimo.com/v1"
+    MIMO_MODEL: str = "mimo-v2.5-pro"
+
     # 讯飞星火 V4 (上线前切换)
     SPARK_API_KEY: str = ""
     SPARK_BASE_URL: str = "https://spark-api-open.xf-yun.com/v1"
     SPARK_MODEL: str = "Spark-V4"
     
-    # LLM 选择: "minimax" 或 "spark"
-    LLM_PROVIDER: str = "minimax"
+    # LLM 选择: "minimax" / "spark" / "mimo"
+    LLM_PROVIDER: str = "mimo"
     
     CORS_ORIGINS: List[str] = ["http://localhost:3000"]
     

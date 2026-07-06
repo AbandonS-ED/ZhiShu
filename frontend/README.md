@@ -1,7 +1,7 @@
 # 智枢 (SmartHub) - 前端项目
 
-> 多智能体学习资源生成系统 · 前端部分（学生端 9 页 + 管理后台 9 页）
-> 最后更新：2026-07-02（文档同步版本）
+> 多智能体学习资源生成系统 · 前端部分（学生端 13 页 + 管理后台 9 页）
+> 最后更新：2026-07-07（MiMo LLM 接入 + 题库修复 + 侧边栏重设计）
 
 ## 技术栈
 
@@ -15,7 +15,7 @@
 
 ```
 src/
-├── app/                    # 路由页面（学生 9 + 管理 9 + 2 布局 + 1 全局 layout）
+├── app/                    # 路由页面（学生 13 + 管理 9 + 2 布局 + 1 全局 layout）
 │   ├── layout.tsx          # 全局布局（Sidebar + Header，/admin /login 跳过）
 │   ├── globals.css         # 自定义设计系统（米色/墨黑/琥珀色系 + admin-* 命名空间）
 │   ├── page.tsx            # / 仪表盘
@@ -62,7 +62,7 @@ src/
 ```bash
 npm install
 npm run dev       # http://localhost:3000
-npm run build     # 验证编译（✅ 通过：18 页面）
+npm run build     # 验证编译（✅ 通过：22 页面）
 npm run lint      # ESLint 检查（✅ 0 errors）
 ```
 
@@ -70,19 +70,23 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 
 ## 页面说明
 
-### 学生端（9 个页面）
+### 学生端（13 个页面）
 
 | 路由 | 页面 | 功能 | 后端联调 |
 |------|------|------|----------|
 | `/` | 仪表盘 | 统计卡片 + 最近活动 + 快速开始 + 课程进度 | ✅ 数据聚合 |
 | `/login` | 登录/注册 | Tab 切换 + 密码校验 + 手机验证码 + 自动跳转 | ✅ **JWT 认证** |
 | `/duihua` | 智能对话 | 多轮对话 + Agent 进度展示 + 推荐问题 + 会话管理 | ✅ **SSE 流式** (真逐 token) |
-| `/profile` | 学习画像 | Chart.js 雷达图 + 7 维详情（comprehension/memory/application/imagination/focus/knowledge_base/learning_goal + confidence）+ 知识点掌握度 + 薄弱环节 + AI 弹窗 | ✅ AI 流式评估 |
+| `/profile` | 学习画像 | Chart.js 雷达图 + 7 维详情 + 知识点掌握度 + 薄弱环节 + AI 弹窗 | ✅ AI 流式评估 |
 | `/resources` | 资源中心 | 资源卡片 + 搜索/筛选 + 网格/列表视图 + 收藏 + 详情模态框 | ✅ **SSE 流式** |
+| `/resources/my-resources` | 我的资源 | 用户创建的资源列表 + 过滤系统自动生成的资源 | ✅ 资源 API |
+| `/resources/[id]` | 资源详情 | 完整学习内容 + 标签页切换 + 练习题答案 | ✅ 资源 API |
+| `/resources/learn/[kp]` | 学习页 | 学习包三阶段 (Learn/Practice/Review) + SSE 流式生成 | ✅ **SSE 流式** |
 | `/path` | 学习路径 | DAG 图谱(SVG 边) + 概览统计 + 详情面板 + 每日计划 | ✅ **SSE 流式** |
-| `/tiku` | 练习题库 | 选择/判断/简答/编程 + 即时反馈 + 进度环形图 + 知识点分析 | ✅ **SSE 流式** (dual-format) |
-| `/pinggu` | 学习评估 | 评分环形动画 + 六维进度条 + 趋势折线图 + 正确率柱状图 + **LLM 评估报告**（优势/弱项/易错区 + 7 维画像 + 7 天趋势） | ✅ AI 评估 |
+| `/tiku` | 练习题库 | 胶囊选择器 + ✏️ 自定义输入 + 超30提示 + AI 流式出题 | ✅ **SSE 流式** (dual-format) |
+| `/pinggu` | 学习评估 | 评分环形动画 + 六维进度条 + 趋势折线图 + LLM 评估报告 | ✅ AI 评估 |
 | `/setting` | 账号设置 | 个人信息编辑 + 修改密码 | ✅ auth API |
+| `/zixi` | 自习模式 | TF.js + MoveNet 摄像头本地姿态检测 + 三状态机 | ✅ evaluation/record |
 
 ### 管理后台（9 个页面）
 

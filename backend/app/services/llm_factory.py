@@ -38,6 +38,14 @@ def get_llm_client():
             base_url=settings.SPARK_BASE_URL,
         )
         logger.info("LLM provider: spark (%s)", settings.SPARK_BASE_URL)
+    elif provider == "mimo":
+        from app.services.mimo_client import MiMoClient
+        _client = MiMoClient(
+            api_key=settings.MIMO_API_KEY,
+            base_url=settings.MIMO_BASE_URL,
+            model=settings.MIMO_MODEL,
+        )
+        logger.info("LLM provider: mimo (%s)", settings.MIMO_BASE_URL)
     else:
         # 默认 minimax
         from app.services.minimax_client import MiniMaxClient

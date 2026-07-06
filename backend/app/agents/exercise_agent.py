@@ -35,7 +35,8 @@ class ExerciseAgent:
 - 生成 2 道基础题（difficulty=30-50）：考察核心概念和基本公式
 - 生成 1 道进阶题（difficulty=60-75）：需要综合应用或略微转弯
 - 选择题 4 个选项，干扰项要有迷惑性且基于真实错误设计
-- 只返回 JSON，不要其他文字"""
+- 只返回 JSON，不要其他文字
+- 输出语言必须是中文。如果知识点是外语类（如英语、日语），题目和选项可以用目标语言，但解析必须用中文"""
 
     SYSTEM_PROMPT_CHALLENGE = """你是一个专业的练习题生成器。根据学生的知识画像，为指定知识点生成**挑战难度**的练习题。
 
@@ -59,7 +60,8 @@ class ExerciseAgent:
 - 生成 1 道竞赛/面试级别题（difficulty=90-100）：考察综合应用、创新思路
 - 题目设计要巧妙，干扰项要基于真实错误经验
 - 考察方式：概念辨析/错例分析/多步推导/反例构造
-- 只返回 JSON，不要其他文字"""
+- 只返回 JSON，不要其他文字
+- 输出语言必须是中文。如果知识点是外语类（如英语、日语），题目和选项可以用目标语言，但解析必须用中文"""
 
     SYSTEM_PROMPT_BASIC = """你是一个专业的练习题生成器。根据学生的知识画像，为指定知识点生成**基础入门**的练习题。
 
@@ -82,7 +84,8 @@ class ExerciseAgent:
 - 全部为基础题（difficulty=20-40）
 - 重点考察：概念辨析、公式回忆、直接应用
 - 表述要直白，避免歧义陷阱
-- 只返回 JSON，不要其他文字"""
+- 只返回 JSON，不要其他文字
+- 输出语言必须是中文。如果知识点是外语类（如英语、日语），题目和选项可以用目标语言，但解析必须用中文"""
 
     _VARIANT_PROMPTS = {
         "mixed": SYSTEM_PROMPT_MIXED,
@@ -113,8 +116,8 @@ class ExerciseAgent:
         system_prompt = self._VARIANT_PROMPTS.get(variant, self.SYSTEM_PROMPT_MIXED)
         user_prompt = self._build_prompt(knowledge_point, student_profile, exercise_type, count, variant)
 
-        # challenge 模式需要更多 token
-        max_tokens = 4096 if variant == "challenge" else 2560
+        # MiMo 推理模式消耗 token，统一给 4096
+        max_tokens = 4096
 
         response = await get_llm_client().chat(
             messages=[{"role": "user", "content": user_prompt}],
@@ -186,7 +189,76 @@ class ExerciseAgent:
         return "\n".join(parts)
 
     def _parse_response(self, content: str) -> dict:
-        return parse_json_response(content, {"exercises": []})
+        # 1. 标准解析
+        result = parse_json_response(content, {"exercises": []})
+        if result.get("exercises"):
+            return result
+
+        # 2. MiMo 可能返回裸数组 [...]，尝试提取
+        import json, re
+        # 先去 markdown 代码块包裹
+        cleaned = content.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```(?:json)?\s*\n?", "", cleaned)
+            cleaned = re.sub(r"\n?```\s*$", "", cleaned)
+        # 尝试解析为 JSON
+        try:
+            parsed = json.loads(cleaned)
+            # 裸数组 → 包装
+            if isinstance(parsed, list):
+                parsed = {"exercises": parsed}
+            if isinstance(parsed, dict) and "exercises" in parsed:
+                raw_exs = parsed["exercises"]
+            else:
+                raw_exs = []
+        except (json.JSONDecodeError, TypeError):
+            # 3. 从文本中提取 JSON 块
+            match = re.search(r'\[[\s\S]*\]', cleaned)
+            if match:
+                try:
+                    raw_exs = json.loads(match.group())
+                except (json.JSONDecodeError, TypeError):
+                    raw_exs = []
+            else:
+                raw_exs = []
+
+        # 4. 补全缺失字段
+        fixed = []
+        for ex in raw_exs:
+            if not isinstance(ex, dict):
+                continue
+            q = ex.get("question", "")
+            a = str(ex.get("answer", ""))
+            # 推断 type
+            ex_type = ex.get("type", "")
+            if not ex_type:
+                if re.match(r"^(true|false|对|错|是|否)", a, re.IGNORECASE) or "判断" in q:
+                    ex_type = "judge"
+                elif ex.get("options") or re.search(r"[A-D][.、]", q):
+                    ex_type = "choice"
+                else:
+                    ex_type = "short_answer"
+            # difficulty 字符串→数字
+            diff = ex.get("difficulty", 50)
+            if isinstance(diff, str):
+                diff_map = {"easy": 30, "medium": 50, "hard": 80, "入门": 30, "中等": 50, "困难": 80}
+                diff = diff_map.get(diff.lower(), 50)
+            # options 处理：MiMo 可能不带选项
+            options = ex.get("options")
+            if not options and ex_type == "choice":
+                options = [f"A. {a}", "B. (待补充)", "C. (待补充)", "D. (待补充)"]
+            fixed.append({
+                "type": ex_type,
+                "question": q,
+                "options": options,
+                "answer": a,
+                "explanation": ex.get("explanation", ""),
+                "difficulty": diff,
+                "knowledge_point": ex.get("knowledge_point", ""),
+            })
+
+        result["exercises"] = fixed
+        return result
 
 
 exercise_agent = ExerciseAgent()

@@ -1,6 +1,6 @@
 # 智枢(SmartHub) Backend
 
-> 最后更新：2026-07-02（数据库 schema 修复 + 文档同步版本）
+> 最后更新：2026-07-07（MiMo LLM 接入 + 题库功能修复）
 
 基于 FastAPI + 9 Agent 的多智能体学习资源生成系统后端。
 
@@ -8,9 +8,9 @@
 
 - **框架**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg
 - **Agent**: 9 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）
-- **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 67 业务端点门禁
+- **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 69 业务端点门禁
 - **角色**: `role` 字段（student / admin）+ `is_active` 软删除 + `last_login` 记录
-- **LLM**: MiniMax-M3（开发）→ 讯飞星火 V4（上线前切换 `LLM_PROVIDER=spark`）
+- **LLM**: 小米 MiMo v2.5（当前）→ MiniMax-M3 → 讯飞星火 V4（上线前切换 `LLM_PROVIDER=spark`）
 - **数据库**: PostgreSQL 18 + **12 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（Celery broker，当前未起 worker）
 
 ## 快速开始
@@ -42,7 +42,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 backend/
 ├── app/
-│   ├── main.py              # 入口（12 个 router + lifespan 初始化）= 67 唯一端点
+│   ├── main.py              # 入口（12 个 router + lifespan 初始化）= 69 唯一端点
 │   ├── api/                 # 12 个 router：auth / profile / resource / path / tutor / chat / mindmap / dashboard / evaluation / admin / admin_exercises
 │   ├── core/
 │   │   ├── config.py        # Settings（MINIMAX_* + SPARK_* + JWT_SECRET + LLM_PROVIDER）
@@ -75,7 +75,7 @@ backend/
 │   │   ├── audio_agent.py     # 音频脚本生成
 │   │   ├── behavior_analysis_agent.py # 行为分析 + 画像更新
 │   │   └── master_agent.py    # LangGraph StateGraph **10 节点**
-│   └── services/              # 16 个 Service
+│   └── services/              # 17 个 Service
 │       ├── minimax_client.py     # httpx OpenAI 兼容格式客户端
 │       ├── minimax_langchain.py  # LangChain BaseChatModel 封装
 │       ├── spark_client.py       # 讯飞星火 V4 客户端
@@ -104,7 +104,7 @@ backend/
 └── .env                     # API Key（已 gitignore）
 ```
 
-## API 路由（67 个唯一端点）
+## API 路由（69 个唯一端点）
 
 > 唯一端点 = 唯一路径 + 方法组合。`backend/app/main.py` 注册 12 router，含 `/` 和 `/health` 根路由。
 
@@ -148,7 +148,7 @@ backend/
 | POST | `/api/v1/profile/force-analyze` | ✅ | **强制分析画像**（忽略缓存） |
 | GET | `/api/v1/profile/analysis-status` | ✅ | **获取分析状态**（查看分析进度） |
 
-### 资源生成（resource.py）— 13 个端点
+### 资源生成（resource.py）— 15 个端点
 
 | 方法 | 路径 | 门禁 | 说明 |
 |------|------|------|------|
@@ -257,6 +257,7 @@ backend/
 | `services/minimax_client.py` | httpx 直接调用 MiniMax-M3（OpenAI 兼容格式） | ✅ 可用 |
 | `services/minimax_langchain.py` | LangChain BaseChatModel 封装 | ✅ 可用 |
 | `services/spark_client.py` | 讯飞星火 V4 客户端（同步 + 流式） | ✅ 已实现 |
+| `services/mimo_client.py` | 小米 MiMo v2.5 客户端（`api-key` 头认证 + 流式/非流式 + 空 choices 容错） | ✅ 已实现 |
 | `services/anti_hallucination.py` | 防幻觉三层验证（模式检测+来源验证+LLM语义校验） | ✅ 已实现 |
 | `services/content_safety.py` | 内容安全（敏感词过滤 + LLM 语义检查） | ✅ 已实现 |
 | `services/document_parser.py` | 文档解析器（PDF/DOCX/PPTX/MD/TXT） | ✅ 已实现 |
@@ -268,7 +269,7 @@ backend/
 | `services/vector_store.py` | pgvector 检索 + JSONB 降级方案 | ✅ 已实现 |
 | `services/recommendation_service.py` | 推荐服务（多维度打分推荐） | ✅ 已实现 |
 | `services/chat_recommendation_service.py` | 对话推荐服务（基于会话上下文） | ✅ 已实现 |
-| `services/llm_factory.py` | LLM 客户端工厂（MiniMax/Spark） | ✅ 已实现 |
+| `services/llm_factory.py` | LLM 客户端工厂（MiniMax/Spark/MiMo） | ✅ 已实现 |
 | `services/scheduled_analysis_service.py` | 定时画像分析（每日自动分析） | ✅ 已实现 |
 
 ## 数据库
@@ -294,7 +295,7 @@ backend/
 
 - **密码哈希**：`bcrypt`（`core/security.py`）
 - **JWT**：HS256，7 天过期，密钥从 `JWT_SECRET` 环境变量读取
-- **门禁**：67 个业务端点全部加 `Depends(get_current_user)` + `student_id` 所有权校验
+- **门禁**：69 个业务端点全部加 `Depends(get_current_user)` + `student_id` 所有权校验
 - **角色隔离**：`students.role` 字段（`student` / `admin`），管理员通过 `_require_admin()` 额外校验
 - **软删除**：`is_active=false` 时登录返回 403
 - **登录审计**：登录成功后自动 `last_login = now()`

@@ -19,7 +19,7 @@
 
 ## 硬约束
 
-- **LLM**: 开发用 MiniMax-M3，`base_url` `https://api.minimax.chat/v1`（**没有 `i`**，不是 `minimaxi`）。比赛前切星火：`LLM_PROVIDER=spark` + `SPARK_API_KEY=xxx`。讯飞鉴权只用 `Authorization: Bearer {api_key}`，不拼 api_secret。
+- **LLM**: 当前用小米 MiMo v2.5（`LLM_PROVIDER=mimo`，`api-key` 头认证）。备选：MiniMax-M3（`minimax`）/ 讯飞星火 V4（`spark`）。比赛前切星火：`LLM_PROVIDER=spark` + `SPARK_API_KEY=xxx`。讯飞鉴权只用 `Authorization: Bearer {api_key}`，不拼 api_secret。
 - **禁用** Google Fonts / Vercel / Sentry / OpenAI（中国不可达）。字体走 `frontend/src/app/fonts/` 本地 woff + `next/font/local`。
 - **pip** 加 `-i https://pypi.tuna.tsinghua.edu.cn/simple`；npm 走 `frontend/.npmrc` 的 `registry.npmmirror.com`。
 - **端口**: 后端 **8001**（不要 8000），前端 3000。`api.ts:3` 的 `BASE_URL` 已同步。用 `start.ps1` 一键启动，`stop.ps1` 一键停止。
@@ -57,7 +57,7 @@ cd backend && celery -A app.core.celery_config beat --loglevel=info
 cd backend && python -m pytest tests/ -v          # 129 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
-cd frontend && npm run build                       # 21 页面
+cd frontend && npm run build                       # 22 页面
 ```
 
 ## 关键架构事实
@@ -67,9 +67,10 @@ cd frontend && npm run build                       # 21 页面
 - **DB JSON 格式**: assistant 消息存 `{"type":"tutor","data":{"answer":"..."}}` 或 `{"type":"multi","data":{"final_response":"..."}}`
 - **前端 `loadSession`**: 解析 JSON 提取 `answer` / `final_response`，统一 `rendered=false` 让 `markdownToHtml` 渲染
 - **题库出题**: StateGraph exercise 意图 → 保存到 `exercises` 表（去重 + 限容 20 道/知识点）→ 回复追加 `[👉 点击前往题库作答](/tiku?kp=xxx)`
+- **MiMo v2.5**: 中国集群 `api-key` 头认证（非 `Authorization: Bearer`），`/chat/completions` 兼容。mimo-v2.5-pro 推理消耗过多 token，降级用 mimo-v2.5
 - **防幻觉**: 6 Agent 接 `validate()`（Document/Exercise 走三层，其他走 `skip_llm=True` 快速模式）
 - **RAG**: `document_parser → text_chunker → embedding → vector_store.search → reranker`
-- **认证**: bcrypt + JWT（HS256，7 天），全 **68** 端点 `Depends(get_current_user)` 门禁
+- **认证**: bcrypt + JWT（HS256，7 天），全 **69** 端点 `Depends(get_current_user)` 门禁
 - **手机验证码**: 内存存储 + 5 分钟有效期，控制台 print 模拟短信，注册时校验
 - **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，18 管理端点（含 9 Agent 监控 + 文档管理 + 用户删除）
 - **Agent 监控**: `agent_metrics.py` 内存计数器 + `threading.Lock` 线程安全，30s 自动刷新
@@ -108,10 +109,14 @@ cd frontend && npm run build                       # 21 页面
 | 验证码按钮样式丑 | 复用 `.submit-btn` 全黑大按钮与输入框不协调 | 新增 `.code-row` + `.code-btn` 独立样式，深色背景与提交按钮统一 |
 | 注册表单展开生硬 | `register-extras` 直接 `display:none/block` 切换无过渡 | 改为 `max-height:0→600px` + `opacity:0→1` 平滑动画 |
 | `student_profiles.last_analyzed_at` 列缺失 | 查询 profile 时 500 Internal Server Error | `ALTER TABLE student_profiles ADD COLUMN last_analyzed_at TIMESTAMP WITH TIME ZONE DEFAULT NULL` |
+| MiMo `api-key` 头认证 | 用 `Authorization: Bearer` 会 401 | MiMo 中国集群用 `api-key` 头，独立 `mimo_client.py` 实现 |
+| MiMo 流式空 choices | `choices[0]` IndexError | `_stream` 方法过滤 `choices is None or len==0` 的 chunk |
+| MiMo JSON 输出不完整 | max_tokens 太小导致截断 | exercise_agent max_tokens 2560→4096，_parse_response 加裸数组/缺字段容错 |
+| `exercise_bank.created_by` 类型 | UUID vs String(50) 不匹配 | 对齐 DB schema 为 `UUID` 类型 |
 
 ## 提交规范
 
 - `feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `test:` 开头
 - 涉及评分项（流式/防幻觉/多智能体/RAG）附 1-2 句说明
-- 前端改动需 `npm run lint` 0 errors + `npm run build` 18 页面通过
+- 前端改动需 `npm run lint` 0 errors + `npm run build` 22 页面通过
 - 比赛前**必做**：`.env` 改 `LLM_PROVIDER=spark` + 跑 `tests/smoke_test` 验证星火路径
