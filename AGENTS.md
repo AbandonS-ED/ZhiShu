@@ -17,6 +17,18 @@
 | 以诚实无知为荣 | 以假装理解为耻 |
 | 以谨慎重构为荣 | 以盲目修改为耻 |
 
+## 开发测试流程（每改必验，不跳步骤）
+
+| 改动类型 | 验证方式 | 通过条件 |
+|---|---|---|
+| CSS / 样式 | `npm run lint + build` → 浏览器看效果 | 0 错误 + 视觉正常 |
+| TypeScript / 前端逻辑 | `npm run lint + build` → 浏览器操作对应功能 | 0 错误 + 功能正常 |
+| Python / 后端 API | `python -m py_compile` → 重启后端 → curl/httpx 测端点 | 编译通过 + API 返回正确 |
+| SQL / 数据库 | 直接查 DB 验证数据 | 数据符合预期 |
+| 配置 / 环境变量 | 重启服务验证 | 服务正常启动 |
+
+**流程**：改代码 → lint + build → 浏览器/API 验证 → commit → 下一个。每个 commit 独立可运行，出问题快速定位。
+
 ## 硬约束
 
 - **LLM**: 当前用小米 MiMo v2.5（`LLM_PROVIDER=mimo`，`api-key` 头认证）。备选：MiniMax-M3（`minimax`）/ 讯飞星火 V4（`spark`）。比赛前切星火：`LLM_PROVIDER=spark` + `SPARK_API_KEY=xxx`。讯飞鉴权只用 `Authorization: Bearer {api_key}`，不拼 api_secret。
@@ -57,7 +69,7 @@ cd backend && celery -A app.core.celery_config beat --loglevel=info
 cd backend && python -m pytest tests/ -v          # 129 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
-cd frontend && npm run build                       # 22 页面
+cd frontend && npm run build                       # 24 页面
 ```
 
 ## 关键架构事实
@@ -118,5 +130,5 @@ cd frontend && npm run build                       # 22 页面
 
 - `feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `test:` 开头
 - 涉及评分项（流式/防幻觉/多智能体/RAG）附 1-2 句说明
-- 前端改动需 `npm run lint` 0 errors + `npm run build` 22 页面通过
+- 前端改动需 `npm run lint` 0 errors + `npm run build` 24 页面通过
 - 比赛前**必做**：`.env` 改 `LLM_PROVIDER=spark` + 跑 `tests/smoke_test` 验证星火路径

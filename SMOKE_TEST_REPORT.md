@@ -1,6 +1,6 @@
 # 端到端冒烟测试报告
 
-> 最后更新：2026-07-02（数据库 schema 修复 + 文档同步版本）
+> 最后更新：2026-07-07（管理后台重构 + 性能优化 + Bug 修复）
 
 ## 测试概览
 
@@ -18,17 +18,20 @@
 
 ---
 
-## 最新变更（2026-07-02）
+## 最新变更（2026-07-07）
 
-数据库 schema 修复 + 文档同步：
-- 后端 67 个 API 端点
-- 前端 18 页面（9 学生页 + 9 管理页）
+管理后台重构 + 性能优化 + Bug 修复：
+- 后端 69+ 个 API 端点
+- 前端 24 页面（13 学生页 + 9 管理页 + 2 子页面）
 - Agent 数量：9 个子 Agent + 1 个 Master Agent
-- 服务数量：16 个
+- 服务数量：17 个
 - 模型数量：13 个
 - 测试文件：7 个，共 129 个 pytest
 - 7 维画像：comprehension / memory / application / imagination / focus / knowledge_base / learning_goal
 - 管理后台：18 个端点
+- 首页 JS 体积：93kB（chart.js 动态导入，-42%）
+- 评估页 JS 体积：99.4kB（marked 隔离，-11%）
+- 生产模式：start.ps1 默认 next build + next start
 
 ---
 

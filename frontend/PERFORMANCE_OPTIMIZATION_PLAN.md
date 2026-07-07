@@ -270,12 +270,25 @@ export default nextConfig
 3. ✅ 优化 Next.js 配置
 
 ### 第二阶段（1-2天）
-4. ✅ 动态导入 chart.js 组件
+4. ✅ 动态导入 chart.js 组件（首页 JS 161kB → 93kB, -42%）
 5. ✅ 优化图标导入
 
-### 第三阶段（可选）
+### 第三阶段（已完成）
 6. ✅ 页面组件拆分
-7. ✅ 添加 React.memo 优化
+7. ✅ React.memo 优化
+8. ✅ marked 隔离（新建 lib/markdown.ts，/pinggu JS 112kB → 99.4kB, -11%）
+9. ✅ Sidebar prefetch 删除（消除带宽争抢）
+
+## 实际效果
+
+| 优化方案 | 实际改善 | 状态 |
+|---------|---------|------|
+| layout 改为服务器组件 | 减少 30-50% 客户端 JS | ✅ 已完成 |
+| 动态导入 chart.js | 首页 JS 161kB → 93kB（-42%） | ✅ 已完成 |
+| marked 隔离 | /pinggu JS 112kB → 99.4kB（-11%） | ✅ 已完成 |
+| Sidebar prefetch 删除 | 消除带宽争抢 | ✅ 已完成 |
+| 添加 loading 状态 | 改善用户体验 | ✅ 已完成 |
+| Next.js 配置优化 | 减少 10-20% 包大小 | ✅ 已完成 |
 
 ## 预期效果总结
 

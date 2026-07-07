@@ -25,7 +25,7 @@
 
 ```
 ZhiShu/
-├── frontend/                        # Next.js 前端 (22 页面)
+├── frontend/                        # Next.js 前端 (24 页面)
 │   ├── src/app/                     # 页面路由 (13 学生页 + 9 管理页)
 │   │   ├── resources/               # 资源中心
 │   │   │   ├── page.tsx             # 资源列表 (AI 生成 + 手动创建)
@@ -93,7 +93,7 @@ cd backend && celery -A app.core.celery_config beat --loglevel=info
 cd backend && python -m pytest tests/ -v          # 129 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
-cd frontend && npm run build                       # 22 页面
+cd frontend && npm run build                       # 24 页面
 ```
 
 ## 架构要点
@@ -233,6 +233,27 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ exercise_bank.created_by 类型修正 (String→UUID)
 - ✅ exercise 语言规则 (外语类题目可保留目标语言，解析必须中文)
 - ✅ 题库 UI 重设计 (胶囊选择器 + ✏️ 自定义输入 + 超30提示)
+- ✅ 管理后台布局重构 (汉堡菜单 + responsive grid + 管理页容器 `.admin-pg`)
+- ✅ 管理后台样式隔离 (删 `#adminAppWrap` + `.admin-pnl` 死代码)
+- ✅ dashboard 7 天趋势聚合 (AT TIME ZONE 'UTC' 时区修复 + daily_agg + today_minutes + streak_days)
+- ✅ dashboard `total_exercises` 缺失修复 (admin.py ExerciseBank 计数)
+- ✅ admin users `exercise_count` 批量查询 (消除 undefined)
+- ✅ 登录页管理员入口 (页脚小字 "管理员入口 →")
+- ✅ chart.js 动态导入 (首页 JS 161kB → 93kB, -42%)
+- ✅ Sidebar prefetch 删除 (消除带宽争抢)
+- ✅ marked 隔离 (新建 `lib/markdown.ts`, `lib/utils.ts` 移除 marked 依赖, `/pinggu` JS 112kB → 99.4kB)
+- ✅ 生产模式启动 (`start.ps1` 默认 `next build + next start`, `-Dev` 切开发模式)
+- ✅ start.ps1 build bug 修复 (`-NoNewWindow -Wait` 替代 stdout/stderr 同文件重定向)
+- ✅ 后端画像分析延迟 30 秒 (`scheduled_analysis_service.py` `_run_loop` 加 `await asyncio.sleep(30)`)
+- ✅ exercises 答案校验逻辑 (`String.fromCharCode(65 + oi)` 字母比较 + `String(oi)` 数字比较双保险)
+- ✅ exercises 弹窗 CSS 缺失 (`.admin-mo`/`.admin-md` 体系复用)
+- ✅ users 弹窗 CSS 缺失 (`admin-modal-*` → `.admin-mo`/`.admin-md`)
+- ✅ users 搜索框 CSS 缺失 (`admin-input` → `admin-si`)
+- ✅ exercises 下拉框 CSS 缺失 (`admin-sel` → `admin-sf`)
+- ✅ 死代码 `.admin-pgr` 系列删除
+- ✅ marked v18 `setOptions()` 兼容 (`marked.parse(md, { breaks, gfm })`)
+- ✅ CSS 变量补全 (`--glass`/`--purple`/`--purple-soft`/`--r-md`/`--ink-6`)
+- ✅ 管理后台 24 页面编译通过 (build 输出)
 
 ### P2 — 清理项
 
@@ -269,12 +290,18 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 | MiMo 流式空 choices | `choices[0]` IndexError | `_stream` 方法过滤 `choices is None or len==0` 的 chunk |
 | MiMo JSON 输出不完整 | max_tokens 太小导致截断 | exercise_agent max_tokens 2560→4096，_parse_response 加裸数组/缺字段容错 |
 | `exercise_bank.created_by` 类型 | UUID vs String(50) 不匹配 | 对齐 DB schema 为 `UUID` 类型 |
+| marked v18 `setOptions()` | `marked.setOptions()` 崩溃 | 改用 `marked.parse(md, { breaks, gfm })` 选项传入 |
+| admin CSS 类名冲突 | `.admin-pg` 同时用于分页栏和页面容器 | 分页栏改名 `.admin-pgr`（后删除） |
+| exercises 弹窗缺 CSS | `admin-mask`/`admin-dialog` 不存在 | 复用 `.admin-mo`/`.admin-md` 已有体系 |
+| users 弹窗 CSS 缺失 | `admin-modal-*` 自定义类名 | 统一改 `.admin-mo`/`.admin-md` |
+| dashboard 时区 | `func.date()` 在非 UTC DB 下日期偏移 | 加 `AT TIME ZONE 'UTC'` 确保按 UTC 截断 |
+| start.ps1 build stdout | `Start-Process` 不能 `-RedirectStandardOutput` + `-NoNewWindow` 同时用 | 改 `-NoNewWindow -Wait` 同步等待 |
 
 ## 提交规范
 
 - `feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `test:` 开头
 - 涉及评分项 (流式/防幻觉/多智能体) 附 1-2 句说明
-- 前端改动需 `npm run lint` 0 errors + `npm run build` 22 页面通过
+- 前端改动需 `npm run lint` 0 errors + `npm run build` 24 页面通过
 - 比赛前**必做**: `.env` 改 `LLM_PROVIDER=spark` + 跑 `tests/smoke_test` 验证星火路径
 
 ## 写新功能前先看
