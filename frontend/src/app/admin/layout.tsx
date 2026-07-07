@@ -77,7 +77,7 @@ function AdminShell({ children }: { children: ReactNode }) {
   const cur = PANELS[activePanel]
 
   return (
-    <div className="admin-app" style={{ display: 'flex', height: '100vh' }}>
+    <div className="admin-app">
       <aside className={`admin-sb${sbOpen ? ' open' : ''}`}>
         <div className="sb-brand">
           <div className="mk2">S</div>

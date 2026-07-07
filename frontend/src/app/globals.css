@@ -1412,6 +1412,7 @@ body:has(.login-page){
 
 /* ═══ ADMIN APP SHELL ═══ */
 /* (死代码已删除：#adminAppWrap v0 残留) */
+.admin-app{display:flex;height:100vh}
 
 /* SIDEBAR */
 .admin-sb{width:248px;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0}
