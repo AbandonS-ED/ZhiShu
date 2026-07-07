@@ -85,6 +85,8 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { href: '/duihua', label: '智能对话', tag: 'AI', svg: chatSvg },
       { href: '/zixi', label: '自习模式', tag: 'NEW', svg: zixiSvg },
+      { href: '/resources', label: '资源中心', svg: bookSvg },
+      { href: '/tiku', label: '练习题库', svg: checkSvg },
     ],
   },
   {
@@ -93,14 +95,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { href: '/path', label: '学习计划', svg: pathSvg },
       { href: '/profile', label: '学习画像', svg: userSvg },
       { href: '/pinggu', label: '学习评估', svg: evalSvg },
-    ],
-  },
-  {
-    label: '资源',
-    items: [
-      { href: '/resources', label: '资源中心', svg: bookSvg },
       { href: '/resources/my-resources', label: '我的资源', svg: bookmarkSvg },
-      { href: '/tiku', label: '练习题库', svg: checkSvg },
     ],
   },
 ]
