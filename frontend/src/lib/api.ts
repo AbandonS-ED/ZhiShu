@@ -527,7 +527,7 @@ export const authApi = {
       body: JSON.stringify({ phone, code }),
     }),
   getMe: () => request<AuthStudent>('/auth/me', { method: 'GET' }),
-  updateMe: (data: { name?: string; email?: string }) =>
+  updateMe: (data: { name?: string; email?: string; major?: string; grade?: string }) =>
     request<AuthStudent>('/auth/me', {
       method: 'PUT',
       body: JSON.stringify(data),

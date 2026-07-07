@@ -50,7 +50,7 @@ interface Stats {
   recent_chats: Activity[]
 }
 
-const DAILY_GOAL = 60 // 目标每日 60 分钟
+  const DEFAULT_DAILY_GOAL = 60 // 默认目标每日 60 分钟
 
 export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null)
@@ -58,6 +58,27 @@ export default function Home() {
   const [hasProfile, setHasProfile] = useState(false)
   const [resourceCount, setResourceCount] = useState(0)
   const [loadingUser, setLoadingUser] = useState(true)
+  const [dailyGoal, setDailyGoal] = useState(DEFAULT_DAILY_GOAL)
+
+  useEffect(() => {
+    const saved = localStorage.getItem('zhishu_daily_goal')
+    if (saved) {
+      const v = parseInt(saved, 10)
+      if (!isNaN(v) && v >= 10 && v <= 480) setDailyGoal(v)
+    }
+  }, [])
+
+  useEffect(() => {
+    function onStorage() {
+      const saved = localStorage.getItem('zhishu_daily_goal')
+      if (saved) {
+        const v = parseInt(saved, 10)
+        if (!isNaN(v) && v >= 10 && v <= 480) setDailyGoal(v)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   useEffect(() => {
     const sid = getStudentId()
@@ -108,7 +129,7 @@ export default function Home() {
   }
 
   // 进度环参数
-  const todayPct = Math.min(s.today_minutes / DAILY_GOAL * 100, 100)
+  const todayPct = Math.min(s.today_minutes / dailyGoal * 100, 100)
   const circ = 2 * Math.PI * 42 // 周长
   const offset = circ - (circ * todayPct / 100)
 
@@ -140,10 +161,10 @@ export default function Home() {
           </div>
           <div className="dash-hero-info">
             <div className="dash-hero-title">
-              {s.today_minutes >= DAILY_GOAL ? '今日目标已达成 !' : `今日已学 ${s.today_minutes} 分钟`}
+              {s.today_minutes >= dailyGoal ? '今日目标已达成 !' : `今日已学 ${s.today_minutes} 分钟`}
             </div>
             <div className="dash-hero-sub">
-              目标 {DAILY_GOAL} 分钟 · {todayPct >= 100 ? '超额完成' : `还差 ${DAILY_GOAL - s.today_minutes} 分钟`}
+              目标 {dailyGoal} 分钟 · {todayPct >= 100 ? '超额完成' : `还差 ${dailyGoal - s.today_minutes} 分钟`}
             </div>
             <div className="dash-hero-streak">
               <span className="streak-fire">🔥</span>

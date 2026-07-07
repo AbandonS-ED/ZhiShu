@@ -1,10 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useAppStore } from '@/stores/appStore'
-import { clearStudentIdCache } from '@/lib/student'
+import { logout } from '@/lib/student'
 
 type NavItem = {
   href: string
@@ -102,7 +102,6 @@ const navGroups: { label: string; items: NavItem[] }[] = [
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const student = useAppStore((s) => s.student)
   const setStudent = useAppStore((s) => s.setStudent)
@@ -120,11 +119,7 @@ export default function Sidebar() {
   const userRole = [student?.major, student?.grade].filter(Boolean).join(' · ') || '智枢用户'
 
   function handleLogout() {
-    localStorage.removeItem('zhishu_token')
-    localStorage.removeItem('zhishu_refresh_token')
-    localStorage.removeItem('zhishu_student')
-    clearStudentIdCache() // 清除缓存
-    router.push('/login')
+    logout()
   }
 
   const isActive = (href: string) => {

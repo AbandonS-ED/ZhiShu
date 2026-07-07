@@ -94,6 +94,8 @@ class RegisterRequest(BaseModel):
 class UpdateMeRequest(BaseModel):
     name: str = ""
     email: str = ""
+    major: str = ""
+    grade: str = ""
 
     @field_validator("name")
     @classmethod
@@ -316,6 +318,10 @@ async def update_me(
     if req.name:
         user.name = req.name
     user.email = req.email.strip() or None
+    if req.major:
+        user.major = req.major
+    if req.grade:
+        user.grade = req.grade
     user.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(user)

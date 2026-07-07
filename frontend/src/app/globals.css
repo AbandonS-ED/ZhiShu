@@ -1683,7 +1683,32 @@ body:has(.login-page){
 .set-info-val{font-size:14px;font-weight:500}
 .set-loading{padding:40px;text-align:center;color:var(--ink-3);font-size:14px}
 
-@media(max-width:600px){.set-page{padding:12px}.set-card{padding:16px}.set-info-grid{grid-template-columns:1fr}}
+/* 骨架屏 */
+.set-skeleton{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:24px;display:flex;flex-direction:column;gap:14px}
+
+/* 快捷入口 */
+.set-quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.set-quick-card{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px 12px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-sm);text-decoration:none;color:var(--ink);cursor:pointer;transition:all .15s}
+.set-quick-card:hover{border-color:var(--ink-3);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.set-quick-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+.set-quick-label{font-size:13px;font-weight:500}
+.set-quick-arrow{font-size:16px;color:var(--ink-3)}
+
+/* 学习概览 */
+.set-overview{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.set-overview-item{text-align:center;padding:14px 8px;background:var(--bg);border-radius:var(--r-sm);border:1px solid var(--line)}
+.set-overview-val{font-size:22px;font-weight:600;margin-bottom:4px}
+.set-overview-label{font-size:12px;color:var(--ink-3)}
+
+/* 每日目标 */
+.set-goal-row{display:flex;align-items:center;gap:10px}
+.set-goal-unit{font-size:13px;color:var(--ink-3);white-space:nowrap}
+
+/* 退出登录 */
+.set-logout-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px;border:1px solid #fecaca;border-radius:var(--r-xs);background:rgba(239,68,68,0.05);color:#b91c1c;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+.set-logout-btn:hover{background:rgba(239,68,68,0.1);border-color:#f87171}
+
+@media(max-width:600px){.set-page{padding:12px}.set-card{padding:16px}.set-info-grid{grid-template-columns:1fr}.set-quick-grid{grid-template-columns:repeat(2,1fr)}.set-overview{grid-template-columns:1fr}.set-goal-row{flex-wrap:wrap}}
 
 /* ═══ RESOURCES REDESIGN — REC FEED + PHASE BUTTON ═══ */
 

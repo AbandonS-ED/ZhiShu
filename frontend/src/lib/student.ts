@@ -34,3 +34,13 @@ export function requireLogin(): string {
 export function clearStudentIdCache() {
   cachedStudentId = null
 }
+
+// 统一退出登录（设置页 + 侧边栏复用）
+export function logout() {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem('zhishu_token')
+  localStorage.removeItem('zhishu_refresh_token')
+  localStorage.removeItem('zhishu_student')
+  clearStudentIdCache()
+  window.location.href = '/login'
+}
