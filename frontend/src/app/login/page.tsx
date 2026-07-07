@@ -541,6 +541,7 @@ export default function LoginPage() {
                 登录即表示你同意 <a href="#">服务条款</a> 和 <a href="#">隐私政策</a>
                 <br />
                 <span style={{ marginTop: '4px', display: 'inline-block' }}>智枢 SmartHub · 第十五届中国软件杯 A3 赛题</span>
+                <a href="/admin/login" style={{ fontSize: 12, opacity: 0.5, marginTop: 6, display: 'inline-block' }}>管理员入口 →</a>
               </div>
             </div>
 
