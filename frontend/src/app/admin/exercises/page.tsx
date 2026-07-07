@@ -242,11 +242,11 @@ export default function AdminExercisesPage() {
           placeholder="搜索题目..."
           style={{ flex: 1, minWidth: 160 }}
         />
-        <select className="admin-sel" value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }}>
+        <select className="admin-sf" value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }}>
           <option value="">全部题型</option>
           {TYPE_KEYS.map((k) => <option key={k} value={k}>{TYPE_LABELS[k]}</option>)}
         </select>
-        <select className="admin-sel" value={kpFilter} onChange={(e) => { setKpFilter(e.target.value); setPage(1) }}>
+        <select className="admin-sf" value={kpFilter} onChange={(e) => { setKpFilter(e.target.value); setPage(1) }}>
           <option value="">全部知识点</option>
           {kpList.map((kp) => <option key={kp.name} value={kp.name}>{kp.name} ({kp.count})</option>)}
         </select>
@@ -356,7 +356,7 @@ export default function AdminExercisesPage() {
               <div>
                 <label style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 4, display: 'block' }}>题型</label>
                 <select
-                  className="admin-sel"
+                  className="admin-sf"
                   value={form.exercise_type}
                   onChange={(e) => setForm((f) => ({ ...f, exercise_type: e.target.value }))}
                 >

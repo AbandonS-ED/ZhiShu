@@ -80,14 +80,14 @@ export default function UsersPage() {
           <h3>用户管理</h3>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
-              className="admin-input"
+              className="admin-si"
               placeholder="搜索学号/姓名..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1) }}
               style={{ width: 180 }}
             />
             <select
-              className="admin-input"
+              className="admin-si"
               value={roleFilter}
               onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}
               style={{ width: 100 }}
@@ -168,13 +168,13 @@ export default function UsersPage() {
       )}
 
       {modal.open && modal.user && (
-        <div className="admin-modal-mask" onClick={() => setModal({ open: false, user: null })}>
-          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="admin-modal-h">
+        <div className="admin-mo vis" onClick={() => setModal({ open: false, user: null })}>
+          <div className="admin-md" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-md-h">
               <h3>用户详情</h3>
-              <button onClick={() => setModal({ open: false, user: null })}>×</button>
+              <button className="admin-md-x" onClick={() => setModal({ open: false, user: null })}>×</button>
             </div>
-            <div className="admin-modal-b">
+            <div className="admin-md-body">
               <p>学号: {modal.user.student_no}</p>
               <p>姓名: {modal.user.name}</p>
               <p>邮箱: {modal.user.email || '-'}</p>
