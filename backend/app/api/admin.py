@@ -142,6 +142,8 @@ async def list_users(
 ):
     _require_admin(user)
 
+    from app.models.exercise_bank import ExerciseBank
+
     q = select(Student)
     count_q = select(sa_func.count()).select_from(Student)
 
@@ -160,6 +162,17 @@ async def list_users(
     )
     students = result.scalars().all()
 
+    # 批量查询每个学生的练习题数
+    student_ids = [s.id for s in students]
+    ex_counts: dict = {}
+    if student_ids:
+        ex_result = await db.execute(
+            select(ExerciseBank.created_by, sa_func.count(ExerciseBank.id))
+            .where(ExerciseBank.created_by.in_(student_ids))
+            .group_by(ExerciseBank.created_by)
+        )
+        ex_counts = {row[0]: row[1] for row in ex_result.all()}
+
     items = []
     for student in students:
         items.append({
@@ -169,6 +182,7 @@ async def list_users(
             "email": student.email or "",
             "role": student.role or "student",
             "is_active": student.is_active if student.is_active is not None else True,
+            "exercise_count": ex_counts.get(student.id, 0),
             "last_login": student.last_login.isoformat() if student.last_login else None,
             "created_at": student.created_at.isoformat() if student.created_at else None,
         })

@@ -232,7 +232,7 @@ export default function AdminExercisesPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
-    <>
+    <div className="admin-pg">
       {/* 操作栏 */}
       <div className="admin-op" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
         <input
@@ -346,13 +346,13 @@ export default function AdminExercisesPage() {
 
       {/* 新增/编辑弹窗 */}
       {modal && modal !== 'batch' && (
-        <div className="admin-mask" onClick={() => setModal(null)}>
-          <div className="admin-dialog" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
-            <div className="admin-dlg-hd">
+        <div className="admin-mo vis" onClick={() => setModal(null)}>
+          <div className="admin-md" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <div className="admin-md-h">
               <h3>{modal === 'add' ? '新增题目' : '编辑题目'}</h3>
-              <button className="admin-dlg-x" onClick={() => setModal(null)}>×</button>
+              <button className="admin-md-x" onClick={() => setModal(null)}>×</button>
             </div>
-            <div className="admin-dlg-bd" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="admin-md-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label style={{ fontSize: 12, color: 'var(--ink-2)', marginBottom: 4, display: 'block' }}>题型</label>
                 <select
@@ -432,7 +432,7 @@ export default function AdminExercisesPage() {
                 </div>
               </div>
             </div>
-            <div className="admin-dlg-ft">
+            <div className="admin-md-ft">
               <button className="admin-btn" onClick={() => setModal(null)}>取消</button>
               <button className="admin-btn admin-btn-primary" onClick={handleSave} disabled={saving}>
                 {saving ? '保存中...' : '保存'}
@@ -444,13 +444,13 @@ export default function AdminExercisesPage() {
 
       {/* 批量导入弹窗 */}
       {modal === 'batch' && (
-        <div className="admin-mask" onClick={() => setModal(null)}>
-          <div className="admin-dialog" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
-            <div className="admin-dlg-hd">
+        <div className="admin-mo vis" onClick={() => setModal(null)}>
+          <div className="admin-md" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
+            <div className="admin-md-h">
               <h3>批量导入题目</h3>
-              <button className="admin-dlg-x" onClick={() => setModal(null)}>×</button>
+              <button className="admin-md-x" onClick={() => setModal(null)}>×</button>
             </div>
-            <div className="admin-dlg-bd">
+            <div className="admin-md-body">
               <p style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>
                 粘贴 JSON 数组，每项包含：question, exercise_type, options(选择题), answer, explanation, difficulty, knowledge_point
               </p>
@@ -473,7 +473,7 @@ export default function AdminExercisesPage() {
                 style={{ fontFamily: 'monospace', fontSize: 12 }}
               />
             </div>
-            <div className="admin-dlg-ft">
+            <div className="admin-md-ft">
               <button className="admin-btn" onClick={() => setModal(null)}>取消</button>
               <button className="admin-btn admin-btn-primary" onClick={handleBatchImport} disabled={saving}>
                 {saving ? '导入中...' : '导入'}
@@ -482,6 +482,6 @@ export default function AdminExercisesPage() {
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }

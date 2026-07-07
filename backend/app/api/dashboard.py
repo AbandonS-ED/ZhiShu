@@ -9,7 +9,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, cast, Date
+from sqlalchemy import select, func, cast, Date, text
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.student import Student
@@ -45,16 +45,18 @@ async def get_dashboard_stats(
     thirty_days_ago = now - timedelta(days=30)
 
     # ═══ 7 天每日学习时长聚合 ═══
+    # 用 AT TIME ZONE 'UTC' 确保日期按 UTC 截断（DB 时区可能是 Asia/Shanghai）
+    utc_date = func.date(LearningRecord.created_at.op('AT TIME ZONE')(text("'UTC'")))
     daily_agg_result = await db.execute(
         select(
-            func.date(LearningRecord.created_at).label('day'),
+            utc_date.label('day'),
             func.coalesce(func.sum(LearningRecord.duration_seconds), 0).label('total_seconds')
         )
         .where(
             LearningRecord.student_id == sid,
             LearningRecord.created_at >= week_ago
         )
-        .group_by(func.date(LearningRecord.created_at))
+        .group_by(utc_date)
     )
     daily_agg = {row.day: row.total_seconds for row in daily_agg_result.all()}
 
@@ -75,13 +77,13 @@ async def get_dashboard_stats(
     # ═══ 连续学习天数（streak）═══
     # 查最近 30 天有记录的日期
     streak_dates_result = await db.execute(
-        select(func.date(LearningRecord.created_at))
+        select(utc_date)
         .where(
             LearningRecord.student_id == sid,
             LearningRecord.created_at >= thirty_days_ago
         )
         .distinct()
-        .order_by(func.date(LearningRecord.created_at).desc())
+        .order_by(utc_date.desc())
     )
     active_dates = {row[0] for row in streak_dates_result.all()}
 

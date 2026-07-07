@@ -169,7 +169,7 @@ export default function LearningPage({ knowledge_point }: { knowledge_point: str
               {ex.options && (
                 <div className="lp-options">
                   {ex.options.map((opt: string, oi: number) => (
-                    <label key={oi} className={`lp-option ${practiceAnswers[i] === oi ? (practiceAnswers[i] === ex.answer ? 'correct' : 'wrong') : ''}`}>
+                    <label key={oi} className={`lp-option ${practiceAnswers[i] !== undefined ? (String.fromCharCode(65 + oi) === String(ex.answer).toUpperCase() || String(oi) === String(ex.answer) ? (practiceAnswers[i] === oi ? 'correct' : '') : (practiceAnswers[i] === oi ? 'wrong' : '')) : ''}`}>
                       <input
                         type="radio"
                         name={`q-${i}`}
@@ -185,7 +185,7 @@ export default function LearningPage({ knowledge_point }: { knowledge_point: str
               )}
               {revealedAns.has(i) && (
                 <div className="lp-reveal">
-                  <span className={`lp-ans ${practiceAnswers[i] === ex.answer ? 'correct' : 'wrong'}`}>
+                  <span className={`lp-ans ${practiceAnswers[i] !== undefined ? (String.fromCharCode(65 + practiceAnswers[i]) === String(ex.answer).toUpperCase() || String(practiceAnswers[i]) === String(ex.answer) ? 'correct' : 'wrong') : ''}`}>
                     答案：{ex.answer}
                   </span>
                   <button
