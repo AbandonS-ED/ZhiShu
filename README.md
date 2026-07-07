@@ -4,12 +4,12 @@
 
 ## 项目简介
 
-智枢 (SmartHub) 是一个面向《人工智能导论》课程的多智能体个性化学习系统。通过 9 个 AI Agent 协同工作，为学生提供对话式学习画像评估、个性化学习资源生成、智能学习路径规划、RAG 智能辅导和效果评估等服务。
+智枢 (SmartHub) 是一个面向《人工智能导论》课程的多智能体个性化学习系统。通过 14 个 AI Agent 协同工作，为学生提供对话式学习画像评估、个性化学习资源生成、智能学习路径规划、RAG 智能辅导和效果评估等服务。
 
 ### 核心功能
 
 - **F1 对话式画像 (35%)** — 7 维学生画像评估（理解力/记忆力/应用转化/想象力/专注力/知识基础/学习目标）
-- **F2 多智能体资源生成 (45%)** — 9 Agent 协同生成学习资源（含防幻觉三层验证）
+- **F2 多智能体资源生成 (45%)** — 14 Agent 协同生成学习资源（含防幻觉三层验证）
 - **F3 学习路径规划** — DAG 可视化路径 + 每日学习计划
 - **F4 智能辅导** — RAG 问答 + 多轮对话上下文
 - **F5 效果评估** — LLM 生成评估报告 + 趋势分析
@@ -28,8 +28,8 @@
 | 数据库 | PostgreSQL 18 (12 张表) + Redis | - |
 | 向量库 | pgvector (JSONB 降级方案) | - |
 | 异步任务 | Celery (Redis broker) | - |
-| **前端 AI** | **@tensorflow/tfjs 4.20 + @tensorflow-models/pose-detection 2.1（MoveNet Lightning · 自习模式）** | **~3MB 模型 · 浏览器本地推理** |
-| 测试 | pytest (129 个测试) + 端到端冒烟测试 | - |
+| **前端 AI** | **@tensorflow/tfjs 4.22 + @tensorflow-models/pose-detection 2.1（MoveNet Lightning · 自习模式）** | **~3MB 模型 · 浏览器本地推理** |
+| 测试 | pytest (110 个测试) + 端到端冒烟测试 | - |
 
 ## 项目结构
 
@@ -37,23 +37,24 @@
 ZhiShu/
 ├── frontend/                      # Next.js 前端 (24 页面)
 │   └── src/
-│       ├── app/                   # 页面路由
-│       │   ├── layout.tsx         # 根布局 (本地字体 + ClientShell)
-│       │   ├── page.tsx           # 仪表盘
-│       │   ├── login/             # 登录/注册页 (手机验证码)
-│       │   ├── duihua/            # 智能对话页 (SSE 流式)
-│       │   ├── profile/           # 学习画像页 (7 维雷达图)
-│       │   ├── resources/         # 资源中心
-│       │   │   ├── page.tsx       # 资源列表 (AI 生成 + 手动创建)
-│       │   │   ├── my-resources/  # 我的资源 (过滤系统自动生成)
-│       │   │   ├── [id]/          # 资源详情 (标签页 + 练习题)
-│       │   │   └── components/    # 资源组件 (ResourceCard + CreateModal + ResourceProgress)
-│       │   ├── path/              # 学习路径页 (DAG 可视化)
-│       │   ├── tiku/              # 练习题库页
-│       │   ├── pinggu/            # 学习评估页
-│       │   ├── setting/           # 用户设置页
-│       │   ├── zixi/              # 自习模式 (TF.js + MoveNet 本地姿态检测)
-│       │   └── admin/             # 管理后台 (独立 Shell + 9 页面)
+│   ├── app/                   # 页面路由
+│   │   ├── layout.tsx         # 根布局 (本地字体 + ClientShell)
+│   │   ├── page.tsx           # 仪表盘
+│   │   ├── login/             # 登录/注册页 (手机验证码)
+│   │   ├── duihua/            # 智能对话页 (SSE 流式)
+│   │   ├── profile/           # 学习画像页 (7 维雷达图)
+│   │   ├── resources/         # 资源中心
+│   │   │   ├── page.tsx       # 资源列表 (AI 生成 + 手动创建)
+│   │   │   ├── my-resources/  # 我的资源 (过滤系统自动生成)
+│   │   │   ├── [id]/          # 资源详情 (标签页 + 练习题)
+│   │   │   ├── learn/[kp]/    # 学习包 (三阶段 Learn/Practice/Review)
+│   │   │   └── components/    # 资源组件 (ResourceCard + CreateModal + ResourceProgress)
+│   │   ├── path/              # 学习路径页 (DAG 可视化)
+│   │   ├── tiku/              # 练习题库页
+│   │   ├── pinggu/            # 学习评估页
+│   │   ├── setting/           # 用户设置页 (个人中心 + 密码 + 每日目标)
+│   │   ├── zixi/              # 自习模式 (TF.js + MoveNet 本地姿态检测)
+│   │   └── admin/             # 管理后台 (独立 Shell + 9 页面)
 │       ├── components/            # 共享组件
 │       │   ├── Icon.tsx           # 40+ SVG 图标集
 │       │   ├── RobotIcon.tsx      # 机器人图标
@@ -61,8 +62,9 @@ ZhiShu/
 │       ├── lib/                   # 工具库
 │       │   ├── api.ts             # API 客户端
 │       │   ├── sse.ts             # 统一 SSE 流式工具
-│       │   ├── student.ts         # 学生 ID 获取工具
+│       │   ├── student.ts         # 学生 ID 获取工具 + logout()
 │       │   ├── utils.ts           # 工具函数
+│       │   ├── markdown.ts        # Markdown 转 HTML (marked)
 │       │   └── admin/             # 管理后台 Context + 共享组件
 │       ├── stores/appStore.ts     # Zustand 全局状态
 │       ├── types/index.ts         # TypeScript 类型定义
@@ -70,8 +72,8 @@ ZhiShu/
 ├── backend/                       # FastAPI 后端
 │   └── app/
 │       ├── main.py                # 应用入口 + 路由注册
-│       ├── api/                   # 12 个路由模块 (69 端点)
-│       ├── agents/                # 9 个 Agent + StateGraph 编排
+│       ├── api/                   # 10 个路由模块 (60 端点)
+│       ├── agents/                # 14 个 Agent 模块 + StateGraph 编排
 │       │   ├── master_agent.py    # LangGraph StateGraph 10 节点
 │       │   ├── state.py           # AgentState + IntentType
 │       │   ├── communicator.py    # MessageBus pub/sub
@@ -82,12 +84,15 @@ ZhiShu/
 │       │   ├── path_agent.py      # 学习路径
 │       │   ├── tutor_agent.py     # RAG 问答
 │       │   ├── audio_agent.py     # 音频脚本
-│       │   └── behavior_analysis_agent.py # 行为分析
+│       │   ├── behavior_analysis_agent.py # 行为分析
+│       │   ├── coordinator_agent.py # 任务协调
+│       │   ├── review_agent.py    # 质量审核
+│       │   └── resource_creator_agent.py # 资源创建
 │       ├── services/              # 17 个服务模块
 │       ├── models/                # 13 个数据模型
 │       ├── tasks/                 # Celery 异步任务
 │       └── core/                  # 核心模块 (配置/数据库/安全/Agent 指标)
-├── tests/                         # 129 pytest + 冒烟测试
+├── tests/                         # 110 pytest + 冒烟测试
 ├── docs/                          # 设计文档
 ├── scripts/                       # 数据库初始化脚本
 ├── docker-compose.yml             # Docker 编排
@@ -172,7 +177,7 @@ npm run dev
 9. `/pinggu` → 查看 LLM 评估报告
 10. `/zixi` → 自习模式 → 选时长/难度 → 可选开摄像头 → 开始番茄钟 → 静默巡查 → 结束看报告
 11. `/` → 仪表盘 → 查看统计数据
-12. `/setting` → 修改个人信息
+12. `/setting` → 个人中心（信息编辑 + 密码修改 + 每日目标 + 退出登录）
 
 ### 注册体验
 
@@ -190,12 +195,12 @@ npm run dev
 6. `/admin/paths` → 学习路径管理
 7. `/admin/chats` → 对话记录（消息详情）
 8. `/admin/documents` → 知识库文档管理
-9. `/admin/agents` → Agent 监控面板（9 Agent 实时调用统计 + 30s 自动刷新）
+9. `/admin/agents` → Agent 监控面板（14 Agent 模块实时调用统计 + 30s 自动刷新）
 
 ## 测试
 
 ```bash
-# 单元测试 (129 pytest)
+# 单元测试 (110 pytest)
 cd backend
 python -m pytest tests/ -v
 
@@ -214,7 +219,7 @@ npm run build
 
 ## 技术亮点
 
-- **多智能体编排**: LangGraph StateGraph 10 节点 + 9 子 Agent 协同
+- **多智能体编排**: LangGraph StateGraph 10 节点 + 14 Agent 模块协同
 - **防幻觉机制**: PatternDetector + SourceValidator + LLMValidator 三层验证
 - **流式输出**: 8 个 SSE 端点 (对话/资源/练习/路径/画像评估/学习包/题库出题)
 - **RAG 管道**: 文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排
@@ -222,7 +227,7 @@ npm run build
 - **评估报告 AI 化**: LLM 生成自然语言报告 + 趋势分析 + 知识点掌握度统计
 - **推荐系统**: 基于画像/评估/对话/题库/路径的多维度打分推荐
 - **资源中心重构**: AI 生成 + 手动创建 + 进度动画（4步骤+倒计时）+ 保存功能 + 我的资源 + 资源详情
-- **管理后台**: 18 个管理端点 + Agent 监控 + 并行查询 + N+1 优化
+- **管理后台**: 11 个管理端点 + Agent 监控 + 并行查询 + N+1 优化
 - **题库系统**: 题库 CRUD + AI 流式出题 + 题池采样 + MiMo 容错解析 (裸数组/缺字段/字符串难度)
 - **手机验证码**: 模拟短信服务（控制台输出），5 分钟有效期
 - **行为驱动画像**: 对话/练习/资源/路径学习自动更新 7 维画像

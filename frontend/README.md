@@ -1,7 +1,7 @@
 # 智枢 (SmartHub) - 前端项目
 
 > 多智能体学习资源生成系统 · 前端部分（学生端 13 页 + 管理后台 9 页）
-> 最后更新：2026-07-07（MiMo LLM 接入 + 题库修复 + 侧边栏重设计）
+> 最后更新：2026-07-08（设置页全量重写 + 数值校准）
 
 ## 技术栈
 
@@ -9,7 +9,7 @@
 - **样式**: Tailwind CSS 3.4 + 自定义 CSS（模板 1:1 复刻）
 - **状态管理**: React useState + Context（学生端 + 管理端独立 Context）+ Zustand（setting 页）
 - **路由隔离**: `/admin` 路由前缀，独立的 RootLayout 拦截
-- **Agent**: 9 个 AI Agent 协同工作
+- **Agent**: 14 个 Agent 模块协同工作
 
 ## 项目结构
 
@@ -28,7 +28,7 @@ src/
 │   ├── profile/            # /profile 学习画像（含 ChatModal）
 │   ├── resources/          # /resources 资源中心
 │   ├── tiku/               # /tiku 练习题库
-│   ├── setting/            # /setting 账号设置（个人信息编辑 + 修改密码）
+│   ├── setting/            # /setting 个人中心（学习概览+快捷入口+信息编辑+密码修改+每日目标+退出登录）
 │   └── admin/              # ⭐ 管理后台（独立布局 + Token 隔离）
 │       ├── layout.tsx      # 管理后台布局（admin-sb + admin-hd + 底部登出）
 │       ├── page.tsx        # /admin 仪表盘
@@ -39,17 +39,19 @@ src/
 │       ├── paths/          # /admin/paths 学习路径
 │       ├── chats/          # /admin/chats 对话记录
 │       ├── documents/      # /admin/documents 知识库
-│       └── agents/         # /admin/agents Agent 监控（9 Agent）
+│   └── agents/         # /admin/agents Agent 监控（14 Agent 模块）
 ├── components/
 │   ├── layout/                # 学生端 Sidebar + Header
 │   └── RobotIcon.tsx          # ⭐ 极简机器人 SVG（替换 🤖 emoji）
-├── hooks/
-│   └── usePageTimer.ts        # ⭐ 页面停留计时器（自动上报 learning_records）
+├── hooks/                  # ⭐ 页面停留计时器 + 自习模式摄像头巡查
+│   ├── usePageTimer.ts        # 页面停留计时器（自动上报 learning_records）
+│   └── useCameraPatrol.ts     # ⭐ TF.js + MoveNet 摄像头本地姿态巡查（懒加载 + 30/60/120s 间隔）
 ├── lib/
 │   ├── api.ts                 # API 客户端（auth/chat/resource/path/profile/dashboard/evaluation/tutor/mindmap/admin，自动带 token；SSE 委托 sse.ts）
 │   ├── sse.ts                 # ⭐ 统一 SSE 工具（createEventStream + 3 次重试 + 指数退避 + 120s 超时）
-│   ├── student.ts             # student_id 本地存储（zhishu_student）
-│   ├── utils.ts               # cn() + escapeHtml() + markdownToHtml() + extractAnswer() + showToast()
+│   ├── student.ts             # student_id 本地存储（zhishu_student）+ logout()
+│   ├── utils.ts               # cn() + escapeHtml() + showToast() + extractAnswer()
+│   ├── markdown.ts            # Markdown 转 HTML（marked 库隔离）
 │   ├── admin/context.tsx      # ⭐ 管理后台共享状态（AdminProvider + useAdmin）
 │   └── admin/components.tsx   # ⭐ 管理后台共享组件（AdminCheckbox + BatchDeleteBar + useSelection）
 ├── stores/appStore.ts         # Zustand store（已接入 setting 页）
@@ -62,7 +64,7 @@ src/
 ```bash
 npm install
 npm run dev       # http://localhost:3000
-npm run build     # 验证编译（✅ 通过：22 页面）
+npm run build     # 验证编译（✅ 通过：24 页面）
 npm run lint      # ESLint 检查（✅ 0 errors）
 ```
 
@@ -100,7 +102,7 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 | `/admin/paths` | 学习路径 | 表格 + DAG 详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/chats` | 对话记录 | 表格 + 对话详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/documents` | 知识库 | 表格 + 类型筛选 + **批量删除** | 硬编码 |
-| `/admin/agents` | Agent 监控 | 9 Agent 集群卡片 + 调用统计 + 错误率 | 硬编码 |
+| `/admin/agents` | Agent 监控 | 14 Agent 模块集群卡片 + 调用统计 + 错误率 | 硬编码 |
 
 ## 开发规范
 

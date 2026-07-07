@@ -1,7 +1,7 @@
 # 多智能体协同升级方案 — LangGraph StateGraph
 
 > 基于赛题 A3 需求 + 当前代码现状，将 Master Agent 从"if-else 路由"升级为真多智能体编排。
-> **最后更新**：2026-07-02 — 实际实现：**10 节点** StateGraph（intent_recognition → task_planning → conditional_route → 6 Agent → result_aggregation → response_generation），9 个子 Agent 已全部落地。
+> **最后更新**：2026-07-08 — 实际实现：**10 节点** StateGraph（intent_recognition → task_planning → conditional_route → 6 Agent → result_aggregation → response_generation），14 个 Agent 模块已全部落地。
 
 ---
 
@@ -856,7 +856,7 @@ async def run(self, initial_state: dict) -> dict:
 
 ### 9.1 现有 API 端点不变
 
-所有 23 个 API 端点路径、参数、返回格式**完全不变**。StateGraph 改造只影响 `chat.py` 的 `/stream` 端点内部实现。
+所有 60 个 API 端点路径、参数、返回格式**完全不变**。StateGraph 改造只影响 `chat.py` 的 `/stream` 端点内部实现。
 
 ### 9.2 单 Agent 请求仍正常工作
 
@@ -868,7 +868,7 @@ async def run(self, initial_state: dict) -> dict:
 
 ### 9.4 测试兼容
 
-- 现有 71 个 pytest（`test_json_parser` + `test_anti_hallucination` + `test_agents` + `test_api`）：子 Agent 的 `generate()` 不变，全部通过
+- 现有 110 个 pytest（`test_json_parser` + `test_anti_hallucination` + `test_agents` + `test_api`）：子 Agent 的 `generate()` 不变，全部通过
 - 现有 9 API smoke test：端点路径和格式不变，全部通过
 
 ---
@@ -925,7 +925,7 @@ async def run(self, initial_state: dict) -> dict:
 | 3 | "什么是梯度下降" | tutor 意图，走原路径真逐 token 流式 |
 | 4 | "整体学习计划" | full_course：profile → document → mindmap → exercise → path，5 步串行 |
 | 5 | "出 5 道搜索算法练习题" | 单 Agent Exercise，走 StateGraph |
-| 6 | 所有 71 个 pytest 通过 | 无回归 |
+| 6 | 所有 110 个 pytest 通过 | 无回归 |
 | 7 | 所有 9 API smoke test 通过 | 无回归 |
 | 8 | 前端 SSE 消息格式不变 | 前端零改动 |
 

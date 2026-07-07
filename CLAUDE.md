@@ -15,7 +15,7 @@
 |---|---|---|---|
 | 前端 | Next.js (App Router) + Tailwind CSS + TypeScript | 14.2.5 | 本地 woff 字体，无 Google Fonts |
 | 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 | Python 3.11 |
-| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 9 子 Agent |
+| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 14 Agent 模块 |
 | LLM | 三客户端: MimoClient (当前) / MiniMaxClient / SparkClient | - | `LLM_PROVIDER=mimo\|minimax\|spark` 切换 |
 | 向量库 | pgvector (JSONB 降级方案) | - | embedding 用 JSONB 占位 |
 | 数据库 | PostgreSQL 18 + Redis | - | 12 张表 |
@@ -39,13 +39,13 @@ ZhiShu/
 │   └── src/hooks/usePageTimer.ts    # 页面停留计时器
 ├── backend/                         # FastAPI 后端
 │   ├── app/main.py                  # 应用入口 + 路由注册
-│   ├── app/api/                     # 12 个路由模块 (69 端点)
-│   ├── app/agents/                  # 9 个 Agent + StateGraph 编排
+│   ├── app/api/                     # 10 个路由模块 (60 端点)
+│   ├── app/agents/                  # 14 个 Agent 模块 + StateGraph 编排
 │   ├── app/services/                # 17 个服务模块
 │   ├── app/models/                  # 13 个数据模型
 │   ├── app/tasks/                   # Celery 异步任务
 │   └── app/core/                    # 核心模块 (配置/数据库/安全)
-├── tests/                           # 129 pytest + 冒烟测试
+├── tests/                           # 110 pytest + 冒烟测试
 ├── docs/                            # 设计文档
 ├── scripts/                         # 数据库初始化脚本
 ├── docker-compose.yml               # Docker 编排
@@ -90,7 +90,7 @@ cd backend && celery -A app.core.celery_config worker --loglevel=info
 cd backend && celery -A app.core.celery_config beat --loglevel=info
 
 # 测试
-cd backend && python -m pytest tests/ -v          # 129 pytest
+cd backend && python -m pytest tests/ -v          # 110 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
 cd frontend && npm run build                       # 24 页面
@@ -106,7 +106,7 @@ intent_recognition → task_planning → conditional_route
   → result_aggregation → response_generation
 ```
 
-`master_agent.py` 实际节点: `intent_recognition` + `task_planning` + 6 个 `run_*_agent` (document / mindmap / exercise / path / tutor / audio) + `result_aggregation` + `response_generation` = **10 个节点**。
+`master_agent.py` 实际节点: `intent_recognition` + `task_planning` + 6 个 `run_*_agent` (document / mindmap / exercise / path / tutor / audio) + `result_aggregation` + `response_generation` = **10 个节点**。另有 `coordinator_agent` / `review_agent` / `resource_creator_agent` / `initial_assessment_agent` / `behavior_analysis_agent` 等辅助 Agent。
 
 ### 7 维学生画像
 
@@ -172,7 +172,7 @@ study_patrol / study_session_end → learning_records
      POST /auth/register → 校验验证码 + bcrypt 哈希密码 + 手机号唯一 → 存入 students → 返回 JWT
 登录: POST /auth/login → bcrypt 校验密码 → 检查 is_active → 记录 last_login → 返回 JWT
 验证: Authorization: Bearer <token> → decode_token() → get_current_user() 依赖
-门禁: 69 个业务端点全部加 Depends(get_current_user) + student_id 所有权校验
+门禁: 60 个业务端点全部加 Depends(get_current_user) + student_id 所有权校验
 ```
 
 ### 管理后台系统
@@ -183,7 +183,7 @@ study_patrol / study_session_end → learning_records
 Token: zhishu_admin_token (与学生端 zhishu_token 隔离)
 登录: /admin/login → 调用 /auth/login → 校验 role === 'admin' → 存 zhishu_admin_user
 题库 CRUD: admin_exercises.py 6 个端点 (列表/创建/批量导入/编辑/删除/知识点列表)
-管理端点: admin.py 18 个端点 (统计/趋势/用户CRUD/资源/路径/对话/文档/Agent 监控)
+管理端点: admin.py 11 个端点 (统计/趋势/用户CRUD/资源/路径/对话/文档/Agent 监控)
 Agent 监控: agent_metrics.py 内存计数器 (threading.Lock 线程安全)
 并行查询: get_stats 用 asyncio.gather() 并行 10 个计数查询
 N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
@@ -208,7 +208,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 对话页刷新修复 (sessionId 持久化 + loadSession 渲染)
 - ✅ 骨架屏 loading (4 页面 shimmer 动画)
 - ✅ 评估报告 AI 化 + 预生成缓存 + 定时生成
-- ✅ 管理后台 API 增强 (18 端点 + 9 Agent 监控 + 并行查询 + N+1 优化)
+- ✅ 管理后台 API 增强 (18 端点 + 14 Agent 模块 + 并行查询 + N+1 优化)
 - ✅ 手机验证码注册 (控制台输出 + 5 分钟有效期 + 手机号唯一)
 - ✅ 三页面接入真实 API (paths/chats/documents)
 - ✅ forEach async 批量操作修复 (users/page.tsx)
@@ -254,6 +254,8 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ marked v18 `setOptions()` 兼容 (`marked.parse(md, { breaks, gfm })`)
 - ✅ CSS 变量补全 (`--glass`/`--purple`/`--purple-soft`/`--r-md`/`--ink-6`)
 - ✅ 管理后台 24 页面编译通过 (build 输出)
+- ✅ 设置页全量重写为个人中心 (骨架屏+学习概览+快捷入口+个人信息含major/grade+密码切换+每日目标+退出登录+logout复用+storage事件同步)
+- ✅ 密码输入框 autocomplete 属性 (current-password/new-password 防浏览器自动填充)
 
 ### P2 — 清理项
 
@@ -296,6 +298,8 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 | users 弹窗 CSS 缺失 | `admin-modal-*` 自定义类名 | 统一改 `.admin-mo`/`.admin-md` |
 | dashboard 时区 | `func.date()` 在非 UTC DB 下日期偏移 | 加 `AT TIME ZONE 'UTC'` 确保按 UTC 截断 |
 | start.ps1 build stdout | `Start-Process` 不能 `-RedirectStandardOutput` + `-NoNewWindow` 同时用 | 改 `-NoNewWindow -Wait` 同步等待 |
+| DAILY_GOAL replaceAll 误伤 | `replaceAll('DAILY_GOAL','dailyGoal')` 把常量名 `DEFAULT_DAILY_GOAL` 也改了 | 常量名用大写，变量名用小写，replaceAll 前确认范围 |
+| setting 页死代码 | `useRouter` 导入但未使用 | 删除未使用的 import 和变量 |
 
 ## 提交规范
 

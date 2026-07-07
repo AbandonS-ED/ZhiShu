@@ -298,6 +298,7 @@ export default function SettingPage() {
               value={oldPwd}
               onChange={(e) => setOldPwd(e.target.value)}
               placeholder="请输入当前密码"
+              autoComplete="current-password"
             />
             <span className="input-icon" onClick={() => setShowOldPwd((s) => !s)}>
               {showOldPwd ? (
@@ -322,6 +323,7 @@ export default function SettingPage() {
               value={newPwd}
               onChange={(e) => setNewPwd(e.target.value)}
               placeholder="至少 6 位"
+              autoComplete="new-password"
             />
             <span className="input-icon" onClick={() => setShowNewPwd((s) => !s)}>
               {showNewPwd ? (
@@ -345,6 +347,7 @@ export default function SettingPage() {
             value={cfmPwd}
             onChange={(e) => setCfmPwd(e.target.value)}
             placeholder="再次输入新密码"
+            autoComplete="new-password"
           />
         </div>
 
