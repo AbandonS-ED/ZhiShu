@@ -3,7 +3,8 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { chatApi, profileApi, evaluationApi, type StudentProfile } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
-import { escapeHtml, markdownToHtml, extractAnswer } from '@/lib/utils'
+import { escapeHtml, extractAnswer } from '@/lib/utils'
+import { markdownToHtml } from '@/lib/markdown'
 import { usePageTimer } from '@/hooks/usePageTimer'
 import Icon from '@/components/Icon'
 

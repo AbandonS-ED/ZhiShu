@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { exerciseApi, evaluationApi, profileApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
-import { markdownToHtml } from '@/lib/utils'
+import { markdownToHtml } from '@/lib/markdown'
 import RobotIcon from '@/components/RobotIcon'
 import { usePageTimer } from '@/hooks/usePageTimer'
 import Icon from '@/components/Icon'
