@@ -47,6 +47,11 @@
   --r: 14px;
   --r-sm: 10px;
   --r-xs: 7px;
+  --r-md: 12px;
+  --glass: rgba(255,255,255,0.72);
+  --purple: #8b5cf6;
+  --purple-soft: rgba(139,92,246,0.08);
+  --ink-6: rgba(28,25,23,0.04);
   --sidebar-w: 240px;
   --header-h: 60px;
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
