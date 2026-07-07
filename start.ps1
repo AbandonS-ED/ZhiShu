@@ -79,18 +79,14 @@ if ($Dev) {
 } else {
     # 生产模式：先 build 再 start（首次加载快，无热更新）
     Write-Host "  正在构建前端 (next build)..." -ForegroundColor Gray
-    $buildLog = Join-Path $LogDir 'frontend-build.log'
     $buildProc = Start-Process -FilePath 'node.exe' `
         -ArgumentList 'node_modules\next\dist\bin\next','build' `
         -WorkingDirectory $FrontendDir `
-        -RedirectStandardOutput $buildLog `
-        -RedirectStandardError $buildLog `
-        -WindowStyle Hidden `
+        -NoNewWindow `
         -Wait `
         -PassThru
     if ($buildProc.ExitCode -ne 0) {
-        Write-Host "  ❌ 前端构建失败，查看 $buildLog" -ForegroundColor Red
-        Write-Host "  💡 回退到开发模式..." -ForegroundColor Yellow
+        Write-Host "  ❌ 前端构建失败，回退到开发模式..." -ForegroundColor Yellow
         $Dev = $true
     } else {
         Write-Host "  ✅ 前端构建完成" -ForegroundColor Green
