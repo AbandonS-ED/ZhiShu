@@ -44,12 +44,15 @@ async def get_stats(
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
 
     # 并行执行所有计数查询
+    from app.models.exercise_bank import ExerciseBank
+
     [
         user_count,
         admin_count,
         path_count,
         chat_count,
         doc_count,
+        exercise_count,
         today_active,
     ] = await asyncio.gather(
         db.execute(select(sa_func.count()).select_from(Student).where(Student.role == "student")),
@@ -57,6 +60,7 @@ async def get_stats(
         db.execute(select(sa_func.count()).select_from(LearningPath)),
         db.execute(select(sa_func.count()).select_from(ChatSession)),
         db.execute(select(sa_func.count()).select_from(DocumentChunk)),
+        db.execute(select(sa_func.count()).select_from(ExerciseBank)),
         db.execute(
             select(sa_func.count(sa_func.distinct(LearningRecord.student_id)))
             .where(LearningRecord.created_at >= today_start)
@@ -68,11 +72,13 @@ async def get_stats(
     path_count = path_count.scalar() or 0
     chat_count = chat_count.scalar() or 0
     doc_count = doc_count.scalar() or 0
+    exercise_count = exercise_count.scalar() or 0
     today_active = today_active.scalar() or 0
 
     return {
         "total_users": user_count,
         "admin_count": admin_count,
+        "total_exercises": exercise_count,
         "total_paths": path_count,
         "total_chats": chat_count,
         "total_documents": doc_count,
@@ -152,10 +158,10 @@ async def list_users(
         q.order_by(Student.created_at.desc())
         .offset((page - 1) * page_size).limit(page_size)
     )
-    rows = result.all()
+    students = result.scalars().all()
 
     items = []
-    for student in rows:
+    for student in students:
         items.append({
             "id": str(student.id),
             "student_no": student.student_no,
