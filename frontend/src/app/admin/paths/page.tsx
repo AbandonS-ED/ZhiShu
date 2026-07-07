@@ -43,7 +43,7 @@ export default function PathsPage() {
   }
 
   return (
-    <div className="admin-pnl vis">
+    <div className="admin-pg">
       <div className="admin-tb">
         <input
           className="admin-si"

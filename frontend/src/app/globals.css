@@ -1411,8 +1411,7 @@ body:has(.login-page){
 #adminLgBtn.off{opacity:.5;pointer-events:none}
 
 /* ═══ ADMIN APP SHELL ═══ */
-#adminAppWrap{display:none;height:100vh}
-#adminAppWrap.open{display:flex}
+/* (死代码已删除：#adminAppWrap v0 残留) */
 
 /* SIDEBAR */
 .admin-sb{width:248px;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0}
@@ -1489,7 +1488,7 @@ body:has(.login-page){
 .admin-cd-b{padding:18px 20px}
 
 /* Stats */
-.admin-sg{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.admin-sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:16px}
 .admin-st{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;transition:box-shadow .3s}
 .admin-st:hover{box-shadow:var(--shadow-md)}
 .admin-st-t{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
@@ -1615,9 +1614,10 @@ body:has(.login-page){
 .admin-dag-n.cur{background:var(--warm-soft);color:var(--warm);border-color:rgba(196,122,58,0.2);box-shadow:0 0 0 2px rgba(196,122,58,0.15)}
 .admin-dag-n.pend{opacity:.5}
 
-/* Panel */
-.admin-pnl{display:none}.admin-pnl.vis{display:block;animation:emerge .35s var(--ease)}
+/* Panel (admin page root) */
+.admin-pg{display:block;animation:emerge .35s var(--ease)}
 .admin-g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.admin-g2:has(> :only-child){grid-template-columns:1fr}
 
 /* Toast */
 #adminToast{
@@ -1629,7 +1629,19 @@ body:has(.login-page){
 }
 
 @media(max-width:1200px){.admin-sg{grid-template-columns:repeat(2,1fr)}.admin-g2{grid-template-columns:1fr}}
-@media(max-width:768px){.admin-sb{display:none}.admin-sg{grid-template-columns:1fr}.admin-cnt{padding:16px}}
+/* 汉堡菜单按钮（默认隐藏） */
+.admin-hd .hd-menu{display:none;background:none;border:1px solid var(--line);color:var(--ink-3);cursor:pointer;width:32px;height:32px;border-radius:var(--r-xs);font-size:16px;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+.admin-hd .hd-menu:hover{background:var(--accent-soft);color:var(--ink)}
+/* 侧边栏遮罩层 */
+.admin-sb-mask{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.3);z-index:99}
+@media(max-width:768px){
+  .admin-hd .hd-menu{display:flex}
+  .admin-sb{position:fixed;left:-248px;top:0;bottom:0;z-index:100;transition:left .3s ease}
+  .admin-sb.open{left:0}
+  .admin-sb-mask.open{display:block}
+  .admin-sg{grid-template-columns:1fr}
+  .admin-cnt{padding:16px}
+}
 
 /* ═══ ADMIN CHECKBOX + BATCH BAR ═══ */
 .admin-cb{display:inline-flex;align-items:center;justify-content:center;cursor:pointer;width:18px;height:18px;flex-shrink:0}

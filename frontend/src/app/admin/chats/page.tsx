@@ -57,7 +57,7 @@ export default function ChatsPage() {
   }
 
   return (
-    <div className="admin-pnl vis">
+    <div className="admin-pg">
       <div className="admin-tb">
         <div style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--ink-3)' }}>
           共 <b style={{ color: 'var(--ink)' }}>{total}</b> 条会话

@@ -56,7 +56,7 @@ export default function AgentsPage() {
   const maxCalls = Math.max(...agents.map((a) => a.calls), 1)
 
   return (
-    <div className="admin-pnl vis">
+    <div className="admin-pg">
       <div className="admin-cd" style={{ marginBottom: 12 }}>
         <div className="admin-cd-h">
           <h3>Agent 集群状态</h3>

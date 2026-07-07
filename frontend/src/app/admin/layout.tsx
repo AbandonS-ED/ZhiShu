@@ -9,6 +9,7 @@ function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const { user, isAuth, logout, activePanel, setActivePanel, showToast } = useAdmin()
   const [hydrated, setHydrated] = useState(false)
+  const [sbOpen, setSbOpen] = useState(false)
 
   useEffect(() => {
     if (pathname === '/admin/login') {
@@ -59,6 +60,7 @@ function AdminShell({ children }: { children: ReactNode }) {
 
   function navTo(panel: PanelId, path: string) {
     setActivePanel(panel)
+    setSbOpen(false)
     router.push(path)
   }
 
@@ -76,7 +78,7 @@ function AdminShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="admin-app" style={{ display: 'flex', height: '100vh' }}>
-      <aside className="admin-sb">
+      <aside className={`admin-sb${sbOpen ? ' open' : ''}`}>
         <div className="sb-brand">
           <div className="mk2">S</div>
           <div>
@@ -203,8 +205,17 @@ function AdminShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
+      {sbOpen && <div className={`admin-sb-mask open`} onClick={() => setSbOpen(false)} />}
+
       <div className="admin-mn">
         <header className="admin-hd">
+          <button className="hd-menu" onClick={() => setSbOpen(o => !o)} title="菜单">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
           <h2>{cur.title}</h2>
           <div className="sp"></div>
           <span className="hs">{cur.sub}</span>

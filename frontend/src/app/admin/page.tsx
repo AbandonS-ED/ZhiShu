@@ -61,7 +61,7 @@ export default function AdminDashboardPage() {
   const studentCount = stats.total_users - stats.admin_count
 
   return (
-    <div className="admin-pnl vis">
+    <div className="admin-pg">
       {loading ? (
         <div className="admin-sg">
           <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />

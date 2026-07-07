@@ -74,7 +74,7 @@ export default function UsersPage() {
   const totalPages = Math.ceil(total / 20)
 
   return (
-    <div className="admin-pnl vis">
+    <div className="admin-pg">
       <div className="admin-cd">
         <div className="admin-cd-h">
           <h3>用户管理</h3>
