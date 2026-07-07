@@ -115,16 +115,6 @@ export default function Sidebar() {
     } catch {}
   }, [student, setStudent])
 
-  // 预加载关键页面
-  useEffect(() => {
-    router.prefetch('/duihua')
-    router.prefetch('/profile')
-    router.prefetch('/resources')
-    router.prefetch('/tiku')
-    router.prefetch('/pinggu')
-    router.prefetch('/zixi')
-  }, [router])
-
   const userName = student?.name || student?.student_no || '未登录'
   const userAvatar = (userName).charAt(0) || '未'
   const userRole = [student?.major, student?.grade].filter(Boolean).join(' · ') || '智枢用户'

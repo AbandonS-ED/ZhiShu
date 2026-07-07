@@ -4,9 +4,16 @@ import { useState, useEffect } from 'react'
 import { getStudentId } from '@/lib/student'
 import dynamic from 'next/dynamic'
 
-const Line = dynamic(() => import('react-chartjs-2').then(m => m.Line), { ssr: false })
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip } from 'chart.js'
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, Tooltip)
+const Line = dynamic(() =>
+  import('chart.js').then(chartjs => {
+    chartjs.Chart.register(
+      chartjs.CategoryScale, chartjs.LinearScale, chartjs.PointElement,
+      chartjs.LineElement, chartjs.Filler, chartjs.Tooltip,
+    )
+    return import('react-chartjs-2').then(m => m.Line)
+  }),
+  { ssr: false },
+)
 
 interface Activity {
   type: string
