@@ -18,7 +18,7 @@ from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
 from app.models.learning_record import LearningRecord
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 
 router = APIRouter()
 
@@ -40,7 +40,56 @@ async def get_dashboard_stats(
     total_resources = 0
 
     now = datetime.now(timezone.utc)
+    today = now.date()
     week_ago = now - timedelta(days=7)
+    thirty_days_ago = now - timedelta(days=30)
+
+    # ═══ 7 天每日学习时长聚合 ═══
+    daily_agg_result = await db.execute(
+        select(
+            func.date(LearningRecord.created_at).label('day'),
+            func.coalesce(func.sum(LearningRecord.duration_seconds), 0).label('total_seconds')
+        )
+        .where(
+            LearningRecord.student_id == sid,
+            LearningRecord.created_at >= week_ago
+        )
+        .group_by(func.date(LearningRecord.created_at))
+    )
+    daily_agg = {row.day: row.total_seconds for row in daily_agg_result.all()}
+
+    # 补齐 7 天空数据（确保连续）
+    daily_study_minutes = []
+    for i in range(6, -1, -1):
+        d = today - timedelta(days=i)
+        secs = daily_agg.get(d, 0)
+        daily_study_minutes.append({
+            "date": d.isoformat(),
+            "minutes": max(0, secs // 60),
+        })
+
+    # 今日学习时长
+    today_secs = daily_agg.get(today, 0)
+    today_minutes = max(0, today_secs // 60)
+
+    # ═══ 连续学习天数（streak）═══
+    # 查最近 30 天有记录的日期
+    streak_dates_result = await db.execute(
+        select(func.date(LearningRecord.created_at))
+        .where(
+            LearningRecord.student_id == sid,
+            LearningRecord.created_at >= thirty_days_ago
+        )
+        .distinct()
+        .order_by(func.date(LearningRecord.created_at).desc())
+    )
+    active_dates = {row[0] for row in streak_dates_result.all()}
+
+    streak_days = 0
+    check = today
+    while check in active_dates:
+        streak_days += 1
+        check -= timedelta(days=1)
 
     # ═══ 学习路径进度 ═══
     path_result = await db.execute(
@@ -176,20 +225,24 @@ async def get_dashboard_stats(
     )
     weekly_study_sessions = study_sessions_result.scalar_one() or 0
 
+    # 计算本周累计学习小时
+    week_total_secs = sum(daily_agg.get(today - timedelta(days=i), 0) for i in range(7))
+    week_total_hours = week_total_secs / 3600
+
     return {
         "knowledge_points": total_resources,
         "knowledge_points_trend": f"+{min(3, total_resources)} 本周",
-        "learning_hours": f"{total_exercises * 0.5:.1f}h",
-        "learning_hours_trend": f"+{min(4.2, total_exercises * 0.1):.1f}h 本周",
+        "learning_hours": f"{week_total_hours:.1f}h",
+        "learning_hours_trend": f"+{week_total_hours:.1f}h 本周",
         "accuracy": f"{avg_score:.0f}%",
         "accuracy_trend": f"+{min(5, avg_score * 0.1):.0f}% 较上周",
         "path_progress": f"{path_progress:.0f}%",
         "path_progress_trend": f"{completed_nodes} / {total_nodes} 节点",
         "study_sessions": weekly_study_sessions,
         "study_sessions_trend": f"+{weekly_study_sessions} 本周",
-        "today_minutes": 0,
-        "daily_study_minutes": [],
-        "streak_days": 0,
+        "today_minutes": today_minutes,
+        "daily_study_minutes": daily_study_minutes,
+        "streak_days": streak_days,
         "recent_activities": activities,
     }
 
