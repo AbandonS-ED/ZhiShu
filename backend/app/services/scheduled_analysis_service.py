@@ -50,6 +50,8 @@ class ScheduledAnalysisService:
 
     async def _run_loop(self):
         """主循环"""
+        # 启动后延迟 30 秒再跑第一次分析，避免和用户 API 请求抢资源
+        await asyncio.sleep(30)
         while self._running:
             try:
                 await self._analyze_all_students()

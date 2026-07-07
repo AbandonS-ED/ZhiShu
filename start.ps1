@@ -5,6 +5,9 @@
 # 3. 记录 PID 到 .pids 文件（stop.ps1 用）
 # 4. 后端启动非 reload 模式（避免父子进程问题）
 # 5. 启动失败立刻提示
+# 6. 默认生产模式（next build + next start），-Dev 切开发模式
+
+param([switch]$Dev)
 
 $ErrorActionPreference = 'Continue'
 $RepoRoot = $PSScriptRoot
@@ -15,7 +18,11 @@ $PidFile = Join-Path $RepoRoot '.service-pids.json'
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
-Write-Host "正在启动服务..." -ForegroundColor Yellow
+if ($Dev) {
+    Write-Host "正在启动服务 (开发模式 - 支持热更新)..." -ForegroundColor Yellow
+} else {
+    Write-Host "正在启动服务 (生产模式 - 最佳性能)..." -ForegroundColor Yellow
+}
 
 # 0. 启动前检查端口
 Write-Host "[0/4] 检查端口占用..." -ForegroundColor Gray
@@ -54,20 +61,54 @@ $backendProc = Start-Process -FilePath $backendExe `
 
 Write-Host "  后端 PID: $($backendProc.Id)" -ForegroundColor Green
 
-# 2. 启动前端 (直接调 next CLI,绕过 cmd /c npm wrapper,让 Start-Process 拿到 next-server 真实 PID)
+# 2. 启动前端
 Write-Host "[2/4] 启动前端 (端口 3000)..." -ForegroundColor Cyan
 $frontendLog = Join-Path $LogDir 'frontend.log'
 $frontendErr = Join-Path $LogDir 'frontend.err.log'
 
-# next CLI 入口:优先用项目本地 node_modules/next/dist/bin/next,避免全局 next 不一致
 $nextExe = Join-Path $FrontendDir 'node_modules\next\dist\bin\next'
-if (-not (Test-Path $nextExe)) {
-    # 兜底走 npx
-    $nextExe = 'npx.cmd'
-    $nextArgs = @('--no-install','next','dev')
+if ($Dev) {
+    # 开发模式：next dev（支持热更新，首次加载慢）
+    if (-not (Test-Path $nextExe)) {
+        $nextExe = 'npx.cmd'
+        $nextArgs = @('--no-install','next','dev')
+    } else {
+        $nextExe = 'node.exe'
+        $nextArgs = @('node_modules\next\dist\bin\next','dev')
+    }
 } else {
-    $nextExe = 'node.exe'
-    $nextArgs = @('node_modules\next\dist\bin\next','dev')
+    # 生产模式：先 build 再 start（首次加载快，无热更新）
+    Write-Host "  正在构建前端 (next build)..." -ForegroundColor Gray
+    $buildLog = Join-Path $LogDir 'frontend-build.log'
+    $buildProc = Start-Process -FilePath 'node.exe' `
+        -ArgumentList 'node_modules\next\dist\bin\next','build' `
+        -WorkingDirectory $FrontendDir `
+        -RedirectStandardOutput $buildLog `
+        -RedirectStandardError $buildLog `
+        -WindowStyle Hidden `
+        -Wait `
+        -PassThru
+    if ($buildProc.ExitCode -ne 0) {
+        Write-Host "  ❌ 前端构建失败，查看 $buildLog" -ForegroundColor Red
+        Write-Host "  💡 回退到开发模式..." -ForegroundColor Yellow
+        $Dev = $true
+    } else {
+        Write-Host "  ✅ 前端构建完成" -ForegroundColor Green
+    }
+    if (-not $Dev) {
+        $nextExe = 'node.exe'
+        $nextArgs = @('node_modules\next\dist\bin\next','start')
+    }
+}
+
+if ($Dev) {
+    if (-not (Test-Path (Join-Path $FrontendDir 'node_modules\next\dist\bin\next'))) {
+        $nextExe = 'npx.cmd'
+        $nextArgs = @('--no-install','next','dev')
+    } else {
+        $nextExe = 'node.exe'
+        $nextArgs = @('node_modules\next\dist\bin\next','dev')
+    }
 }
 
 $frontendProc = Start-Process -FilePath $nextExe `
@@ -84,6 +125,7 @@ Write-Host "  前端 PID: $($frontendProc.Id)" -ForegroundColor Green
 @{
     backend = $backendProc.Id
     frontend = $frontendProc.Id
+    mode = if ($Dev) { 'dev' } else { 'prod' }
     started_at = (Get-Date).ToString('o')
 } | ConvertTo-Json | Set-Content -Path $PidFile
 
@@ -99,7 +141,8 @@ for ($i = 1; $i -le 60; $i++) {
     } catch {}
 }
 
-for ($i = 1; $i -le 60; $i++) {
+$frontendTimeout = if ($Dev) { 60 } else { 30 }
+for ($i = 1; $i -le $frontendTimeout; $i++) {
     Start-Sleep -Seconds 1
     try {
         $r = Invoke-WebRequest -Uri 'http://localhost:3000' -UseBasicParsing -TimeoutSec 3
@@ -109,17 +152,25 @@ for ($i = 1; $i -le 60; $i++) {
 
 # 4. 验证状态
 Write-Host "[4/4] 启动结果:" -ForegroundColor White
+$modeLabel = if ($Dev) { '开发模式' } else { '生产模式' }
 if ($backendOK) {
     Write-Host "  ✅ 后端: http://localhost:8001  (PID $($backendProc.Id))" -ForegroundColor Green
 } else {
-    Write-Host "  ❌ 后端: 30 秒内未就绪，查看 $backendErr" -ForegroundColor Red
+    Write-Host "  ❌ 后端: 60 秒内未就绪，查看 $backendErr" -ForegroundColor Red
 }
 
 if ($frontendOK) {
-    Write-Host "  ✅ 前端: http://localhost:3000  (PID $($frontendProc.Id))" -ForegroundColor Green
+    Write-Host "  ✅ 前端: http://localhost:3000  (PID $($frontendProc.Id)) [$modeLabel]" -ForegroundColor Green
 } else {
-    Write-Host "  ❌ 前端: 60 秒内未就绪，查看 $frontendErr" -ForegroundColor Red
+    Write-Host "  ❌ 前端: $frontendTimeout 秒内未就绪，查看 $frontendErr" -ForegroundColor Red
 }
 
 Write-Host ""
+if ($Dev) {
+    Write-Host "💡 开发模式：改代码自动热更新，但首次加载慢" -ForegroundColor Cyan
+    Write-Host "💡 生产模式：.\start.ps1（首次加载秒开，但改代码需重新 build）" -ForegroundColor Cyan
+} else {
+    Write-Host "💡 生产模式：首次加载秒开，改代码需重新 .\start.ps1" -ForegroundColor Cyan
+    Write-Host "💡 开发模式：.\start.ps1 -Dev（支持热更新，但首次加载慢）" -ForegroundColor Cyan
+}
 Write-Host "💡 停止服务: .\stop.ps1" -ForegroundColor Cyan
