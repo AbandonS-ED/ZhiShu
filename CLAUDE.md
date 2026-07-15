@@ -39,7 +39,7 @@ ZhiShu/
 │   └── src/hooks/usePageTimer.ts    # 页面停留计时器
 ├── backend/                         # FastAPI 后端
 │   ├── app/main.py                  # 应用入口 + 路由注册
-│   ├── app/api/                     # 10 个路由模块 (60 端点)
+│   ├── app/api/                     # 11 个路由模块 (67 端点)
 │   ├── app/agents/                  # 14 个 Agent 模块 + StateGraph 编排
 │   ├── app/services/                # 17 个服务模块
 │   ├── app/models/                  # 13 个数据模型
@@ -256,6 +256,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 管理后台 24 页面编译通过 (build 输出)
 - ✅ 设置页全量重写为个人中心 (骨架屏+学习概览+快捷入口+个人信息含major/grade+密码切换+每日目标+退出登录+logout复用+storage事件同步)
 - ✅ 密码输入框 autocomplete 属性 (current-password/new-password 防浏览器自动填充)
+- ✅ 错题本功能 (wrong_questions 表 + 7 端点 + AI 错因分析 + 同类题推荐 + 掌握度算法 + /tiku 答错自动收录)
 
 ### P2 — 清理项
 

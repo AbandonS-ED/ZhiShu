@@ -52,7 +52,8 @@ ZhiShu/
 │   │   ├── path/              # 学习路径页 (DAG 可视化)
 │   │   ├── tiku/              # 练习题库页
 │   │   ├── pinggu/            # 学习评估页
-│   │   ├── setting/           # 用户设置页 (个人中心 + 密码 + 每日目标)
+│   │       ├── setting/           # 用户设置页 (个人中心 + 密码 + 每日目标)
+│       ├── wrong-questions/   # 错题本 (AI 错因 + 同类题 + 复习)
 │   │   ├── zixi/              # 自习模式 (TF.js + MoveNet 本地姿态检测)
 │   │   └── admin/             # 管理后台 (独立 Shell + 9 页面)
 │       ├── components/            # 共享组件
@@ -72,7 +73,7 @@ ZhiShu/
 ├── backend/                       # FastAPI 后端
 │   └── app/
 │       ├── main.py                # 应用入口 + 路由注册
-│       ├── api/                   # 10 个路由模块 (60 端点)
+│       ├── api/                   # 11 个路由模块 (67 端点)
 │       ├── agents/                # 14 个 Agent 模块 + StateGraph 编排
 │       │   ├── master_agent.py    # LangGraph StateGraph 10 节点
 │       │   ├── state.py           # AgentState + IntentType
