@@ -69,7 +69,7 @@ cd backend && celery -A app.core.celery_config beat --loglevel=info
 cd backend && python -m pytest tests/ -v          # 110 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
-cd frontend && npm run build                       # 24 页面
+cd frontend && npm run build                       # 28 页面
 ```
 
 ## 关键架构事实
@@ -82,7 +82,7 @@ cd frontend && npm run build                       # 24 页面
 - **MiMo v2.5**: 中国集群 `api-key` 头认证（非 `Authorization: Bearer`），`/chat/completions` 兼容。mimo-v2.5-pro 推理消耗过多 token，降级用 mimo-v2.5
 - **防幻觉**: 6 Agent 接 `validate()`（Document/Exercise 走三层，其他走 `skip_llm=True` 快速模式）
 - **RAG**: `document_parser → text_chunker → embedding → vector_store.search → reranker`
-- **认证**: bcrypt + JWT（HS256，7 天），全 **60** 端点 `Depends(get_current_user)` 门禁
+- **认证**: bcrypt + JWT（HS256，7 天），全 **62** 端点 `Depends(get_current_user)` 门禁
 - **手机验证码**: 内存存储 + 5 分钟有效期，控制台 print 模拟短信，注册时校验
 - **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，11 管理端点（含 Agent 监控 + 文档管理 + 用户删除）
 - **Agent 监控**: `agent_metrics.py` 内存计数器 + `threading.Lock` 线程安全，30s 自动刷新
@@ -94,6 +94,8 @@ cd frontend && npm run build                       # 24 页面
 - **评估报告**: 优先读 `evaluation_reports` 缓存表；无缓存则实时调 LLM 生成；Celery 每天 4 点预生成
 - **资源中心**: AI 生成 + 手动创建 + 进度动画（4步骤+倒计时）+ 保存功能 + 我的资源（过滤系统自动生成）+ 资源详情（标签页+练习题答案）
 - **设置页**: 个人中心（学习概览+快捷入口+信息编辑含major/grade+密码切换+每日目标localStorage可配置+退出登录+骨架屏+响应式）
+- **学习计划**: AI 生成学习路径 + 节点状态管理（completed/current/pending）+ 测验解锁机制 + 综合测试
+- **测验功能**: AI 实时生成题目（选择题/判断题/简答题）+ 自动评分 + 60分及格 + 节点解锁 + 答案解析
 - **一键启停**: `start.ps1` + `stop.ps1`，杀所有 python/node 进程解决孤儿 socket
 
 ## 踩过的坑（不修会卡住）
