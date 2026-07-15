@@ -13,6 +13,7 @@
 - **F3 学习路径规划** — DAG 可视化路径 + 每日学习计划
 - **F4 智能辅导** — RAG 问答 + 多轮对话上下文
 - **F5 效果评估** — LLM 生成评估报告 + 趋势分析
+- **学习计划** — AI 生成学习路径 + 节点状态管理 + 测验解锁机制 + 综合测试
 - **资源中心** — AI 生成 + 手动创建 + 进度动画 + 保存功能 + 我的资源 + 资源详情
 - **自习模式 v1.5** — TF.js + MoveNet 浏览器本地姿态检测，番茄钟专注 + 静默巡查 + 报告（专注/低头/离席）
 - **管理后台** — 仪表盘 + 用户/资源/题库管理 + Agent 监控 + 手机验证码注册 + 用户删除
@@ -25,7 +26,7 @@
 | 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 |
 | Agent | LangGraph StateGraph (10 节点编排 + MessageBus 通信) | - |
 | LLM | 三客户端：小米 MiMo v2.5 (当前) / MiniMax-M3 / 讯飞星火 V4 | - |
-| 数据库 | PostgreSQL 18 (12 张表) + Redis | - |
+| 数据库 | PostgreSQL 18 (14 张表) + Redis | - |
 | 向量库 | pgvector (JSONB 降级方案) | - |
 | 异步任务 | Celery (Redis broker) | - |
 | **前端 AI** | **@tensorflow/tfjs 4.22 + @tensorflow-models/pose-detection 2.1（MoveNet Lightning · 自习模式）** | **~3MB 模型 · 浏览器本地推理** |
@@ -35,7 +36,7 @@
 
 ```
 ZhiShu/
-├── frontend/                      # Next.js 前端 (24 页面)
+├── frontend/                      # Next.js 前端 (28 页面)
 │   └── src/
 │   ├── app/                   # 页面路由
 │   │   ├── layout.tsx         # 根布局 (本地字体 + ClientShell)
@@ -50,6 +51,13 @@ ZhiShu/
 │   │   │   ├── learn/[kp]/    # 学习包 (三阶段 Learn/Practice/Review)
 │   │   │   └── components/    # 资源组件 (ResourceCard + CreateModal + ResourceProgress)
 │   │   ├── path/              # 学习路径页 (DAG 可视化)
+│   │   ├── plan/              # 学习计划页 (节点管理 + 测验)
+│   │   │   ├── page.tsx       # 计划列表
+│   │   │   └── [pathId]/      # 计划详情
+│   │   │       ├── page.tsx   # 路径可视化
+│   │   │       ├── learn/     # 知识点学习
+│   │   │       ├── quiz/      # 知识点测验
+│   │   │       └── final-test/# 综合测试
 │   │   ├── tiku/              # 练习题库页
 │   │   ├── pinggu/            # 学习评估页
 │   │   ├── setting/           # 用户设置页 (个人中心 + 密码 + 每日目标)
@@ -72,8 +80,8 @@ ZhiShu/
 ├── backend/                       # FastAPI 后端
 │   └── app/
 │       ├── main.py                # 应用入口 + 路由注册
-│       ├── api/                   # 10 个路由模块 (60 端点)
-│       ├── agents/                # 14 个 Agent 模块 + StateGraph 编排
+│       ├── api/                   # 10 个路由模块 (62 端点)
+│       ├── agents/                # 15 个 Agent 模块 + StateGraph 编排
 │       │   ├── master_agent.py    # LangGraph StateGraph 10 节点
 │       │   ├── state.py           # AgentState + IntentType
 │       │   ├── communicator.py    # MessageBus pub/sub
@@ -172,12 +180,17 @@ npm run dev
 4. `/resources` → 点击「创建资源」→ 输入需求 → AI 生成 → 预览 → 保存
 5. `/resources/my-resources` → 查看我创建的资源
 6. `/resources/[id]` → 资源详情 → 标签页切换 → 练习题答案
-7. `/tiku` → 查看题库 → AI 生成练习题
-8. `/path` → 输入知识点 → 生成学习路径
-9. `/pinggu` → 查看 LLM 评估报告
-10. `/zixi` → 自习模式 → 选时长/难度 → 可选开摄像头 → 开始番茄钟 → 静默巡查 → 结束看报告
-11. `/` → 仪表盘 → 查看统计数据
-12. `/setting` → 个人中心（信息编辑 + 密码修改 + 每日目标 + 退出登录）
+7. `/plan` → 查看学习计划列表
+8. `/plan/[pathId]` → 查看学习路径（节点状态：completed/current/pending）
+9. `/plan/[pathId]/learn/[nodeId]` → 学习知识点
+10. `/plan/[pathId]/quiz/[nodeId]` → AI 生成测验题 → 作答 → 60分以上解锁下一节点
+11. `/plan/[pathId]/final-test` → 综合测试
+12. `/tiku` → 查看题库 → AI 生成练习题
+13. `/path` → 输入知识点 → 生成学习路径
+14. `/pinggu` → 查看 LLM 评估报告
+15. `/zixi` → 自习模式 → 选时长/难度 → 可选开摄像头 → 开始番茄钟 → 静默巡查 → 结束看报告
+16. `/` → 仪表盘 → 查看统计数据
+17. `/setting` → 个人中心（信息编辑 + 密码修改 + 每日目标 + 退出登录）
 
 ### 注册体验
 
@@ -226,6 +239,8 @@ npm run build
 - **统一 SSE 工具**: 前后端统一流式处理，支持重试 + 指数退避 + 120s 超时
 - **评估报告 AI 化**: LLM 生成自然语言报告 + 趋势分析 + 知识点掌握度统计
 - **推荐系统**: 基于画像/评估/对话/题库/路径的多维度打分推荐
+- **学习计划系统**: AI 生成学习路径 + 节点状态管理（completed/current/pending）+ 测验解锁机制 + 综合测试
+- **测验功能**: AI 实时生成题目（选择题/判断题/简答题）+ 自动评分 + 节点解锁 + 答案解析
 - **资源中心重构**: AI 生成 + 手动创建 + 进度动画（4步骤+倒计时）+ 保存功能 + 我的资源 + 资源详情
 - **管理后台**: 11 个管理端点 + Agent 监控 + 并行查询 + N+1 优化
 - **题库系统**: 题库 CRUD + AI 流式出题 + 题池采样 + MiMo 容错解析 (裸数组/缺字段/字符串难度)
