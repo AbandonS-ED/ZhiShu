@@ -10,6 +10,7 @@ from app.models.evaluation_report import EvaluationReport
 from app.models.resource import Resource
 from app.models.exercise import Exercise
 from app.models.exercise_bank import ExerciseBank
+from app.models.wrong_question import WrongQuestion
 
 __all__ = [
     "Student", "StudentProfile", "DocumentChunk",
@@ -17,4 +18,5 @@ __all__ = [
     "ChatSession", "ChatMessage", "LearningRecord",
     "LearningActivityLog", "EvaluationReport",
     "Resource", "Exercise", "ExerciseBank",
+    "WrongQuestion",
 ]

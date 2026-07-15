@@ -2,8 +2,8 @@
 // 开发环境直连后端 8001（CORS 已在后端配置 localhost:3000）
 const BASE_URL = 'http://localhost:8001/api/v1'
 
-import type { Resource, ResourceContent, Exercise } from '@/types'
-export type { Resource, ResourceContent, Exercise }
+import type { Resource, ResourceContent, Exercise, WrongQuestion, WrongQuestionStats } from '@/types'
+export type { Resource, ResourceContent, Exercise, WrongQuestion, WrongQuestionStats }
 import type { AISourceCreateRequest, ManualCreateRequest, ReviewRequest, ResourceItem, ReviewResult } from '@/app/resources/types'
 export type { AISourceCreateRequest, ManualCreateRequest, ReviewRequest, ResourceItem, ReviewResult }
 
@@ -537,6 +537,64 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+}
+
+// ===== Wrong Questions (错题本) =====
+
+export interface WrongQuestionListResponse {
+  items: WrongQuestion[]
+  total: number
+  page: number
+  page_size: number
+  stats: WrongQuestionStats
+}
+
+export interface AnalyzeResponse {
+  error_type: string
+  error_analysis: string
+  ai_explanation: string
+  similar_exercises: Array<{
+    type: string
+    question: string
+    options?: string[]
+    answer: string
+    explanation?: string
+  }>
+}
+
+export const wrongQuestionsApi = {
+  add: (data: { student_id: string; exercise_id: string; wrong_answer: string }) =>
+    request<WrongQuestion>('/wrong-questions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  list: (params: {
+    student_id: string
+    filter_type?: 'all' | 'unmastered' | 'mastered'
+    error_type?: string
+    keyword?: string
+    page?: number
+    page_size?: number
+  }) => {
+    const search = new URLSearchParams()
+    search.set('student_id', params.student_id)
+    if (params.filter_type && params.filter_type !== 'all') search.set('filter_type', params.filter_type)
+    if (params.error_type) search.set('error_type', params.error_type)
+    if (params.keyword) search.set('keyword', params.keyword)
+    if (params.page) search.set('page', String(params.page))
+    if (params.page_size) search.set('page_size', String(params.page_size))
+    return request<WrongQuestionListResponse>(`/wrong-questions?${search.toString()}`)
+  },
+  get: (id: string) => request<WrongQuestion>(`/wrong-questions/${id}`),
+  analyze: (id: string) =>
+    request<AnalyzeResponse>(`/wrong-questions/${id}/analyze`, { method: 'POST' }),
+  review: (id: string, is_correct: boolean) =>
+    request<{ mastery_level: number; is_mastered: boolean; review_count: number; correct_count: number }>(
+      `/wrong-questions/${id}/review`,
+      { method: 'POST', body: JSON.stringify({ is_correct }) },
+    ),
+  delete: (id: string) =>
+    request<{ message: string }>(`/wrong-questions/${id}`, { method: 'DELETE' }),
 }
 
 // ===== Admin (管理后台) =====

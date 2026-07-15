@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { exerciseApi, evaluationApi, profileApi } from '@/lib/api'
+import { exerciseApi, evaluationApi, profileApi, wrongQuestionsApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { markdownToHtml } from '@/lib/markdown'
 import RobotIcon from '@/components/RobotIcon'
@@ -298,6 +298,14 @@ export default function TikuPage() {
       correct: correct,
       question_type: ex.type,
     }).catch(() => {})
+    // 答错自动加入错题本
+    if (!correct) {
+      wrongQuestionsApi.add({
+        student_id: getStudentId()!,
+        exercise_id: id,
+        wrong_answer: String.fromCharCode(65 + selected),
+      }).catch(() => {})
+    }
   }, [answers, exercises, addRecent])
 
   const answerJudge = useCallback((id: string, selected: boolean) => {
@@ -320,6 +328,14 @@ export default function TikuPage() {
       correct: correct,
       question_type: ex.type,
     }).catch(() => {})
+    // 答错自动加入错题本
+    if (!correct) {
+      wrongQuestionsApi.add({
+        student_id: getStudentId()!,
+        exercise_id: id,
+        wrong_answer: selected ? '对' : '错',
+      }).catch(() => {})
+    }
   }, [answers, exercises, addRecent])
 
   const answerShort = useCallback((id: string, value: string) => {

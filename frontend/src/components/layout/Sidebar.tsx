@@ -73,6 +73,15 @@ const bookmarkSvg = (
   </svg>
 )
 
+const wrongBookSvg = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 4h12a2 2 0 0 1 2 2v14" />
+    <path d="M4 4v14a2 2 0 0 0 2 2h12" />
+    <path d="M16 8l-4 4-2-2" />
+    <path d="M8 14l4 4 6-6" />
+  </svg>
+)
+
 const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: '主控台',
@@ -87,6 +96,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { href: '/zixi', label: '自习模式', tag: 'NEW', svg: zixiSvg },
       { href: '/resources', label: '资源中心', svg: bookSvg },
       { href: '/tiku', label: '练习题库', svg: checkSvg },
+      { href: '/wrong-questions', label: '错题本', tag: 'NEW', svg: wrongBookSvg },
     ],
   },
   {

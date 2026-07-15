@@ -133,3 +133,51 @@ export interface GenerationTask {
   completed_steps: number
   created_at: string
 }
+
+// 错题本
+export type ErrorType = 'calculation' | 'concept' | 'reading' | 'carelessness' | 'unknown'
+
+export interface WrongQuestionExercise {
+  id: string
+  type: string
+  question: string
+  options?: string[]
+  answer?: string
+  explanation?: string
+  knowledge_point?: string
+  difficulty?: number
+}
+
+export interface WrongQuestion {
+  id: string
+  student_id: string
+  exercise_id: string
+  wrong_answer: string
+  correct_answer?: string
+  error_type: ErrorType
+  error_analysis?: string
+  ai_explanation?: string
+  similar_exercises: Array<{
+    type: string
+    question: string
+    options?: string[]
+    answer: string
+    explanation?: string
+  }>
+  mastery_level: number
+  review_count: number
+  correct_count: number
+  is_mastered: boolean
+  last_reviewed_at?: string
+  created_at?: string
+  updated_at?: string
+  exercise?: WrongQuestionExercise
+}
+
+export interface WrongQuestionStats {
+  total: number
+  mastered: number
+  unmastered: number
+  by_error_type: Record<string, number>
+  avg_mastery_level: number
+}
