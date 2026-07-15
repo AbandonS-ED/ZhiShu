@@ -11,7 +11,7 @@ class AgentMetrics:
         "initial_assessment": {"name": "InitialAssessmentAgent", "role": "画像构建"},
         "document": {"name": "DocumentAgent", "role": "知识讲解"},
         "exercise": {"name": "ExerciseAgent", "role": "练习生成"},
-        "path": {"name": "PathAgent", "role": "路径规划"},
+
         "tutor": {"name": "TutorAgent", "role": "智能问答"},
         "mindmap": {"name": "MindMapAgent", "role": "思维导图"},
         "audio": {"name": "AudioAgent", "role": "音频脚本"},

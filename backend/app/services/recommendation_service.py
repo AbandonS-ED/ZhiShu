@@ -10,7 +10,6 @@ from app.models.learning_record import LearningRecord
 from app.models.student_profile import StudentProfile
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
-from app.models.learning_path import LearningPath
 
 logger = logging.getLogger(__name__)
 
@@ -203,19 +202,6 @@ class RecommendationService:
 
     async def _path_recency_bonus(self, db: AsyncSession, sid: uuid.UUID, kp: str) -> float:
         """该 KP 是否在最近7天的学习路径中出现"""
-        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-        result = await db.execute(
-            select(LearningPath.daily_plan, LearningPath.updated_at)
-            .where(LearningPath.student_id == sid)
-            .order_by(LearningPath.updated_at.desc())
-            .limit(10)
-        )
-        for daily_plan, updated_at in result.all():
-            if updated_at and updated_at >= seven_days_ago:
-                if daily_plan:
-                    plan_str = str(daily_plan)
-                    if kp in plan_str:
-                        return 1.0
         return 0.0
 
     def _build_reason(

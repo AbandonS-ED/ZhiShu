@@ -1,22 +1,65 @@
-"""Exercise Agent — 自适应练习题生成
+"""Exercise Agent — 多学科自适应练习题生成
 
-根据学生画像和 variant，生成不同类型的练习题：
-- variant: mixed=混合难度（入门+进阶）/ challenge=挑战难度
-
-包含防幻觉验证（N3 评分项）。
+根据学生画像、学科类型和 variant，生成不同类型的练习题：
+- 编程类：选择题 + 编程题
+- 数学类：选择题 + 计算题 + 证明题
+- 理论类：选择题 + 简答题 + 论述题
 """
 
 from app.services.llm_factory import get_llm_client
 from app.services.anti_hallucination import anti_hallucination
 from app.services.json_parser import parse_json_response
+import logging
+
+logger = logging.getLogger(__name__)
+
+# 学科分类关键词
+PROGRAMMING_KEYWORDS = [
+    'python', 'java', 'c++', 'javascript', '编程', '程序', '代码', '算法',
+    '数据结构', '开发', '软件', '前端', '后端', '数据库', 'sql', 'html',
+    'css', 'react', 'vue', 'node', 'git', 'docker', 'linux', 'api'
+]
+
+MATH_KEYWORDS = [
+    '数学', '微积分', '线性代数', '概率', '统计', '方程', '函数', '极限',
+    '导数', '积分', '矩阵', '向量', '几何', '代数', '数论', '离散数学',
+    '高等数学', '数学分析', '复变函数', '实变函数', '泛函分析'
+]
+
+SCIENCE_KEYWORDS = [
+    '物理', '化学', '生物', '天文', '地理', '科学', '实验', '力学',
+    '电磁', '光学', '热学', '量子', '有机', '无机', '分子', '细胞'
+]
 
 
-class ExerciseAgent:
-    """自适应练习题生成 Agent"""
+def detect_subject_type(knowledge_point: str) -> str:
+    """检测学科类型"""
+    kp_lower = knowledge_point.lower()
+    
+    for keyword in PROGRAMMING_KEYWORDS:
+        if keyword in kp_lower:
+            return "programming"
+    
+    for keyword in MATH_KEYWORDS:
+        if keyword in kp_lower:
+            return "math"
+    
+    for keyword in SCIENCE_KEYWORDS:
+        if keyword in kp_lower:
+            return "science"
+    
+    return "theory"
 
-    SYSTEM_PROMPT_MIXED = """你是一个专业的练习题生成器。根据学生的知识画像，为指定知识点生成**混合难度**的练习题。
 
-你的输出必须是一个 JSON 对象，type 字段必须使用英文值：
+# 数学类系统提示
+MATH_SYSTEM_PROMPT = """你是一个专业的数学练习题生成器。为指定数学知识点生成练习题。
+
+## 题目类型要求
+- 数学类题目应该包含：选择题、计算题、证明题
+- 不要生成编程题或代码相关题目
+- 题目要考察数学概念、公式应用、计算能力、逻辑推理
+
+## 输出格式（严格JSON）
 {
   "exercises": [
     {
@@ -27,20 +70,33 @@ class ExerciseAgent:
       "explanation": "详细解析",
       "difficulty": 50,
       "knowledge_point": "知识点"
+    },
+    {
+      "type": "short_answer",
+      "question": "计算题或证明题内容",
+      "answer": "参考答案",
+      "explanation": "解题步骤和思路",
+      "difficulty": 60,
+      "knowledge_point": "知识点"
     }
   ]
 }
 
-## 难度分布（本题为混合难度）
-- 生成 2 道基础题（difficulty=30-50）：考察核心概念和基本公式
-- 生成 1 道进阶题（difficulty=60-75）：需要综合应用或略微转弯
-- 选择题 4 个选项，干扰项要有迷惑性且基于真实错误设计
-- 只返回 JSON，不要其他文字
-- 输出语言必须是中文。如果知识点是外语类（如英语、日语），题目和选项可以用目标语言，但解析必须用中文"""
+## 注意事项
+- 选择题要有4个选项，干扰项要有迷惑性
+- 计算题要给出完整的解题步骤
+- 证明题要考察逻辑推理能力
+- 解释要详细，包含解题思路
+- 只返回JSON，不要其他文字"""
 
-    SYSTEM_PROMPT_CHALLENGE = """你是一个专业的练习题生成器。根据学生的知识画像，为指定知识点生成**挑战难度**的练习题。
+# 编程类系统提示
+PROGRAMMING_SYSTEM_PROMPT = """你是一个专业的编程练习题生成器。为指定编程知识点生成练习题。
 
-你的输出必须是一个 JSON 对象，type 字段必须使用英文值：
+## 题目类型要求
+- 编程类题目应该包含：选择题、编程题
+- 题目要考察编程概念、代码理解、算法思维、实际应用
+
+## 输出格式（严格JSON）
 {
   "exercises": [
     {
@@ -49,23 +105,35 @@ class ExerciseAgent:
       "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
       "answer": "B",
       "explanation": "详细解析",
-      "difficulty": 85,
+      "difficulty": 50,
+      "knowledge_point": "知识点"
+    },
+    {
+      "type": "coding",
+      "question": "编程题要求",
+      "answer": "参考代码",
+      "explanation": "代码解释和思路",
+      "difficulty": 60,
       "knowledge_point": "知识点"
     }
   ]
 }
 
-## 难度分布（本题为挑战难度）
-- 生成 2 道高难度题（difficulty=80-90）：考察深度理解、推导能力
-- 生成 1 道竞赛/面试级别题（difficulty=90-100）：考察综合应用、创新思路
-- 题目设计要巧妙，干扰项要基于真实错误经验
-- 考察方式：概念辨析/错例分析/多步推导/反例构造
-- 只返回 JSON，不要其他文字
-- 输出语言必须是中文。如果知识点是外语类（如英语、日语），题目和选项可以用目标语言，但解析必须用中文"""
+## 注意事项
+- 选择题考察代码理解、概念辨析
+- 编程题要给出明确的要求和输入输出示例
+- 解释要详细，包含代码思路
+- 只返回JSON，不要其他文字"""
 
-    SYSTEM_PROMPT_BASIC = """你是一个专业的练习题生成器。根据学生的知识画像，为指定知识点生成**基础入门**的练习题。
+# 理论类系统提示
+THEORY_SYSTEM_PROMPT = """你是一个专业的练习题生成器。为指定知识点生成练习题。
 
-你的输出必须是一个 JSON 对象：
+## 题目类型要求
+- 理论类题目应该包含：选择题、简答题
+- 不要生成编程题或代码相关题目
+- 题目要考察概念理解、知识应用、分析能力
+
+## 输出格式（严格JSON）
 {
   "exercises": [
     {
@@ -74,191 +142,135 @@ class ExerciseAgent:
       "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
       "answer": "B",
       "explanation": "详细解析",
-      "difficulty": 30,
+      "difficulty": 50,
+      "knowledge_point": "知识点"
+    },
+    {
+      "type": "short_answer",
+      "question": "简答题内容",
+      "answer": "参考答案",
+      "explanation": "答案要点和评分标准",
+      "difficulty": 60,
       "knowledge_point": "知识点"
     }
   ]
 }
 
-## 难度分布（本题为基础入门）
-- 全部为基础题（difficulty=20-40）
-- 重点考察：概念辨析、公式回忆、直接应用
-- 表述要直白，避免歧义陷阱
-- 只返回 JSON，不要其他文字
-- 输出语言必须是中文。如果知识点是外语类（如英语、日语），题目和选项可以用目标语言，但解析必须用中文"""
+## 注意事项
+- 选择题要有4个选项，干扰项要有迷惑性
+- 简答题要考察概念理解和分析能力
+- 解释要详细，包含答案要点
+- 只返回JSON，不要其他文字"""
 
-    _VARIANT_PROMPTS = {
-        "mixed": SYSTEM_PROMPT_MIXED,
-        "challenge": SYSTEM_PROMPT_CHALLENGE,
-        "basic": SYSTEM_PROMPT_BASIC,
-    }
+
+class ExerciseAgent:
+    """多学科自适应练习题生成 Agent"""
+
+    def _get_system_prompt(self, knowledge_point: str, variant: str) -> str:
+        """根据学科类型和难度获取系统提示"""
+        subject_type = detect_subject_type(knowledge_point)
+        
+        if subject_type == "programming":
+            base_prompt = PROGRAMMING_SYSTEM_PROMPT
+        elif subject_type == "math":
+            base_prompt = MATH_SYSTEM_PROMPT
+        else:
+            base_prompt = THEORY_SYSTEM_PROMPT
+        
+        # 根据难度调整提示
+        if variant == "basic":
+            difficulty_hint = "\n## 难度要求\n- 全部为基础题（difficulty=20-40）\n- 重点考察核心概念和基本应用"
+        elif variant == "challenge":
+            difficulty_hint = "\n## 难度要求\n- 全部为高难度题（difficulty=80-100）\n- 考察深度理解和综合应用"
+        else:
+            difficulty_hint = "\n## 难度要求\n- 2道基础题（difficulty=30-50）\n- 1道进阶题（difficulty=60-75）"
+        
+        return base_prompt + difficulty_hint
 
     async def generate(
         self,
         knowledge_point: str,
         student_profile: dict | None = None,
         exercise_type: str = "all",
-        count: int = 5,
+        count: int = 3,
         variant: str = "mixed",
     ) -> dict:
-        """生成练习题
-
-        Args:
-            knowledge_point: 知识点
-            student_profile: 学生画像
-            exercise_type: all/choice/judge/short_answer/coding
-            count: 生成数量
-            variant: mixed=混合难度 / challenge=挑战难度 / basic=基础入门
-
-        Returns:
-            {exercises: [...], validation: dict}
-        """
-        system_prompt = self._VARIANT_PROMPTS.get(variant, self.SYSTEM_PROMPT_MIXED)
-        user_prompt = self._build_prompt(knowledge_point, student_profile, exercise_type, count, variant)
-
-        # MiMo 推理模式消耗 token，统一给 4096
-        max_tokens = 4096
-
-        response = await get_llm_client().chat(
-            messages=[{"role": "user", "content": user_prompt}],
-            system=system_prompt,
-            max_tokens=max_tokens,
-            temperature=0.7,
-        )
-
-        result = self._parse_response(response["content"])
-
-        # 防幻觉验证
-        exercises_text = "\n".join(
-            ex.get("question", "") + "\n" + ex.get("explanation", "")
-            for ex in result.get("exercises", [])
-        )
-        if exercises_text:
-            validation = await anti_hallucination.validate(
-                content=exercises_text,
-                knowledge_point=knowledge_point,
-                skip_llm=True,
-            )
-            result["validation"] = {
-                "passed": validation.passed,
-                "issues": validation.issues,
-                "confidence": validation.confidence,
-            }
-
-        result["_variant"] = variant
-        return result
-
-    async def execute(self, state: dict) -> dict:
-        """从 AgentState 解包参数，调用 generate()"""
-        kp = state.get("intent_params", {}).get("knowledge_point", "通用知识")
-        return await self.generate(
-            knowledge_point=kp,
-            student_profile=state.get("student_profile"),
-            exercise_type=state.get("intent_params", {}).get("exercise_type", "all"),
-            count=state.get("intent_params", {}).get("exercise_count", 5),
-            variant=state.get("intent_params", {}).get("variant", "mixed"),
-        )
-
-    def _build_prompt(
-        self,
-        knowledge_point: str,
-        student_profile: dict | None,
-        exercise_type: str,
-        count: int,
-        variant: str,
-    ) -> str:
-        parts = [f"请为「{knowledge_point}」生成 {count} 道练习题（variant={variant}）。"]
-
+        """生成练习题"""
+        system_prompt = self._get_system_prompt(knowledge_point, variant)
+        
+        user_prompt = f"请为「{knowledge_point}」知识点生成{count}道练习题。"
+        
         if student_profile:
             dims = student_profile.get("dimensions", {})
-            application = dims.get("application", {})
-            if application.get("score", 50) >= 70:
-                parts.append("\n学生应用能力强，可以出一些实践应用题。")
+            if dims:
+                weak_points = [k for k, v in dims.items() if v < 50]
+                if weak_points:
+                    user_prompt += f"\n学生薄弱点：{', '.join(weak_points)}，请适当加强相关内容。"
 
-        type_map = {
-            "all": "混合题型 (选择+判断+简答+编程)",
-            "choice": "选择题",
-            "judge": "判断题",
-            "short_answer": "简答题",
-            "coding": "编程题",
-        }
-        parts.append(f"\n题型: {type_map.get(exercise_type, '混合')}")
-        parts.append(f"数量: {count} 道")
-        parts.append("\n请返回 JSON 格式。只返回 JSON。")
+        messages = [{"role": "user", "content": user_prompt}]
 
-        return "\n".join(parts)
+        try:
+            response = await get_llm_client().chat(
+                messages=messages,
+                system=system_prompt,
+                max_tokens=4096,
+                temperature=0.7,
+            )
+            
+            result = self._parse_response(response["content"])
+            
+            # 过滤掉与学科不匹配的题目
+            subject_type = detect_subject_type(knowledge_point)
+            filtered_exercises = self._filter_exercises(result.get("exercises", []), subject_type)
+            
+            return {"exercises": filtered_exercises}
+            
+        except Exception as e:
+            logger.error("生成练习题失败: %s", e)
+            return {"exercises": []}
+
+    def _filter_exercises(self, exercises: list, subject_type: str) -> list:
+        """根据学科类型过滤题目"""
+        filtered = []
+        
+        for ex in exercises:
+            ex_type = ex.get("type", "")
+            question = ex.get("question", "").lower()
+            
+            # 编程类题目关键词（不包含"函数"，因为数学也有函数）
+            coding_keywords = ["python", "java", "c++", "javascript", "编程", "代码", "程序", "算法", "编写", "代码块", "编程题"]
+            
+            if subject_type == "programming":
+                # 编程类保留所有题目
+                filtered.append(ex)
+            elif subject_type in ["math", "science", "theory"]:
+                # 非编程类过滤掉编程题
+                is_coding = ex_type == "coding"
+                has_coding_keyword = any(kw in question for kw in coding_keywords)
+                
+                if not is_coding and not has_coding_keyword:
+                    filtered.append(ex)
+            else:
+                filtered.append(ex)
+        
+        return filtered
 
     def _parse_response(self, content: str) -> dict:
-        # 1. 标准解析
-        result = parse_json_response(content, {"exercises": []})
-        if result.get("exercises"):
-            return result
-
-        # 2. MiMo 可能返回裸数组 [...]，尝试提取
-        import json, re
-        # 先去 markdown 代码块包裹
-        cleaned = content.strip()
-        if cleaned.startswith("```"):
-            cleaned = re.sub(r"^```(?:json)?\s*\n?", "", cleaned)
-            cleaned = re.sub(r"\n?```\s*$", "", cleaned)
-        # 尝试解析为 JSON
+        """解析LLM响应"""
+        import json
+        
         try:
-            parsed = json.loads(cleaned)
-            # 裸数组 → 包装
-            if isinstance(parsed, list):
-                parsed = {"exercises": parsed}
-            if isinstance(parsed, dict) and "exercises" in parsed:
-                raw_exs = parsed["exercises"]
-            else:
-                raw_exs = []
-        except (json.JSONDecodeError, TypeError):
-            # 3. 从文本中提取 JSON 块
-            match = re.search(r'\[[\s\S]*\]', cleaned)
-            if match:
-                try:
-                    raw_exs = json.loads(match.group())
-                except (json.JSONDecodeError, TypeError):
-                    raw_exs = []
-            else:
-                raw_exs = []
-
-        # 4. 补全缺失字段
-        fixed = []
-        for ex in raw_exs:
-            if not isinstance(ex, dict):
-                continue
-            q = ex.get("question", "")
-            a = str(ex.get("answer", ""))
-            # 推断 type
-            ex_type = ex.get("type", "")
-            if not ex_type:
-                if re.match(r"^(true|false|对|错|是|否)", a, re.IGNORECASE) or "判断" in q:
-                    ex_type = "judge"
-                elif ex.get("options") or re.search(r"[A-D][.、]", q):
-                    ex_type = "choice"
-                else:
-                    ex_type = "short_answer"
-            # difficulty 字符串→数字
-            diff = ex.get("difficulty", 50)
-            if isinstance(diff, str):
-                diff_map = {"easy": 30, "medium": 50, "hard": 80, "入门": 30, "中等": 50, "困难": 80}
-                diff = diff_map.get(diff.lower(), 50)
-            # options 处理：MiMo 可能不带选项
-            options = ex.get("options")
-            if not options and ex_type == "choice":
-                options = [f"A. {a}", "B. (待补充)", "C. (待补充)", "D. (待补充)"]
-            fixed.append({
-                "type": ex_type,
-                "question": q,
-                "options": options,
-                "answer": a,
-                "explanation": ex.get("explanation", ""),
-                "difficulty": diff,
-                "knowledge_point": ex.get("knowledge_point", ""),
-            })
-
-        result["exercises"] = fixed
-        return result
+            json_start = content.find("{")
+            json_end = content.rfind("}") + 1
+            if json_start >= 0 and json_end > json_start:
+                json_str = content[json_start:json_end]
+                result = json.loads(json_str)
+                return result
+        except json.JSONDecodeError as e:
+            logger.warning("JSON解析失败: %s", e)
+        
+        return {"exercises": []}
 
 
+# 创建全局实例
 exercise_agent = ExerciseAgent()

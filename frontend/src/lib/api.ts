@@ -219,13 +219,25 @@ export const exerciseApi = {
     student_id: string,
     knowledge_point: string,
     count = 5,
-    exercise_type = 'all'
+    exercise_type = 'all',
+    types?: string[]
   ) =>
-    request<{ knowledge_point: string; count: number; exercises: Exercise[] }>(
+    request<{ 
+      knowledge_point: string; 
+      count: number; 
+      exercises: Exercise[];
+      generation_time?: number;
+    }>(
       '/resource/exercises/generate',
       {
         method: 'POST',
-        body: JSON.stringify({ student_id, knowledge_point, count, exercise_type }),
+        body: JSON.stringify({ 
+          student_id, 
+          knowledge_point, 
+          count, 
+          exercise_type,
+          types: types || ['choice', 'judge', 'short_answer']
+        }),
       }
     ),
   list: (student_id: string) =>
@@ -234,55 +246,7 @@ export const exerciseApi = {
     ),
 }
 
-// ===== Path =====
-export interface PathNode {
-  id: string
-  label: string
-  type?: string
-  difficulty: number
-  estimated_hours: number
-}
 
-export interface PathEdge {
-  source: string
-  target: string
-  relation?: string
-}
-
-export interface LearningPathData {
-  path_id: string
-  title: string
-  description: string
-  total_days: number
-  nodes: PathNode[]
-  edges: PathEdge[]
-  daily_plan: any[]
-}
-
-export const pathApi = {
-  generateStream(
-    student_id: string,
-    course_topics: string[],
-    onEvent: (e: ChatEvent) => void,
-    total_days = 30,
-    daily_topics = 3
-  ): () => void {
-    return createEventStream(`${BASE_URL}/path/generate/stream`, { student_id, course_topics, total_days, daily_topics }, onEvent)
-  },
-  generate: (student_id: string, course_topics: string[], total_days = 30) =>
-    request<LearningPathData>('/path/generate', {
-      method: 'POST',
-      body: JSON.stringify({ student_id, course_topics, total_days }),
-    }),
-  list: (student_id: string) =>
-    request<Array<{ path_id: string; title: string; total_days: number; created_at: string }>>(
-      `/path/${student_id}`
-    ),
-  get: (student_id: string, path_id: string) =>
-    request<LearningPathData>(`/path/${student_id}/${path_id}`),
-  delete: (student_id: string, path_id: string) =>
-    request<{ message: string }>(`/path/${student_id}/${path_id}`, { method: 'DELETE' }),
-}
 
 // ===== Tutor =====
 export interface TutorAnswer {
@@ -574,7 +538,6 @@ export interface AdminStats {
   total_users: number
   admin_count: number
   total_exercises: number
-  total_paths: number
   total_chats: number
   total_documents: number
   today_active: number
@@ -595,19 +558,6 @@ export interface AdminUser {
   is_active: boolean
   exercise_count: number
   last_login: string | null
-  created_at: string | null
-}
-
-export interface AdminPath {
-  id: string
-  student_id: string
-  student_name: string
-  title: string
-  total_days: number
-  node_count: number
-  edge_count: number
-  nodes: Array<{ id: string; label: string; difficulty: number; estimated_hours: number }>
-  edges: Array<{ source: string; target: string; relation?: string }>
   created_at: string | null
 }
 
@@ -656,11 +606,6 @@ export const adminApi = {
     adminRequest<{ message: string }>(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteStudent: (id: string) =>
     adminRequest<{ message: string }>(`/admin/users/${id}`, { method: 'DELETE' }),
-  getPaths: (page = 1, pageSize = 20, studentId?: string) => {
-    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
-    if (studentId) params.set('student_id', studentId)
-    return adminRequest<{ items: AdminPath[]; total: number; page: number; page_size: number }>(`/admin/paths?${params}`)
-  },
   getChats: (page = 1, pageSize = 20, studentId?: string) => {
     const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
     if (studentId) params.set('student_id', studentId)
@@ -675,4 +620,99 @@ export const adminApi = {
     if (search) params.set('search', search)
     return adminRequest<{ items: AdminDocument[]; total: number; page: number; page_size: number }>(`/admin/documents?${params}`)
   },
+}
+
+// ===== Study Plan (学习计划) =====
+
+export interface StudyPlanStep {
+  id: string
+  order: number
+  title: string
+  description: string
+  estimated_minutes: number
+  status: 'pending' | 'current' | 'completed' | 'skipped'
+  step_type?: string
+  content_hint?: string
+  resource_id?: string | null
+  completed_at?: string | null
+}
+
+export interface StudyPlan {
+  id: string
+  knowledge_point: string
+  title?: string
+  description?: string
+  status: 'planning' | 'learning' | 'completed' | 'abandoned'
+  total_steps: number
+  completed_steps: number
+  estimated_minutes?: number
+  actual_minutes?: number
+  difficulty?: string
+  prerequisites?: string[]
+  steps?: StudyPlanStep[]
+  created_at?: string | null
+  completed_at?: string | null
+}
+
+export interface LearningPathNode {
+  id: string
+  knowledge_point: string
+  order: number
+  status: 'completed' | 'current' | 'pending'
+  prerequisites: string[]
+}
+
+export interface LearningPath {
+  id: string
+  name: string
+  description?: string
+  nodes: LearningPathNode[]
+  status?: string
+  created_at?: string | null
+}
+
+export const studyPlanApi = {
+  // 创建学习计划
+  create: (data: { knowledge_point: string; difficulty?: string; prerequisites?: string[] }) =>
+    request<{ success: boolean; data: StudyPlan }>('/study-plan/create', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // 获取学习计划列表
+  list: (status?: string) => {
+    const params = status ? `?status=${status}` : ''
+    return request<{ success: boolean; data: StudyPlan[] }>(`/study-plan/list${params}`)
+  },
+
+  // 获取学习计划详情
+  get: (planId: string) =>
+    request<{ success: boolean; data: StudyPlan }>(`/study-plan/${planId}`),
+
+  // 完成学习步骤
+  completeStep: (planId: string, stepId: string) =>
+    request<{ success: boolean; data: { completed_steps: number; total_steps: number; all_completed: boolean; plan_status: string } }>(
+      `/study-plan/${planId}/complete-step`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ step_id: stepId }),
+      }
+    ),
+
+  // 生成学习路径
+  generatePath: (data: { target_knowledge: string; current_level?: string }) =>
+    request<{ success: boolean; data: LearningPath }>('/study-plan/generate-path', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // 获取学习路径列表
+  getPaths: () =>
+    request<{ success: boolean; data: LearningPath[] }>('/study-plan/paths/list'),
+
+  // 完成学习节点
+  completeNode: (pathId: string, nodeId: string) =>
+    request<{ success: boolean; message: string }>(`/study-plan/paths/${pathId}/nodes/${nodeId}/complete`, {
+      method: 'POST',
+    }),
 }

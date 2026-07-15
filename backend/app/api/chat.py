@@ -323,7 +323,6 @@ async def _handle_single_agent_stream(
     from app.agents.document_agent import document_agent
     from app.agents.mindmap_agent import mindmap_agent
     from app.agents.exercise_agent import exercise_agent
-    from app.agents.path_agent import path_agent
     from app.services.llm_factory import get_llm_client
     from app.services.anti_hallucination import anti_hallucination
 
@@ -331,7 +330,7 @@ async def _handle_single_agent_stream(
     import re
     kp = last_msg.strip()
     kp = re.sub(r"^(请|帮我|帮忙|给我想?|给我)?(讲解|解释|说明|介绍|生成|出|写|做|画|规划)?(一下|个|份)?\s*", "", kp)
-    kp = re.sub(r"(的原理|的代码|的练习|的思维导图的学习路径|相关内容|相关知识)?\s*$", "", kp)
+    kp = re.sub(r"(的原理|的代码|的练习|的思维导图|相关内容|相关知识)?\s*$", "", kp)
     kp = kp.strip()
     if len(kp) < 2:
         kp = last_msg[:50]
@@ -451,29 +450,6 @@ async def _handle_single_agent_stream(
 
         result_data = {"type": "exercise", "data": result}
 
-    elif intent == "path":
-        # 学习路径
-        yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在规划学习计划...'}, ensure_ascii=False)}\n\n"
-
-        topics = [t.strip() for t in kp.split(",") if t.strip()]
-        if not topics:
-            topics = [kp]
-
-        result = await path_agent.generate(
-            course_topics=topics,
-            student_profile=student_profile,
-            total_days=14,
-        )
-
-        # 切片推 token
-        final_response = f"📚 学习计划已生成：{result.get('title', '')}\n\n共 {len(result.get('nodes', []))} 个知识点，{len(result.get('edges', []))} 条依赖关系"
-        for i in range(0, len(final_response), 8):
-            chunk = final_response[i:i + 8]
-            if chunk:
-                yield f"data: {json.dumps({'type': 'token', 'content': chunk}, ensure_ascii=False)}\n\n"
-
-        result_data = {"type": "path", "data": result}
-
     elif intent == "audio":
         # 音频脚本
         yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在生成音频脚本...'}, ensure_ascii=False)}\n\n"
@@ -548,8 +524,6 @@ async def _handle_state_graph_stream(
                 yield f"data: {json.dumps({'type': 'progress', 'progress': 0.6, 'message': '思维导图生成完成，正在整理内容...'}, ensure_ascii=False)}\n\n"
             elif node_output.get("exercise_result"):
                 yield f"data: {json.dumps({'type': 'progress', 'progress': 0.6, 'message': '练习题生成完成，正在整理内容...'}, ensure_ascii=False)}\n\n"
-            elif node_output.get("path_result"):
-                yield f"data: {json.dumps({'type': 'progress', 'progress': 0.6, 'message': '学习计划生成完成，正在整理内容...'}, ensure_ascii=False)}\n\n"
 
         # 累积：每个节点的输出合并到 final_state
         if isinstance(node_output, dict):
@@ -694,7 +668,7 @@ async def stream_chat(req: ChatRequest, db: AsyncSession = Depends(get_db), user
                 return
 
             # 单 Agent 意图 → 走直接调用（真流式）
-            single_agent_intents = ("document", "mindmap", "exercise", "path", "audio")
+            single_agent_intents = ("document", "mindmap", "exercise", "audio")
             if intent in single_agent_intents:
                 async for evt in _handle_single_agent_stream(
                     intent, last_msg, student_profile, session, db, req.student_id
@@ -864,7 +838,6 @@ def _quick_route(msg: str) -> str | None:
         "profile": ["画像", "分析我的", "了解我", "学习情况"],
         "mindmap": ["思维导图", "脑图", "知识结构", "导图", "结构图"],
         "exercise": ["练习", "题目", "出题", "测试", "考核", "做题"],
-        "path": ["路径", "规划", "计划", "学习安排", "路线"],
         "document": ["教程", "学习材料", "讲解", "解释", "介绍一下", "说明"],
         "audio": ["音频", "语音讲解"],
     }
@@ -882,7 +855,7 @@ def _quick_route(msg: str) -> str | None:
     ]
     # 短消息（<15字）没匹配到其他意图，默认走 tutor（多轮追问场景）
     if len(msg.strip()) < 15 and not any(
-        w in msg_lower for w in ["画像", "思维导图", "脑图", "练习", "题目", "出题", "路径", "规划", "教程", "学习材料", "音频", "讲解", "解释"]
+        w in msg_lower for w in ["画像", "思维导图", "脑图", "练习", "题目", "出题", "教程", "学习材料", "音频", "讲解", "解释"]
     ):
         return "tutor"
     if any(w in msg_lower for w in tutor_keywords):

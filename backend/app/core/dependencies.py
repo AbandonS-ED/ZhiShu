@@ -45,13 +45,6 @@ async def valid_session_id(session_id: str) -> uuid.UUID:
         raise HTTPException(status_code=422, detail=f"无效的 session_id: {session_id}")
 
 
-async def valid_path_id(path_id: str) -> uuid.UUID:
-    """路径参数 path_id → UUID，校验失败返回 422"""
-    try:
-        return uuid.UUID(path_id)
-    except (ValueError, AttributeError, TypeError):
-        raise HTTPException(status_code=422, detail=f"无效的 path_id: {path_id}")
-
 
 def require_admin(user: Student) -> None:
     """校验用户角色为管理员，否则 403"""

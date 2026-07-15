@@ -23,7 +23,6 @@ from app.core.agent_metrics import agent_metrics
 # 子 Agent 导入
 from app.agents.document_agent import document_agent
 from app.agents.exercise_agent import exercise_agent
-from app.agents.path_agent import path_agent
 from app.agents.tutor_agent import tutor_agent
 from app.agents.mindmap_agent import mindmap_agent
 from app.agents.audio_agent import audio_agent
@@ -39,7 +38,6 @@ INTENT_PROMPT = """你是一个学习平台的意图识别助手。根据用户�
 - profile: 构建/更新学习画像（如：了解我的学习情况、分析画像）
 - document: 生成知识讲解/学习材料（如：讲解xx、生成学习材料）
 - exercise: 生成练习题（如：出题、练习、测试）
-- path: 规划学习路径（如：学习计划、路径规划）
 - tutor: 回答学习问题（如：什么是xx、为什么xx、怎么理解xx）
 - mindmap: 生成思维导图（如：画思维导图、知识结构图）
 - audio: 生成音频讲解（如：音频讲解、语音讲解）
@@ -134,9 +132,6 @@ TASK_TEMPLATES: dict[str, list[dict[str, Any]]] = {
     "exercise": [
         {"agent": "exercise_agent", "action": "generate", "priority": "high", "status": "pending"}
     ],
-    "path": [
-        {"agent": "path_agent", "action": "generate", "priority": "high", "status": "pending"}
-    ],
     "tutor": [
         {"agent": "tutor_agent", "action": "answer", "priority": "high", "status": "pending"}
     ],
@@ -155,7 +150,6 @@ TASK_TEMPLATES: dict[str, list[dict[str, Any]]] = {
         {"agent": "document_agent", "action": "generate", "priority": "high", "status": "pending"},
         {"agent": "mindmap_agent", "action": "generate", "priority": "medium", "status": "pending"},
         {"agent": "exercise_agent", "action": "generate", "priority": "medium", "status": "pending"},
-        {"agent": "path_agent", "action": "generate", "priority": "medium", "status": "pending"},
     ],
     "multi_chat": [
         {"agent": "tutor_agent", "action": "answer", "priority": "low", "status": "pending"}
@@ -167,7 +161,6 @@ ROUTE_MAP = {
     "document_agent": "run_document_agent",
     "mindmap_agent": "run_mindmap_agent",
     "exercise_agent": "run_exercise_agent",
-    "path_agent": "run_path_agent",
     "tutor_agent": "run_tutor_agent",
     "audio_agent": "run_audio_agent",
 }
@@ -197,7 +190,6 @@ class MasterAgent:
         graph.add_node("run_document_agent", self._run_document_agent)
         graph.add_node("run_mindmap_agent", self._run_mindmap_agent)
         graph.add_node("run_exercise_agent", self._run_exercise_agent)
-        graph.add_node("run_path_agent", self._run_path_agent)
         graph.add_node("run_tutor_agent", self._run_tutor_agent)
         graph.add_node("run_audio_agent", self._run_audio_agent)
         graph.add_node("result_aggregation", self._result_aggregation)
@@ -217,7 +209,6 @@ class MasterAgent:
                 "run_document_agent": "run_document_agent",
                 "run_mindmap_agent": "run_mindmap_agent",
                 "run_exercise_agent": "run_exercise_agent",
-                "run_path_agent": "run_path_agent",
                 "run_tutor_agent": "run_tutor_agent",
                 "run_audio_agent": "run_audio_agent",
                 "aggregate": "result_aggregation",
@@ -227,7 +218,7 @@ class MasterAgent:
         # 每个 Agent 完成后 → 检查是否有剩余任务
         agent_nodes = [
             "run_document_agent", "run_mindmap_agent",
-            "run_exercise_agent", "run_path_agent", "run_tutor_agent",
+            "run_exercise_agent", "run_tutor_agent",
             "run_audio_agent",
         ]
         for agent_node in agent_nodes:
@@ -422,27 +413,6 @@ class MasterAgent:
         except Exception as e:
             agent_metrics.record("exercise", False, (time.time() - t0) * 1000)
             return self._fail_task(state, f"练习题生成失败: {e}")
-
-    async def _run_path_agent(self, state: AgentState) -> dict:
-        """执行 Path Agent"""
-        topics = state.get("intent_params", {}).get("course_topics", ["基础知识"])
-        if isinstance(topics, str):
-            topics = [topics]
-        kp = state.get("intent_params", {}).get("knowledge_point", "")
-        if kp and kp not in topics:
-            topics = [kp] + topics
-        t0 = time.time()
-        try:
-            result = await path_agent.generate(
-                course_topics=topics,
-                student_profile=state.get("student_profile"),
-                total_days=state.get("intent_params", {}).get("total_days", 14),
-            )
-            agent_metrics.record("path", True, (time.time() - t0) * 1000)
-            return self._complete_task(state, "path_result", result, "学习路径生成完成")
-        except Exception as e:
-            agent_metrics.record("path", False, (time.time() - t0) * 1000)
-            return self._fail_task(state, f"学习路径生成失败: {e}")
 
     async def _run_tutor_agent(self, state: AgentState) -> dict:
         """执行 Tutor Agent"""
@@ -666,12 +636,6 @@ class MasterAgent:
                     knowledge_point=kp, student_profile=state.get("student_profile"),
                 )
                 state["result"] = {"type": "exercise", "data": result}
-            elif request_type == "path":
-                topics = state.get("course_topics", ["基础知识"])
-                result = await path_agent.generate(
-                    course_topics=topics, student_profile=state.get("student_profile"),
-                )
-                state["result"] = {"type": "path", "data": result}
             elif request_type == "tutor":
                 result = await tutor_agent.answer(
                     question=state.get("messages", [{}])[-1].get("content", ""),

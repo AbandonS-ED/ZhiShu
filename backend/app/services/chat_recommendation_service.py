@@ -9,7 +9,6 @@ from app.models.student_profile import StudentProfile
 from app.models.learning_record import LearningRecord
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
-from app.models.learning_path import LearningPath
 
 logger = logging.getLogger(__name__)
 
@@ -161,20 +160,6 @@ class ChatRecommendationService:
             kp, avg = row.knowledge_point, row.avg_score
             if kp and avg is not None and avg < 60:
                 candidates[kp] = max(candidates.get(kp, 0), 0.15 * (1 - avg / 100))
-
-        # 5. 学习路径当前阶段 (weight 0.10)
-        path_result = await db.execute(
-            select(LearningPath)
-            .where(LearningPath.student_id == sid)
-            .order_by(desc(LearningPath.updated_at))
-            .limit(5)
-        )
-        for path in path_result.scalars().all():
-            if path.daily_plan:
-                plan_str = str(path.daily_plan)
-                for kp in list(candidates.keys()):
-                    if kp in plan_str:
-                        candidates[kp] = max(candidates.get(kp, 0), 0.10)
 
         # 如果没有候选，返回空
         if not candidates:

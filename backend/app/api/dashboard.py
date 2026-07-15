@@ -13,7 +13,7 @@ from sqlalchemy import select, func, cast, Date, text
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.student import Student
-from app.models.learning_path import LearningPath
+
 from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
 from app.models.learning_record import LearningRecord
@@ -93,20 +93,7 @@ async def get_dashboard_stats(
         streak_days += 1
         check -= timedelta(days=1)
 
-    # ═══ 学习路径进度 ═══
-    path_result = await db.execute(
-        select(LearningPath).where(LearningPath.student_id == sid)
-    )
-    paths = path_result.scalars().all()
-    total_nodes = 0
-    completed_nodes = 0
 
-    for path in paths:
-        daily_plan = path.daily_plan or []
-        total_nodes += len(daily_plan)
-        completed_nodes += sum(1 for d in daily_plan if d.get("status") == "completed")
-
-    path_progress = (completed_nodes / total_nodes * 100) if total_nodes > 0 else 0
 
     total_exercises = 0
     avg_score = 0
@@ -238,8 +225,8 @@ async def get_dashboard_stats(
         "learning_hours_trend": f"+{week_total_hours:.1f}h 本周",
         "accuracy": f"{avg_score:.0f}%",
         "accuracy_trend": f"+{min(5, avg_score * 0.1):.0f}% 较上周",
-        "path_progress": f"{path_progress:.0f}%",
-        "path_progress_trend": f"{completed_nodes} / {total_nodes} 节点",
+        "path_progress": "0%",
+        "path_progress_trend": "0 / 0 节点",
         "study_sessions": weekly_study_sessions,
         "study_sessions_trend": f"+{weekly_study_sessions} 本周",
         "today_minutes": today_minutes,
@@ -258,38 +245,13 @@ async def get_course_progress(
     """获取课程进度"""
     if str(user.id) != student_id:
         raise HTTPException(status_code=403, detail="只能查看自己的数据")
-    try:
-        sid = uuid.UUID(student_id)
-    except (ValueError, AttributeError, TypeError):
-        raise HTTPException(status_code=422, detail=f"无效的 student_id: {student_id}")
 
-    # 获取所有学习路径作为课程
-    paths_result = await db.execute(
-        select(LearningPath).where(LearningPath.student_id == sid)
-    )
-    paths = paths_result.scalars().all()
-
-    courses = []
-    for path in paths:
-        daily_plan = path.daily_plan or []
-        total = len(daily_plan)
-        completed = sum(1 for d in daily_plan if d.get("status") == "completed")
-        progress = (completed / total * 100) if total > 0 else 0
-
-        courses.append({
-            "name": path.title or "未命名课程",
-            "progress": round(progress),
-            "status": "completed" if progress >= 100 else "in_progress",
-        })
-
-    # 如果没有课程，返回示例数据
-    if not courses:
-        courses = [
-            {"name": "人工智能概述", "progress": 100, "status": "completed"},
-            {"name": "搜索算法", "progress": 85, "status": "in_progress"},
-            {"name": "机器学习基础", "progress": 60, "status": "in_progress"},
-            {"name": "深度学习与神经网络", "progress": 30, "status": "in_progress"},
-            {"name": "自然语言处理", "progress": 10, "status": "in_progress"},
-        ]
+    courses = [
+        {"name": "人工智能概述", "progress": 100, "status": "completed"},
+        {"name": "搜索算法", "progress": 85, "status": "in_progress"},
+        {"name": "机器学习基础", "progress": 60, "status": "in_progress"},
+        {"name": "深度学习与神经网络", "progress": 30, "status": "in_progress"},
+        {"name": "自然语言处理", "progress": 10, "status": "in_progress"},
+    ]
 
     return {"courses": courses}

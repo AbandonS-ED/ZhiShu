@@ -16,10 +16,6 @@ const pageTitles: Record<string, { title: string; sub: string }> = {
     title: '资源中心',
     sub: 'AI 导论 · 学习资源',
   },
-  '/path': {
-    title: '学习路径',
-    sub: '个性化路径规划',
-  },
   '/tiku': {
     title: '练习题库',
     sub: '智能练习与评估',
