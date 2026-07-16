@@ -4,16 +4,17 @@
 
 ## 项目简介
 
-智枢 (SmartHub) 是一个面向《人工智能导论》课程的多智能体个性化学习系统。通过 14 个 AI Agent 协同工作，为学生提供对话式学习画像评估、个性化学习资源生成、智能学习路径规划、RAG 智能辅导和效果评估等服务。
+智枢 (SmartHub) 是一个面向《人工智能导论》课程的多智能体个性化学习系统。通过 15 个 AI Agent 协同工作，为学生提供对话式学习画像评估、个性化学习资源生成、智能学习路径规划、RAG 智能辅导和效果评估等服务。
 
 ### 核心功能
 
 - **F1 对话式画像 (35%)** — 7 维学生画像评估（理解力/记忆力/应用转化/想象力/专注力/知识基础/学习目标）
-- **F2 多智能体资源生成 (45%)** — 14 Agent 协同生成学习资源（含防幻觉三层验证）
+- **F2 多智能体资源生成 (45%)** — 15 Agent 协同生成学习资源（含防幻觉三层验证）
 - **F3 学习路径规划** — DAG 可视化路径 + 每日学习计划
 - **F4 智能辅导** — RAG 问答 + 多轮对话上下文
 - **F5 效果评估** — LLM 生成评估报告 + 趋势分析
 - **学习计划** — AI 生成学习路径 + 节点状态管理 + 测验解锁机制 + 综合测试
+- **错题本** — AI 错因分析(5类错误) + 同类题推荐 + 掌握度算法 + /tiku 答错自动收录
 - **资源中心** — AI 生成 + 手动创建 + 进度动画 + 保存功能 + 我的资源 + 资源详情
 - **自习模式 v1.5** — TF.js + MoveNet 浏览器本地姿态检测，番茄钟专注 + 静默巡查 + 报告（专注/低头/离席）
 - **管理后台** — 仪表盘 + 用户/资源/题库管理 + Agent 监控 + 手机验证码注册 + 用户删除
@@ -51,17 +52,17 @@ ZhiShu/
 │   │   │   ├── learn/[kp]/    # 学习包 (三阶段 Learn/Practice/Review)
 │   │   │   └── components/    # 资源组件 (ResourceCard + CreateModal + ResourceProgress)
 │   │   ├── path/              # 学习路径页 (DAG 可视化)
-│   │   ├── plan/              # 学习计划页 (节点管理 + 测验)
-│   │   │   ├── page.tsx       # 计划列表
+│   │   ├── plan/              # 学习计划页 (AI 路径生成 + 节点学习 + 测验 + 综合测试)
+│   │   │   ├── page.tsx       # 计划首页 (输入知识点 → AI 生成路径)
 │   │   │   └── [pathId]/      # 计划详情
-│   │   │       ├── page.tsx   # 路径可视化
-│   │   │       ├── learn/     # 知识点学习
-│   │   │       ├── quiz/      # 知识点测验
-│   │   │       └── final-test/# 综合测试
+│   │   │       ├── page.tsx   # 知识点依赖图 (DAG)
+│   │   │       ├── learn/[nodeId]/     # 单知识点学习
+│   │   │       ├── quiz/[nodeId]/      # 知识点测验
+│   │   │       └── final-test/         # 综合测试
 │   │   ├── tiku/              # 练习题库页
 │   │   ├── pinggu/            # 学习评估页
-│   │       ├── setting/           # 用户设置页 (个人中心 + 密码 + 每日目标)
-│       ├── wrong-questions/   # 错题本 (AI 错因 + 同类题 + 复习)
+│   │   ├── setting/           # 用户设置页 (个人中心 + 密码 + 每日目标)
+│   │   ├── wrong-questions/   # 错题本 (AI 错因 + 同类题 + 复习)
 │   │   ├── zixi/              # 自习模式 (TF.js + MoveNet 本地姿态检测)
 │   │   └── admin/             # 管理后台 (独立 Shell + 9 页面)
 │       ├── components/            # 共享组件
@@ -81,8 +82,8 @@ ZhiShu/
 ├── backend/                       # FastAPI 后端
 │   └── app/
 │       ├── main.py                # 应用入口 + 路由注册
-│       ├── api/                   # 11 个路由模块 (67 端点)
-│       ├── agents/                # 14 个 Agent 模块 + StateGraph 编排
+│       ├── api/                   # 12 个路由模块 (68 端点)
+│       ├── agents/                # 15 个 Agent 模块 + StateGraph 编排
 │       │   ├── master_agent.py    # LangGraph StateGraph 10 节点
 │       │   ├── state.py           # AgentState + IntentType
 │       │   ├── communicator.py    # MessageBus pub/sub
@@ -209,7 +210,7 @@ npm run dev
 6. `/admin/paths` → 学习路径管理
 7. `/admin/chats` → 对话记录（消息详情）
 8. `/admin/documents` → 知识库文档管理
-9. `/admin/agents` → Agent 监控面板（14 Agent 模块实时调用统计 + 30s 自动刷新）
+9. `/admin/agents` → Agent 监控面板（15 Agent 模块实时调用统计 + 30s 自动刷新）
 
 ## 测试
 
@@ -233,7 +234,7 @@ npm run build
 
 ## 技术亮点
 
-- **多智能体编排**: LangGraph StateGraph 10 节点 + 14 Agent 模块协同
+- **多智能体编排**: LangGraph StateGraph 10 节点 + 15 Agent 模块协同
 - **防幻觉机制**: PatternDetector + SourceValidator + LLMValidator 三层验证
 - **流式输出**: 8 个 SSE 端点 (对话/资源/练习/路径/画像评估/学习包/题库出题)
 - **RAG 管道**: 文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排

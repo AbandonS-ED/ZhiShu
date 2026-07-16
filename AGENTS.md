@@ -95,6 +95,7 @@ cd frontend && npm run build                       # 28 页面
 - **资源中心**: AI 生成 + 手动创建 + 进度动画（4步骤+倒计时）+ 保存功能 + 我的资源（过滤系统自动生成）+ 资源详情（标签页+练习题答案）
 - **设置页**: 个人中心（学习概览+快捷入口+信息编辑含major/grade+密码切换+每日目标localStorage可配置+退出登录+骨架屏+响应式）
 - **错题本**: wrong_questions 表 + 7 端点 + AI 错因分析(5类错误: 计算/概念/审题/粗心/未分析) + 同类题推荐 + 掌握度算法(答对+20%上限100) + /tiku 答错自动收录
+- **学习计划**: study_plans/study_plan_steps/learning_paths 3 表 + 6 端点 + learning_path_agent (AI 教材目录式路径生成 10-15 节点) + study_plan_service (758 行核心服务) + 前端 5 页面(/plan 首页+ 4 子页面) + 节点状态管理(completed/current/pending) + 测验解锁机制 + 综合测试
 - **一键启停**: `start.ps1` + `stop.ps1`，杀所有 python/node 进程解决孤儿 socket
 
 ## 踩过的坑（不修会卡住）
@@ -135,5 +136,5 @@ cd frontend && npm run build                       # 28 页面
 
 - `feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `test:` 开头
 - 涉及评分项（流式/防幻觉/多智能体/RAG）附 1-2 句说明
-- 前端改动需 `npm run lint` 0 errors + `npm run build` 24 页面通过
+- 前端改动需 `npm run lint` 0 errors + `npm run build` 30 页面通过
 - 比赛前**必做**：`.env` 改 `LLM_PROVIDER=spark` + 跑 `tests/smoke_test` 验证星火路径

@@ -46,8 +46,8 @@ ZhiShu/
 │   └── src/hooks/usePageTimer.ts    # 页面停留计时器
 ├── backend/                         # FastAPI 后端
 │   ├── app/main.py                  # 应用入口 + 路由注册
-│   ├── app/api/                     # 11 个路由模块 (67 端点)
-│   ├── app/agents/                  # 14 个 Agent 模块 + StateGraph 编排
+│   ├── app/api/                     # 12 个路由模块 (68 端点)
+│   ├── app/agents/                  # 15 个 Agent 模块 + StateGraph 编排
 │   ├── app/services/                # 17 个服务模块
 │   ├── app/models/                  # 13 个数据模型
 │   ├── app/tasks/                   # Celery 异步任务
@@ -216,7 +216,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 对话页刷新修复 (sessionId 持久化 + loadSession 渲染)
 - ✅ 骨架屏 loading (4 页面 shimmer 动画)
 - ✅ 评估报告 AI 化 + 预生成缓存 + 定时生成
-- ✅ 管理后台 API 增强 (18 端点 + 14 Agent 模块 + 并行查询 + N+1 优化)
+- ✅ 管理后台 API 增强 (18 端点 + 15 Agent 模块 + 并行查询 + N+1 优化)
 - ✅ 手机验证码注册 (控制台输出 + 5 分钟有效期 + 手机号唯一)
 - ✅ 三页面接入真实 API (paths/chats/documents)
 - ✅ forEach async 批量操作修复 (users/page.tsx)
@@ -261,10 +261,11 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 死代码 `.admin-pgr` 系列删除
 - ✅ marked v18 `setOptions()` 兼容 (`marked.parse(md, { breaks, gfm })`)
 - ✅ CSS 变量补全 (`--glass`/`--purple`/`--purple-soft`/`--r-md`/`--ink-6`)
-- ✅ 管理后台 24 页面编译通过 (build 输出)
+- ✅ 管理后台 30 页面编译通过 (build 输出，含 5 个 plan 子页面)
 - ✅ 设置页全量重写为个人中心 (骨架屏+学习概览+快捷入口+个人信息含major/grade+密码切换+每日目标+退出登录+logout复用+storage事件同步)
 - ✅ 密码输入框 autocomplete 属性 (current-password/new-password 防浏览器自动填充)
 - ✅ 错题本功能 (wrong_questions 表 + 7 端点 + AI 错因分析 + 同类题推荐 + 掌握度算法 + /tiku 答错自动收录)
+- ✅ 学习计划模块 (合并 wyy 分支：study_plans/study_plan_steps/learning_paths 3 表 + learning_path_agent + study_plan_service 758 行 + 6 端点 + 前端 5 页面：/plan 首页+4 子页面+综合测试)
 
 ### P2 — 清理项
 
@@ -314,7 +315,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 
 - `feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `test:` 开头
 - 涉及评分项 (流式/防幻觉/多智能体) 附 1-2 句说明
-- 前端改动需 `npm run lint` 0 errors + `npm run build` 24 页面通过
+- 前端改动需 `npm run lint` 0 errors + `npm run build` 30 页面通过
 - 比赛前**必做**: `.env` 改 `LLM_PROVIDER=spark` + 跑 `tests/smoke_test` 验证星火路径
 
 ## 写新功能前先看

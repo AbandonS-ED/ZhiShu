@@ -1,7 +1,7 @@
 # 智枢 (SmartHub) - 前端项目
 
-> 多智能体学习资源生成系统 · 前端部分（学生端 13 页 + 管理后台 9 页）
-> 最后更新：2026-07-08（设置页全量重写 + 数值校准）
+> 多智能体学习资源生成系统 · 前端部分（学生端 20 页 + 管理后台 9 页 + 1 子页面）
+> 最后更新：2026-07-17（学习计划模块合并 + 数值校准）
 
 ## 技术栈
 
@@ -9,7 +9,8 @@
 - **样式**: Tailwind CSS 3.4 + 自定义 CSS（模板 1:1 复刻）
 - **状态管理**: React useState + Context（学生端 + 管理端独立 Context）+ Zustand（setting 页）
 - **路由隔离**: `/admin` 路由前缀，独立的 RootLayout 拦截
-- **Agent**: 14 个 Agent 模块协同工作
+- **Agent**: 15 个 Agent 模块协同工作
+- **学习计划模块** (合并 wyy 分支): 输入知识点 → AI 生成学习路径 (10-15 节点) → 节点学习 → AI 测验 → 综合测试
 
 ## 项目结构
 
@@ -39,7 +40,7 @@ src/
 │       ├── paths/          # /admin/paths 学习路径
 │       ├── chats/          # /admin/chats 对话记录
 │       ├── documents/      # /admin/documents 知识库
-│   └── agents/         # /admin/agents Agent 监控（14 Agent 模块）
+│   └── agents/         # /admin/agents Agent 监控（15 Agent 模块）
 ├── components/
 │   ├── layout/                # 学生端 Sidebar + Header
 │   └── RobotIcon.tsx          # ⭐ 极简机器人 SVG（替换 🤖 emoji）
@@ -64,7 +65,7 @@ src/
 ```bash
 npm install
 npm run dev       # http://localhost:3000
-npm run build     # 验证编译（✅ 通过：24 页面）
+npm run build     # 验证编译（✅ 通过：30 页面）
 npm run lint      # ESLint 检查（✅ 0 errors）
 ```
 
@@ -72,7 +73,7 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 
 ## 页面说明
 
-### 学生端（13 个页面）
+### 学生端（20 个页面，含 5 个 plan 页面）
 
 | 路由 | 页面 | 功能 | 后端联调 |
 |------|------|------|----------|
@@ -89,6 +90,11 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 | `/pinggu` | 学习评估 | 评分环形动画 + 六维进度条 + 趋势折线图 + LLM 评估报告 | ✅ AI 评估 |
 | `/setting` | 账号设置 | 个人信息编辑 + 修改密码 | ✅ auth API |
 | `/zixi` | 自习模式 | TF.js + MoveNet 摄像头本地姿态检测 + 三状态机 | ✅ evaluation/record |
+| `/plan` | **学习计划首页** | 输入知识点 + AI 生成 10-15 节点路径 | ✅ study_plan API |
+| `/plan/[pathId]` | **学习路径详情** | 节点列表 + 状态管理（completed/current/pending） | ✅ study_plan API |
+| `/plan/[pathId]/learn/[nodeId]` | **节点学习** | 节点内容学习 + 进度跟踪 | ✅ study_plan API |
+| `/plan/[pathId]/quiz/[nodeId]` | **节点测验** | AI 出题 + 自动评判 | ✅ study_plan API |
+| `/plan/[pathId]/final-test` | **综合测试** | 全部节点完成后解锁 | ✅ study_plan API |
 
 ### 管理后台（9 个页面）
 
@@ -102,7 +108,7 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 | `/admin/paths` | 学习路径 | 表格 + DAG 详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/chats` | 对话记录 | 表格 + 对话详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/documents` | 知识库 | 表格 + 类型筛选 + **批量删除** | 硬编码 |
-| `/admin/agents` | Agent 监控 | 14 Agent 模块集群卡片 + 调用统计 + 错误率 | 硬编码 |
+| `/admin/agents` | Agent 监控 | 15 Agent 模块集群卡片 + 调用统计 + 错误率 | 硬编码 |
 
 ## 开发规范
 

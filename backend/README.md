@@ -1,17 +1,18 @@
 # 智枢(SmartHub) Backend
 
-> 最后更新：2026-07-08（设置页重写 + 数值校准）
+> 最后更新：2026-07-17（学习计划模块合并 + 数值校准）
 
-基于 FastAPI + 14 Agent 的多智能体学习资源生成系统后端。
+基于 FastAPI + 15 Agent 的多智能体学习资源生成系统后端。
 
 ## 技术栈
 
 - **框架**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg
-- **Agent**: 14 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）
-- **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 **60** 业务端点门禁
+- **Agent**: 15 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）+ learning_path_agent（学习路径 AI 生成）
+- **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 **68** 业务端点门禁
 - **角色**: `role` 字段（student / admin）+ `is_active` 软删除 + `last_login` 记录
 - **LLM**: 小米 MiMo v2.5（当前）→ MiniMax-M3 → 讯飞星火 V4（上线前切换 `LLM_PROVIDER=spark`）
-- **数据库**: PostgreSQL 18 + **12 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（Celery broker，当前未起 worker）
+- **数据库**: PostgreSQL 18 + **15 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（Celery broker，当前未起 worker）
+- **学习计划模块** (合并 wyy 分支): 输入知识点 → AI 生成学习路径 (10-15 节点) → 节点学习 → AI 测验 → 综合测试
 
 ## 快速开始
 
@@ -42,8 +43,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 backend/
 ├── app/
-│   ├── main.py              # 入口（12 个 router + lifespan 初始化）= 60 唯一端点
-│   ├── api/                 # 12 个 router：auth / profile / resource / path / tutor / chat / mindmap / dashboard / evaluation / admin / admin_exercises
+│   ├── main.py              # 入口（13 个 router + lifespan 初始化）= 68 唯一端点
+│   ├── api/                 # 13 个 router：auth / profile / resource / path / tutor / chat / mindmap / dashboard / evaluation / admin / admin_exercises / study_plan
 │   ├── core/
 │   │   ├── config.py        # Settings（MINIMAX_* + SPARK_* + JWT_SECRET + LLM_PROVIDER）
 │   │   ├── database.py      # async SQLAlchemy + pgvector 可选
@@ -75,7 +76,7 @@ backend/
 │   │   ├── audio_agent.py     # 音频脚本生成
 │   │   ├── behavior_analysis_agent.py # 行为分析 + 画像更新
 │   │   └── master_agent.py    # LangGraph StateGraph **10 节点**
-│   └── services/              # 17 个 Service
+│   └── services/              # 18 个 Service
 │       ├── minimax_client.py     # httpx OpenAI 兼容格式客户端
 │       ├── minimax_langchain.py  # LangChain BaseChatModel 封装
 │       ├── spark_client.py       # 讯飞星火 V4 客户端
@@ -93,7 +94,7 @@ backend/
 │       ├── llm_factory.py        # LLM 客户端工厂
 │       └── scheduled_analysis_service.py # 定时画像分析
 ├── scripts/
-│   ├── init_db.sql          # 手动建库 + 建表 SQL 脚本（**12 张表** + 14 索引 + admin 种子数据）
+│   ├── init_db.sql          # 手动建库 + 建表 SQL 脚本（**15 张表** + 14 索引 + admin 种子数据）
 │   ├── init_admin.py        # 自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号
 │   ├── migrate_schema_drift.py # 数据库 schema 漂移迁移（幂等）
 │   └── run_migration.py     # 通用迁移执行器
@@ -104,9 +105,9 @@ backend/
 └── .env                     # API Key（已 gitignore）
 ```
 
-## API 路由（60 个唯一端点）
+## API 路由（68 个唯一端点）
 
-> 唯一端点 = 唯一路径 + 方法组合。`backend/app/main.py` 注册 12 router，含 `/` 和 `/health` 根路由。
+> 唯一端点 = 唯一路径 + 方法组合。`backend/app/main.py` 注册 13 router（含 study_plan router），含 `/` 和 `/health` 根路由。
 
 - `POST /profile/reset` / `GET /profile/assessment-status` / `PUT /profile/background`（profile 重置与背景）
 - `POST /resource/{id}/favorite`（资源收藏）
@@ -274,7 +275,7 @@ backend/
 
 ## 数据库
 
-**12 张表 + 14 个索引**（开发阶段去掉外键约束）：
+**15 张表 + 14 个索引**（开发阶段去掉外键约束）：
 
 | 表名 | 用途 | 索引 |
 |------|------|------|
@@ -295,7 +296,7 @@ backend/
 
 - **密码哈希**：`bcrypt`（`core/security.py`）
 - **JWT**：HS256，7 天过期，密钥从 `JWT_SECRET` 环境变量读取
-- **门禁**：60 个业务端点全部加 `Depends(get_current_user)` + `student_id` 所有权校验
+- **门禁**：68 个业务端点全部加 `Depends(get_current_user)` + `student_id` 所有权校验
 - **角色隔离**：`students.role` 字段（`student` / `admin`），管理员通过 `_require_admin()` 额外校验
 - **软删除**：`is_active=false` 时登录返回 403
 - **登录审计**：登录成功后自动 `last_login = now()`

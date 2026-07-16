@@ -1,6 +1,6 @@
 # 端到端冒烟测试报告
 
-> 最后更新：2026-07-08（设置页全量重写 + 数值校准）
+> 最后更新：2026-07-17（学习计划模块合并 + 数值校准）
 
 ## 测试概览
 
@@ -18,21 +18,15 @@
 
 ---
 
-## 最新变更（2026-07-08）
+## 最新变更（2026-07-17）
 
-设置页全量重写为个人中心 + 数值校准：
-- 后端 60+ 个 API 端点
-- 前端 24 页面（13 学生页 + 9 管理页 + 2 子页面）
-- Agent 数量：14 个 Agent 模块 + 1 个 Master Agent
-- 服务数量：17 个
-- 模型数量：12 个
-- 测试文件：7 个，共 110 个 pytest
-- 7 维画像：comprehension / memory / application / imagination / focus / knowledge_base / learning_goal
-- 管理后台：11 个端点
-- 首页 JS 体积：93kB（chart.js 动态导入，-42%）
-- 评估页 JS 体积：99.4kB（marked 隔离，-11%）
-- 生产模式：start.ps1 默认 next build + next start
-- 设置页：个人中心（学习概览+快捷入口+信息编辑+密码修改+每日目标+退出登录）
+学习计划模块合并（wyy 分支）+ 数值校准：
+- 后端 68 个 API 端点（新增 6 个 study-plan 端点）
+- 前端 30 页面（20 学生页 + 9 管理页 + 1 子页面 + 含 5 个 plan 页面）
+- Agent 数量：15 个 Agent 模块 + 1 个 Master Agent（+ learning_path_agent）
+- 服务数量：18 个（+ study_plan_service）
+- 数据库表：15 张（+ wrong_questions / study_plans / study_plan_steps + learning_paths 节点扩展）
+- **学习计划模块** (合并 wyy 分支): 输入知识点 → AI 生成学习路径 (10-15 节点) → 节点学习 → AI 测验 → 综合测试
 
 ---
 
@@ -50,7 +44,7 @@
 | SQLAlchemy 2.0 兼容 | `_get_exercise_details` 用 PG bool 自动转 int | ✅ 不再报 `'_isnull'` 错误 |
 | Schema 漂移迁移幂等 | 跑 `scripts/migrate_schema_drift.py` 第二次 | ✅ 全部 `[SKIP]`，无重复 ALTER |
 | admin 登录 | `POST /auth/login admin/admin123` | ✅ 200 + JWT |
-| 全部 67 业务端点门禁 | 随机抽 5 个端点不带 token | ✅ 401 |
+| 全部 68 业务端点门禁 | 随机抽 5 个端点不带 token | ✅ 401 |
 | 前端 Lint | `npm run lint` | ✅ 0 errors |
 | 前端 Build | `npm run build` | ✅ 18 页面编译通过 |
 
