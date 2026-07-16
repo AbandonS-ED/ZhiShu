@@ -54,8 +54,8 @@ class StudyPlanStep(Base):
 
 
 class LearningPath(Base):
-    """学习路径表 - 记录知识点之间的依赖关系"""
-    __tablename__ = "learning_paths"
+    """学习路径表 - 记录知识点之间的依赖关系（学习计划专用，避免与 path_agent 的 learning_paths 冲突）"""
+    __tablename__ = "learning_path_plans"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     student_id = Column(UUID(as_uuid=True), nullable=False, index=True)

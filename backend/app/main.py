@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import profile, path, tutor, chat, mindmap, dashboard, evaluation, auth, resource
+from app.api import profile, tutor, chat, mindmap, dashboard, evaluation, auth, resource
 from app.api import admin
 from app.api import wrong_questions
 from app.api import study_plan
