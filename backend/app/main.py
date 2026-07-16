@@ -51,7 +51,7 @@ app.add_middleware(
 )
 
 app.include_router(profile.router, prefix="/api/v1/profile", tags=["学习画像"])
-app.include_router(path.router, prefix="/api/v1/path", tags=["学习路径"])
+
 app.include_router(tutor.router, prefix="/api/v1/tutor", tags=["智能辅导"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["聊天"])
 app.include_router(mindmap.router, prefix="/api/v1/mindmap", tags=["思维导图"])

@@ -15,23 +15,30 @@
 |---|---|---|---|
 | 前端 | Next.js (App Router) + Tailwind CSS + TypeScript | 14.2.5 | 本地 woff 字体，无 Google Fonts |
 | 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 | Python 3.11 |
-| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 14 Agent 模块 |
+| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 15 Agent 模块 |
 | LLM | 三客户端: MimoClient (当前) / MiniMaxClient / SparkClient | - | `LLM_PROVIDER=mimo\|minimax\|spark` 切换 |
 | 向量库 | pgvector (JSONB 降级方案) | - | embedding 用 JSONB 占位 |
-| 数据库 | PostgreSQL 18 + Redis | - | 12 张表 |
+| 数据库 | PostgreSQL 18 + Redis | - | 14 张表 |
 | 异步任务 | Celery (Redis broker) | - | 每日 4 点预生成评估报告 |
 
 ## 项目结构
 
 ```
 ZhiShu/
-├── frontend/                        # Next.js 前端 (24 页面)
-│   ├── src/app/                     # 页面路由 (13 学生页 + 9 管理页)
+├── frontend/                        # Next.js 前端 (28 页面)
+│   ├── src/app/                     # 页面路由 (17 学生页 + 9 管理页)
 │   │   ├── resources/               # 资源中心
 │   │   │   ├── page.tsx             # 资源列表 (AI 生成 + 手动创建)
 │   │   │   ├── my-resources/        # 我的资源 (过滤系统自动生成)
 │   │   │   ├── [id]/                # 资源详情 (标签页 + 练习题)
 │   │   │   └── components/          # 资源组件 (ResourceCard + CreateModal + ResourceProgress)
+│   │   ├── plan/                    # 学习计划
+│   │   │   ├── page.tsx             # 计划列表
+│   │   │   └── [pathId]/            # 计划详情
+│   │   │       ├── page.tsx         # 路径可视化
+│   │   │       ├── learn/           # 知识点学习
+│   │   │       ├── quiz/            # 知识点测验
+│   │   │       └── final-test/      # 综合测试
 │   ├── src/components/              # 共享组件 (Icon.tsx + RobotIcon.tsx + layout/)
 │   ├── src/lib/                     # 工具库 (api.ts + sse.ts + admin/)
 │   ├── src/stores/appStore.ts       # Zustand 全局状态
@@ -93,7 +100,7 @@ cd backend && celery -A app.core.celery_config beat --loglevel=info
 cd backend && python -m pytest tests/ -v          # 110 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
-cd frontend && npm run build                       # 24 页面
+cd frontend && npm run build                       # 28 页面
 ```
 
 ## 架构要点
@@ -158,12 +165,13 @@ study_patrol / study_session_end → learning_records
 | `/api/v1/resource/exercises/generate/stream` | ✅ 真流式 | dual-format (题库出题) |
 | `/api/v1/resource/exercises/pool` | GET | 题池加载 |
 
-### 数据库表关系 (12 张表)
+### 数据库表关系 (14 张表)
 
-`students` 1:N `student_profiles` / `chat_sessions` / `resources` / `learning_paths` / `exercises` / `learning_records` / `evaluation_reports`
+`students` 1:N `student_profiles` / `chat_sessions` / `resources` / `learning_paths` / `learning_plans` / `exercises` / `learning_records` / `evaluation_reports`
 
 `exercise_bank`: 公共题库 (admin 创建，独立于学生)
 `document_chunks`: RAG 知识库文档分块
+`learning_paths`: 学习路径（JSONB nodes 字段存储节点状态）
 
 ### 登录注册系统
 

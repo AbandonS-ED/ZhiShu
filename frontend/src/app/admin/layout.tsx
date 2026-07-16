@@ -43,7 +43,6 @@ function AdminShell({ children }: { children: ReactNode }) {
       const map: Record<string, PanelId> = {
         users: 'pUsers',
         exercises: 'pEx',
-        paths: 'pPath',
         chats: 'pChat',
         documents: 'pDoc',
         agents: 'pAg',
@@ -123,18 +122,6 @@ function AdminShell({ children }: { children: ReactNode }) {
               <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
             </svg>
             <span className="sb-text">练习题</span>
-          </div>
-          <div
-            className={`sb-it${activePanel === 'pPath' ? ' on' : ''}`}
-            onClick={() => navTo('pPath', '/admin/paths')}
-          >
-            <div className="ld"></div>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-              <circle cx="6" cy="6" r="2.5" />
-              <circle cx="18" cy="18" r="2.5" />
-              <path d="M8.5 8.5a6 6 0 0 1 7 7" />
-            </svg>
-            <span className="sb-text">学习路径</span>
           </div>
           <div
             className={`sb-it${activePanel === 'pChat' ? ' on' : ''}`}

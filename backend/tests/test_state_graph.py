@@ -56,7 +56,7 @@ class TestMasterAgentGraph:
             "intent_recognition", "task_planning",
             "run_document_agent",
             "run_mindmap_agent", "run_exercise_agent",
-            "run_path_agent", "run_tutor_agent", "run_audio_agent",
+            "run_tutor_agent", "run_audio_agent",
             "result_aggregation", "response_generation",
         }
         assert set(graph.nodes) == expected_nodes
@@ -137,13 +137,6 @@ class TestSubAgentAdapters:
         from app.agents.mindmap_agent import mindmap_agent
         import inspect
         sig = inspect.signature(mindmap_agent.execute)
-        params = list(sig.parameters.keys())
-        assert "state" in params
-
-    def test_path_agent_execute_signature(self):
-        from app.agents.path_agent import path_agent
-        import inspect
-        sig = inspect.signature(path_agent.execute)
         params = list(sig.parameters.keys())
         assert "state" in params
 

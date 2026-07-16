@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Student, ProfileDimensions, LearningPath, ChatMessage } from '@/types'
+import type { Student, ProfileDimensions, ChatMessage } from '@/types'
 
 interface AppState {
   // 用户信息
@@ -9,10 +9,6 @@ interface AppState {
   // 画像数据
   profile: ProfileDimensions | null
   setProfile: (profile: ProfileDimensions) => void
-
-  // 学习路径
-  learningPath: LearningPath | null
-  setLearningPath: (path: LearningPath) => void
 
   // 当前选中的知识点
   selectedKP: string | null
@@ -40,10 +36,6 @@ export const useAppStore = create<AppState>((set) => ({
   // 画像数据
   profile: null,
   setProfile: (profile) => set({ profile }),
-
-  // 学习路径
-  learningPath: null,
-  setLearningPath: (path) => set({ learningPath: path }),
 
   // 当前选中的知识点
   selectedKP: null,

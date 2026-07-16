@@ -43,21 +43,4 @@ def generate_exercises_async(self, student_id: str, knowledge_point: str, count:
         self.retry(exc=exc, countdown=60)
 
 
-@celery_app.task(bind=True, max_retries=3)
-def generate_path_async(self, student_id: str, course_topics: list, total_days: int = 30):
-    """异步生成学习路径"""
-    import asyncio
-    from app.agents.path_agent import path_agent
 
-    async def _generate():
-        return await path_agent.generate(
-            student_id=student_id,
-            course_topics=course_topics,
-            total_days=total_days,
-        )
-
-    try:
-        result = asyncio.run(_generate())
-        return {"status": "completed", "result": result}
-    except Exception as exc:
-        self.retry(exc=exc, countdown=60)

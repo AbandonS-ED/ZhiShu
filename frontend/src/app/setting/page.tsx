@@ -214,15 +214,6 @@ export default function SettingPage() {
             <span className="set-quick-label">我的资源</span>
             <span className="set-quick-arrow">›</span>
           </a>
-          <a className="set-quick-card" href="/path">
-            <div className="set-quick-icon" style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-                <circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="18" r="2.5" /><path d="M8.5 8.5a6 6 0 0 1 7 7" />
-              </svg>
-            </div>
-            <span className="set-quick-label">学习计划</span>
-            <span className="set-quick-arrow">›</span>
-          </a>
         </div>
       </section>
 

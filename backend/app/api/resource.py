@@ -5,7 +5,8 @@ import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
+from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
@@ -78,6 +79,7 @@ class ExerciseGenerateRequest(BaseModel):
     knowledge_point: str
     count: int = 5
     exercise_type: str = "all"
+    types: List[str] = Field(default_factory=lambda: ["choice", "judge", "short_answer"])
 
     @field_validator("student_id")
     @classmethod
@@ -608,6 +610,82 @@ async def generate_exercises_stream(
             yield sse_error(str(e))
 
     return sse_stream_response(event_generator())
+
+
+# ====================================================================
+# 10b. POST /exercises/generate — AI 出题（非流式）
+# ====================================================================
+
+@router.post("/exercises/generate")
+async def generate_exercises(
+    req: ExerciseGenerateRequest,
+    user: Student = Depends(get_current_user),
+):
+    """非流式生成练习题"""
+    import time
+    start_time = time.time()
+    
+    try:
+        # 确定题型
+        exercise_types = req.types if req.types else ["choice", "judge", "short_answer"]
+        
+        # 调用 agent 生成题目
+        result = await exercise_agent.generate(
+            knowledge_point=req.knowledge_point,
+            student_profile=None,
+            exercise_type=req.exercise_type,
+            count=req.count,
+            variant="mixed",
+        )
+
+        exercises = result.get("exercises", [])
+        
+        # 根据 types 过滤题目
+        if exercise_types and "all" not in exercise_types:
+            exercises = [ex for ex in exercises if ex.get("type") in exercise_types]
+        
+        # 如果过滤后题目不够，补充生成
+        if len(exercises) < req.count:
+            additional_result = await exercise_agent.generate(
+                knowledge_point=req.knowledge_point,
+                student_profile=None,
+                exercise_type="all",
+                count=req.count - len(exercises),
+                variant="mixed",
+            )
+            additional_exercises = additional_result.get("exercises", [])
+            exercises.extend(additional_exercises)
+
+        # 保存到题库
+        from app.core.database import async_session
+        async with async_session() as save_db:
+            for ex in exercises:
+                bank_item = ExerciseBank(
+                    question=ex.get("question", ""),
+                    exercise_type=ex.get("type", "choice"),
+                    options=ex.get("options"),
+                    answer=ex.get("answer", ""),
+                    explanation=ex.get("explanation", ""),
+                    difficulty=ex.get("difficulty", 50),
+                    knowledge_point=req.knowledge_point,
+                    source="ai",
+                    created_by=uuid.UUID(req.student_id),
+                )
+                save_db.add(bank_item)
+            await save_db.commit()
+
+        generation_time = round(time.time() - start_time, 2)
+        
+        return {
+            "knowledge_point": req.knowledge_point,
+            "count": len(exercises),
+            "exercises": exercises,
+            "generation_time": generation_time,
+        }
+
+    except Exception as e:
+        logger.exception("[exercises/generate] 异常")
+        raise HTTPException(status_code=500, detail=f"生成练习题失败: {str(e)}")
 
 
 # ====================================================================

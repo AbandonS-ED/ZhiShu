@@ -69,7 +69,7 @@ cd backend && celery -A app.core.celery_config beat --loglevel=info
 cd backend && python -m pytest tests/ -v          # 110 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
-cd frontend && npm run build                       # 24 页面
+cd frontend && npm run build                       # 28 页面
 ```
 
 ## 关键架构事实
@@ -82,7 +82,7 @@ cd frontend && npm run build                       # 24 页面
 - **MiMo v2.5**: 中国集群 `api-key` 头认证（非 `Authorization: Bearer`），`/chat/completions` 兼容。mimo-v2.5-pro 推理消耗过多 token，降级用 mimo-v2.5
 - **防幻觉**: 6 Agent 接 `validate()`（Document/Exercise 走三层，其他走 `skip_llm=True` 快速模式）
 - **RAG**: `document_parser → text_chunker → embedding → vector_store.search → reranker`
-- **认证**: bcrypt + JWT（HS256，7 天），全 **60** 端点 `Depends(get_current_user)` 门禁
+- **认证**: bcrypt + JWT（HS256，7 天），全 **62** 端点 `Depends(get_current_user)` 门禁
 - **手机验证码**: 内存存储 + 5 分钟有效期，控制台 print 模拟短信，注册时校验
 - **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，11 管理端点（含 Agent 监控 + 文档管理 + 用户删除）
 - **Agent 监控**: `agent_metrics.py` 内存计数器 + `threading.Lock` 线程安全，30s 自动刷新

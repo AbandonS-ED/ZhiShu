@@ -39,7 +39,7 @@ export default function AdminDashboardPage() {
   const router = useRouter()
   const [stats, setStats] = useState<AdminStats>({
     total_users: 0, admin_count: 0, total_exercises: 0,
-    total_paths: 0, total_chats: 0, total_documents: 0, today_active: 0,
+    total_chats: 0, total_documents: 0, today_active: 0,
   })
   const [trends, setTrends] = useState<AdminTrends>({ labels: [], registrations: [], resources: [] })
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -93,7 +93,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
             <div className="admin-st-v" style={{ color: 'var(--success)' }}>{stats.total_exercises.toLocaleString()}</div>
-            <div className="admin-st-s">路径 {stats.total_paths} · 知识库 {stats.total_documents}</div>
+            <div className="admin-st-s">知识库 {stats.total_documents}</div>
           </div>
 
           <div className="admin-st">

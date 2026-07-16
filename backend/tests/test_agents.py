@@ -2,7 +2,6 @@
 
 import pytest
 from app.agents.mindmap_agent import MindMapAgent
-from app.agents.path_agent import PathAgent
 from app.agents.tutor_agent import TutorAgent
 from app.agents.exercise_agent import ExerciseAgent
 from app.agents.document_agent import DocumentAgent
@@ -54,29 +53,6 @@ class TestMindMapAgent:
 
     def test_is_fallback_result_default(self):
         assert self.agent._is_fallback_result({"mermaid_code": self.agent.FALLBACK_MERMAID}) is True
-
-
-class TestPathAgent:
-    def setup_method(self):
-        self.agent = PathAgent()
-
-    def test_build_prompt_basic(self):
-        prompt = self.agent._build_prompt(["机器学习", "深度学习"], None, 30)
-        assert "30 天" in prompt
-        assert "机器学习" in prompt
-
-    def test_build_prompt_with_profile(self):
-        profile = {
-            "comprehension": {"score": 60, "confidence": 0.8},
-            "memory": {"score": 50, "confidence": 0.7},
-        }
-        prompt = self.agent._build_prompt(["机器学习", "深度学习"], profile, 30)
-        assert "机器学习" in prompt
-
-    def test_parse_response_invalid(self):
-        result = self.agent._parse_response("不是 JSON")
-        assert result["nodes"] == []
-        assert result["edges"] == []
 
 
 class TestTutorAgent:

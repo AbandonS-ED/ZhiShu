@@ -43,37 +43,6 @@ export interface KnowledgePoint {
   order_index: number
 }
 
-// 学习路径节点
-export interface PathNode {
-  id: string
-  kp_id: string
-  kp_name: string
-  order: number
-  difficulty: string
-  status: 'locked' | 'available' | 'in_progress' | 'completed'
-  estimated_hours: number
-  resources: string[]
-}
-
-// 学习路径边
-export interface PathEdge {
-  from: string
-  to: string
-  relation: 'prerequisite'
-}
-
-// 学习路径
-export interface LearningPath {
-  id: string
-  name: string
-  description: string
-  nodes: PathNode[]
-  edges: PathEdge[]
-  total_hours: number
-  progress: number
-  status: 'active' | 'completed' | 'paused'
-}
-
 // 学习资源 — 与后端返回格式一致
 export interface Resource {
   resource_id: string

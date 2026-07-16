@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from app.models.learning_record import LearningRecord
 from app.models.student_profile import StudentProfile
-from app.models.learning_path import LearningPath
 from app.models.student import Student
 
 logger = logging.getLogger(__name__)
@@ -230,28 +229,12 @@ class EvaluationService:
         # 获取练习详情（用于 LLM 分析）
         exercise_details = await self._get_exercise_details(db, student_id)
 
-        # 路径进度（从 daily_plan JSONB 统计）
-        path_result = await db.execute(
-            select(LearningPath)
-            .where(LearningPath.student_id == uuid.UUID(student_id))
-        )
-        paths = path_result.scalars().all()
-        total_nodes = 0
-        completed_nodes = 0
-        for path in paths:
-            daily_plan = path.daily_plan or []
-            total_nodes += len(daily_plan)
-            completed_nodes += sum(1 for d in daily_plan if d.get("status") == "completed")
-
         # 综合评分（0-100）
         score = 0
         if total_actions := stats["total_actions"]:
             score += min(30, total_actions * 2)  # 活跃度最高 30 分
         if avg_score:
             score += min(40, avg_score * 0.4)  # 正确率最高 40 分
-        if total_nodes > 0:
-            path_progress = completed_nodes / total_nodes
-            score += min(30, path_progress * 30)  # 路径进度最高 30 分
 
         # 计算近期趋势
         trend = await self._calculate_trend(db, student_id)

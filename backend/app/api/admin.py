@@ -13,7 +13,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_admin
 from app.models.student import Student
 from app.models.student_profile import StudentProfile
-from app.models.learning_path import LearningPath
+
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
 from app.models.learning_record import LearningRecord
@@ -49,7 +49,6 @@ async def get_stats(
     [
         user_count,
         admin_count,
-        path_count,
         chat_count,
         doc_count,
         exercise_count,
@@ -57,7 +56,6 @@ async def get_stats(
     ] = await asyncio.gather(
         db.execute(select(sa_func.count()).select_from(Student).where(Student.role == "student")),
         db.execute(select(sa_func.count()).select_from(Student).where(Student.role == "admin")),
-        db.execute(select(sa_func.count()).select_from(LearningPath)),
         db.execute(select(sa_func.count()).select_from(ChatSession)),
         db.execute(select(sa_func.count()).select_from(DocumentChunk)),
         db.execute(select(sa_func.count()).select_from(ExerciseBank)),
@@ -69,7 +67,6 @@ async def get_stats(
 
     user_count = user_count.scalar() or 0
     admin_count = admin_count.scalar() or 0
-    path_count = path_count.scalar() or 0
     chat_count = chat_count.scalar() or 0
     doc_count = doc_count.scalar() or 0
     exercise_count = exercise_count.scalar() or 0
@@ -79,7 +76,6 @@ async def get_stats(
         "total_users": user_count,
         "admin_count": admin_count,
         "total_exercises": exercise_count,
-        "total_paths": path_count,
         "total_chats": chat_count,
         "total_documents": doc_count,
         "today_active": today_active,
@@ -203,10 +199,6 @@ async def get_user_detail(
     if not target:
         raise HTTPException(status_code=404, detail="用户不存在")
 
-    path_count = (await db.execute(
-        select(sa_func.count()).select_from(LearningPath).where(LearningPath.student_id == target.id)
-    )).scalar() or 0
-
     return {
         "id": str(target.id),
         "student_no": target.student_no,
@@ -214,7 +206,6 @@ async def get_user_detail(
         "email": target.email or "",
         "role": target.role or "student",
         "is_active": target.is_active if target.is_active is not None else True,
-        "path_count": path_count,
         "last_login": target.last_login.isoformat() if target.last_login else None,
         "created_at": target.created_at.isoformat() if target.created_at else None,
     }
@@ -280,7 +271,6 @@ async def delete_user(
         delete(ChatSession).where(ChatSession.student_id == student_id)
     )
     # 3c. 其他关联表
-    await db.execute(delete(LearningPath).where(LearningPath.student_id == student_id))
     await db.execute(delete(LearningRecord).where(LearningRecord.student_id == student_id))
     await db.execute(delete(LearningActivityLog).where(LearningActivityLog.student_id == student_id))
     await db.execute(delete(EvaluationReport).where(EvaluationReport.student_id == student_id))
@@ -293,58 +283,7 @@ async def delete_user(
     return {"message": f"已删除用户「{target.name}」及其所有关联数据"}
 
 
-# ====================================================================
-# 学习路径管理
-# ====================================================================
 
-@router.get("/paths")
-async def list_paths(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    student_id: uuid.UUID | None = None,
-    db: AsyncSession = Depends(get_db),
-    user: Student = Depends(get_current_user),
-):
-    _require_admin(user)
-
-    stu_sub = select(Student.id, Student.name).subquery()
-
-    q = (
-        select(LearningPath, sa_func.coalesce(stu_sub.c.name, "未知").label("student_name"))
-        .outerjoin(stu_sub, LearningPath.student_id == stu_sub.c.id)
-    )
-    count_q = select(sa_func.count()).select_from(LearningPath)
-
-    if student_id:
-        q = q.where(LearningPath.student_id == student_id)
-        count_q = count_q.where(LearningPath.student_id == student_id)
-
-    total = (await db.execute(count_q)).scalar() or 0
-    result = await db.execute(
-        q.order_by(LearningPath.created_at.desc())
-        .offset((page - 1) * page_size).limit(page_size)
-    )
-    rows = result.all()
-
-    items = []
-    for r in rows:
-        path_obj = r[0]  # LearningPath object
-        nodes = path_obj.nodes or []
-        edges = path_obj.edges or []
-        items.append({
-            "id": str(path_obj.id),
-            "student_id": str(path_obj.student_id),
-            "student_name": r.student_name,
-            "title": path_obj.title or "",
-            "total_days": path_obj.total_days or 0,
-            "node_count": len(nodes),
-            "edge_count": len(edges),
-            "nodes": nodes,
-            "edges": edges,
-            "created_at": path_obj.created_at.isoformat() if path_obj.created_at else None,
-        })
-
-    return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
 # ====================================================================
