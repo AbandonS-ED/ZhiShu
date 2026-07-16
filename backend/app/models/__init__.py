@@ -10,6 +10,7 @@ from app.models.resource import Resource
 from app.models.exercise import Exercise
 from app.models.exercise_bank import ExerciseBank
 from app.models.wrong_question import WrongQuestion
+from app.models.study_plan import StudyPlan, StudyPlanStep, LearningPath
 
 __all__ = [
     "Student", "StudentProfile", "DocumentChunk",
@@ -17,4 +18,5 @@ __all__ = [
     "LearningActivityLog", "EvaluationReport",
     "Resource", "Exercise", "ExerciseBank",
     "WrongQuestion",
+    "StudyPlan", "StudyPlanStep", "LearningPath",
 ]

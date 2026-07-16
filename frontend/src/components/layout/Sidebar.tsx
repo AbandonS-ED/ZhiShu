@@ -104,7 +104,7 @@ const navGroups: { label: string; items: NavItem[] }[] = [
     items: [
       { href: '/profile', label: '学习画像', svg: userSvg },
       { href: '/pinggu', label: '学习评估', svg: evalSvg },
-      { href: '/plan', label: '学习计划', svg: calendarSvg },
+      { href: '/plan', label: '学习计划', svg: pathSvg },
       { href: '/resources/my-resources', label: '我的资源', svg: bookmarkSvg },
     ],
   },
