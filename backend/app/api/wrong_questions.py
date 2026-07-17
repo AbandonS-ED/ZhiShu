@@ -366,10 +366,13 @@ async def list_wrong_questions(
     )
     by_error_type = {row[0]: row[1] for row in type_q.all()}
 
-    # === 分页数据 ===
-    query = select(WrongQuestion, Exercise).join(
-        Exercise, WrongQuestion.exercise_id == Exercise.id
-    ).where(WrongQuestion.student_id == student_id)
+    # === 分页数据（LEFT JOIN Exercise 和 ExerciseBank）===
+    query = (
+        select(WrongQuestion, Exercise, ExerciseBank)
+        .outerjoin(Exercise, WrongQuestion.exercise_id == Exercise.id)
+        .outerjoin(ExerciseBank, WrongQuestion.exercise_bank_id == ExerciseBank.id)
+        .where(WrongQuestion.student_id == student_id)
+    )
 
     if filter_type == "unmastered":
         query = query.where(WrongQuestion.is_mastered == False)
@@ -378,7 +381,10 @@ async def list_wrong_questions(
     if error_type:
         query = query.where(WrongQuestion.error_type == error_type)
     if keyword:
-        query = query.where(Exercise.question.ilike(f"%{keyword}%"))
+        # keyword 搜索从 snapshot 取 question（兼容两种 source）
+        query = query.where(
+            WrongQuestion.question_snapshot["question"].astext.ilike(f"%{keyword}%")
+        )
 
     page_query = query.order_by(desc(WrongQuestion.created_at)).limit(page_size).offset((page - 1) * page_size)
     page_count_q = await db.execute(
@@ -388,7 +394,7 @@ async def list_wrong_questions(
 
     page_result = await db.execute(page_query)
     rows = page_result.all()
-    items = [_to_dto(wq, ex) for wq, ex in rows]
+    items = [_to_dto(wq, ex, bank) for wq, ex, bank in rows]
 
     return {
         "items": items,
