@@ -576,7 +576,7 @@ async def generate_exercises_stream(
             exercises = result.get("exercises", [])
             yield sse_progress(0.7, "正在防幻觉验证...")
 
-            # 保存到题库
+            # 保存到题库（flush 生成 UUID 后回填给前端）
             from app.core.database import async_session
             saved_count = 0
             async with async_session() as save_db:
@@ -593,6 +593,9 @@ async def generate_exercises_stream(
                         created_by=uuid.UUID(req.student_id),
                     )
                     save_db.add(bank_item)
+                    # flush 生成 UUID 并回填到原 dict（前端靠这个 ID 加入错题本）
+                    await save_db.flush()
+                    ex["exercise_id"] = str(bank_item.id)
                     saved_count += 1
                 if saved_count > 0:
                     await save_db.commit()
@@ -656,7 +659,7 @@ async def generate_exercises(
             additional_exercises = additional_result.get("exercises", [])
             exercises.extend(additional_exercises)
 
-        # 保存到题库
+        # 保存到题库（flush 生成 UUID 后回填给前端）
         from app.core.database import async_session
         async with async_session() as save_db:
             for ex in exercises:
@@ -672,6 +675,8 @@ async def generate_exercises(
                     created_by=uuid.UUID(req.student_id),
                 )
                 save_db.add(bank_item)
+                await save_db.flush()
+                ex["exercise_id"] = str(bank_item.id)
             await save_db.commit()
 
         generation_time = round(time.time() - start_time, 2)
