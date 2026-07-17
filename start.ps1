@@ -3,7 +3,7 @@
 # 1. 启动前检查 8001/3000 端口，孤儿 socket 警告用户
 # 2. 不用 cmd wrapper（直接用 python.exe + npm），Stop-Process 干净
 # 3. 记录 PID 到 .pids 文件（stop.ps1 用）
-# 4. 后端启动非 reload 模式（避免父子进程问题）
+# 4. 生产模式后端非 reload；开发模式 -Dev 后端带 --reload（支持热更新）
 # 5. 启动失败立刻提示
 # 6. 默认生产模式（next build + next start），-Dev 切开发模式
 
@@ -45,14 +45,20 @@ foreach ($port in @('8001', '3000')) {
     }
 }
 
-# 1. 启动后端（不用 --reload，避免父子进程问题）
-Write-Host "[1/4] 启动后端 (端口 8001, 非 reload 模式)..." -ForegroundColor Cyan
+# 1. 启动后端（生产模式非 reload；开发模式带 --reload 热更新）
+if ($Dev) {
+    Write-Host "[1/4] 启动后端 (端口 8001, dev 模式 - 带 --reload 热更新)..." -ForegroundColor Cyan
+    $backendArgs = @('-m','uvicorn','app.main:app','--host','0.0.0.0','--port','8001','--reload')
+} else {
+    Write-Host "[1/4] 启动后端 (端口 8001, 生产模式 - 非 reload)..." -ForegroundColor Cyan
+    $backendArgs = @('-m','uvicorn','app.main:app','--host','0.0.0.0','--port','8001')
+}
 $backendExe = Join-Path $BackendDir 'venv\Scripts\python.exe'
 $backendLog = Join-Path $LogDir 'backend.log'
 $backendErr = Join-Path $LogDir 'backend.err.log'
 
 $backendProc = Start-Process -FilePath $backendExe `
-    -ArgumentList '-m','uvicorn','app.main:app','--host','0.0.0.0','--port','8001' `
+    -ArgumentList $backendArgs `
     -WorkingDirectory $BackendDir `
     -RedirectStandardOutput $backendLog `
     -RedirectStandardError $backendErr `
