@@ -1,6 +1,7 @@
 """错题本 API — 传统错题集 + AI 错因分析 + 同类题推荐"""
 import json
 import uuid
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -17,6 +18,18 @@ from app.services.llm_factory import get_llm_client
 from app.services.json_parser import parse_json_response
 
 router = APIRouter()
+
+
+@dataclass
+class QuestionSnapshot:
+    """从 snapshot 构建的题目对象，供 LLM 分析使用"""
+    question: str = ""
+    options: Optional[list] = None
+    answer: str = ""
+    explanation: str = ""
+    knowledge_point: str = ""
+    difficulty: int = 50
+    exercise_type: str = "unknown"
 
 
 # ===== Request/Response Models =====
@@ -519,17 +532,17 @@ async def analyze_wrong_question(
     # 用 snapshot 或查到的对象来调用分析
     source_obj = exercise if exercise else bank_item
     if not source_obj:
-        # 用 question_snapshot 构建临时对象
+        # 从 snapshot 构建 QuestionSnapshot 对象
         if wq.question_snapshot:
-            class SnapObj:
-                def __init__(self, snap):
-                    self.question = snap.get("question", "")
-                    self.options = snap.get("options")
-                    self.answer = snap.get("answer", "")
-                    self.explanation = snap.get("explanation", "")
-                    self.knowledge_point = snap.get("knowledge_point", "")
-                    self.difficulty = snap.get("difficulty", 50)
-            source_obj = SnapObj(wq.question_snapshot)
+            source_obj = QuestionSnapshot(
+                question=wq.question_snapshot.get("question", ""),
+                options=wq.question_snapshot.get("options"),
+                answer=wq.question_snapshot.get("answer", ""),
+                explanation=wq.question_snapshot.get("explanation", ""),
+                knowledge_point=wq.question_snapshot.get("knowledge_point", ""),
+                difficulty=wq.question_snapshot.get("difficulty", 50),
+                exercise_type=wq.question_snapshot.get("exercise_type", "unknown"),
+            )
         else:
             raise HTTPException(status_code=404, detail="题目不存在")
 
