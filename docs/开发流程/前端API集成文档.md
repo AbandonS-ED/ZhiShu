@@ -1,6 +1,6 @@
 # 智枢 (SmartHub) 前端 API 集成文档
 
-> ⚠️ **DEPRECATED · 2026-06-09**（最后同步：2026-07-18 — 实际 16 Agent / 69 API 端点 / 9 真流式 / 30 页面 / 110 pytest）
+> ⚠️ **DEPRECATED · 2026-06-09**（最后同步：2026-07-18 — 实际 17 Agent / 70 API 端点 / 9 真流式 / 30 页面 / 110 pytest）
 >
 > 本文档描述的 `ApiClient` 类、Token 刷新、SWR 集成、Auth 模块等**全部未在项目中实现**。
 >

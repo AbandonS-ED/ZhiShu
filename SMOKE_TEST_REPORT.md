@@ -1,6 +1,6 @@
 # 端到端冒烟测试报告
 
-> 最后更新：2026-07-18（学习计划模块合并 + 数值校准）
+> 最后更新：2026-07-18（合并 wyy 分支 AI 智能评分 + 文档全量同步）
 
 ## 测试概览
 
@@ -19,15 +19,15 @@
  
 ---
 
-## 最新变更（2026-07-17）
+## 最新变更（2026-07-18）
 
-学习计划模块合并（wyy 分支）+ 数值校准：
-- 后端 68 个 API 端点（新增 6 个 study-plan 端点）
-- 前端 30 页面（20 学生页 + 9 管理页 + 1 子页面 + 含 5 个 plan 页面）
-- Agent 数量：15 个 Agent 模块 + 1 个 Master Agent（+ learning_path_agent）
-- 服务数量：18 个（+ study_plan_service）
-- 数据库表：15 张（+ wrong_questions / study_plans / study_plan_steps + learning_paths 节点扩展）
-- **学习计划模块** (合并 wyy 分支): 输入知识点 → AI 生成学习路径 (10-15 节点) → 节点学习 → AI 测验 → 综合测试
+合并 wyy 分支 AI 智能评分 + 错题分层分析 + 文档全量同步：
+- 后端 70 个 API 端点（新增 /resource/score-answer）
+- 前端 30 页面
+- Agent 数量：17 个 Agent 模块（+ ScoringAgent）
+- 服务数量：18 个
+- 数据库表：15 张
+- **AI 智能评分**: ScoringAgent 语义评分（5级评分标准·4维度反馈·关键词fallback）+ POST /resource/score-answer 端点
 
 ---
 

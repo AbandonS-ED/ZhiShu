@@ -1,14 +1,14 @@
 # 智枢(SmartHub) Backend
 
-> 最后更新：2026-07-17（学习计划模块合并 + 数值校准）
+> 最后更新：2026-07-18（合并 wyy 分支 AI 智能评分 + 文档全量同步）
 
-基于 FastAPI + 15 Agent 的多智能体学习资源生成系统后端。
+基于 FastAPI + 17 Agent 的多智能体学习资源生成系统后端。
 
 ## 技术栈
 
 - **框架**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg
-- **Agent**: 15 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）+ learning_path_agent（学习路径 AI 生成）
-- **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 **68** 业务端点门禁
+- **Agent**: 17 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）
+- **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 **70** 业务端点门禁
 - **角色**: `role` 字段（student / admin）+ `is_active` 软删除 + `last_login` 记录
 - **LLM**: 小米 MiMo v2.5（当前）→ MiniMax-M3 → 讯飞星火 V4（上线前切换 `LLM_PROVIDER=spark`）
 - **数据库**: PostgreSQL 18 + **15 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（Celery broker，当前未起 worker）

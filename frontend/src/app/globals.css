@@ -1970,7 +1970,6 @@ body:has(.login-page){
   .report-actions{flex-direction:column}
 }
 
-<<<<<<< HEAD
 /* ═══════════════════════════════════════════════════════════════
    智枢 SmartHub · 错题本
    - AI 自动归因 + 同类题推荐 + 复习巩固
@@ -2311,7 +2310,7 @@ body:has(.login-page){
 
 /* ===== Login auth-root ===== */
 .auth-root{min-height:100vh;display:flex;flex-direction:column}
-=======
+
 /* ═══════════════════════════════════════════════════════════════════
    学习计划页面样式
    ═══════════════════════════════════════════════════════════════════ */
@@ -4566,4 +4565,3 @@ body:has(.login-page){
   background: var(--surface);
   cursor: not-allowed;
 }
->>>>>>> origin/wyy

@@ -1,6 +1,6 @@
 # 智枢 (SmartHub) — AI Coding 工具使用说明
 
-> ⚠️ **PARTIALLY DEPRECATED · 2026-06-09**（最后同步：2026-07-18 — 实际 16 Agent / 69 API 端点 / LangGraph StateGraph 10 节点）
+> ⚠️ **PARTIALLY DEPRECATED · 2026-06-09**（最后同步：2026-07-18 — 实际 17 Agent / 70 API 端点 / LangGraph StateGraph 10 节点）
 >
 > 本文档 §4 关键代码片段（LangGraph Master Agent + pgvector RAG）和 §3.6 前端开发阶段（提到 shadcn/ui）描述的代码 / 架构**与实际不符**：
 >

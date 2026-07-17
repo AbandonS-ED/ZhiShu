@@ -15,7 +15,7 @@
 |---|---|---|---|
 | 前端 | Next.js (App Router) + Tailwind CSS + TypeScript | 14.2.5 | 本地 woff 字体，无 Google Fonts |
 | 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 | Python 3.11 |
-| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 16 Agent 模块 |
+| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 17 Agent 模块 |
 | LLM | 三客户端: MimoClient (当前) / MiniMaxClient / SparkClient | - | `LLM_PROVIDER=mimo\|minimax\|spark` 切换 |
 | 向量库 | pgvector (JSONB 降级方案) | - | embedding 用 JSONB 占位 |
 | 数据库 | PostgreSQL 18 + Redis | - | 14 张表 |
@@ -46,8 +46,8 @@ ZhiShu/
 │   └── src/hooks/usePageTimer.ts    # 页面停留计时器
 ├── backend/                         # FastAPI 后端
 │   ├── app/main.py                  # 应用入口 + 路由注册
-│   ├── app/api/                     # 12 个路由模块 (69 端点)
-│   ├── app/agents/                  # 16 个 Agent 模块 + StateGraph 编排
+│   ├── app/api/                     # 12 个路由模块 (70 端点)
+│   ├── app/agents/                  # 17 个 Agent 模块 + StateGraph 编排
 │   ├── app/services/                # 17 个服务模块
 │   ├── app/models/                  # 13 个数据模型
 │   ├── app/tasks/                   # Celery 异步任务
@@ -217,7 +217,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 对话页刷新修复 (sessionId 持久化 + loadSession 渲染)
 - ✅ 骨架屏 loading (4 页面 shimmer 动画)
 - ✅ 评估报告 AI 化 + 预生成缓存 + 定时生成
-- ✅ 管理后台 API 增强 (18 端点 + 15 Agent 模块 + 并行查询 + N+1 优化)
+- ✅ 管理后台 API 增强 (18 端点 + 17 Agent 模块 + 并行查询 + N+1 优化)
 - ✅ 手机验证码注册 (控制台输出 + 5 分钟有效期 + 手机号唯一)
 - ✅ 三页面接入真实 API (paths/chats/documents)
 - ✅ forEach async 批量操作修复 (users/page.tsx)
