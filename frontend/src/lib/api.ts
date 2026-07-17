@@ -250,6 +250,37 @@ export const exerciseApi = {
     ),
 }
 
+// ===== Scoring =====
+export interface ScoreResult {
+  score: number
+  correct: boolean
+  feedback: string
+  key_points_covered: string[]
+  key_points_missing: string[]
+  suggestion: string
+}
+
+export const scoreApi = {
+  scoreAnswer: (
+    question: string,
+    correct_answer: string,
+    student_answer: string,
+    knowledge_point: string = ''
+  ) =>
+    request<ScoreResult>(
+      '/resource/score-answer',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          question,
+          correct_answer,
+          student_answer,
+          knowledge_point,
+        }),
+      }
+    ),
+}
+
 
 
 // ===== Tutor =====
