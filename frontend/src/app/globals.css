@@ -2095,3 +2095,102 @@ body:has(.login-page){
   .wq-review-actions{flex-direction:column}
   .wq-card-meta{gap:8px}
 }
+
+/* ===== 学习计划模块（合并 wyy） ===== */
+.plan-page{min-height:100vh;padding:32px 24px;background:linear-gradient(180deg,var(--bg-2) 0%,var(--bg) 100%)}
+.plan-container{max-width:1200px;margin:0 auto}
+.plan-hero{background:linear-gradient(135deg,#5b6bf2 0%,#8a5cf6 100%);border-radius:20px;padding:48px 40px;color:#fff;margin-bottom:32px;box-shadow:0 12px 40px rgba(91,107,242,.18)}
+.plan-hero h1{font-size:36px;font-weight:700;margin:0 0 12px;letter-spacing:-.5px}
+.plan-hero p{font-size:16px;opacity:.92;margin:0 0 28px;line-height:1.6}
+.plan-search-box{display:flex;align-items:center;gap:12px;background:rgba(255,255,255,.96);border-radius:14px;padding:6px 6px 6px 18px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
+.plan-search-box svg{flex-shrink:0;color:var(--ink-3)}
+.plan-search-box input{flex:1;border:none;outline:none;font-size:15px;padding:14px 8px;background:transparent;color:var(--ink)}
+.plan-search-box input::placeholder{color:var(--ink-4)}
+.plan-search-box .btn-primary{white-space:nowrap;display:flex;align-items:center;gap:8px;padding:12px 22px;border-radius:10px;background:var(--ink);color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
+.plan-search-box .btn-primary:hover:not(:disabled){background:#1a1d2e;transform:translateY(-1px)}
+.plan-search-box .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.plan-section{margin-bottom:36px}
+.section-header{display:flex;align-items:baseline;gap:12px;margin-bottom:18px}
+.section-header h2{font-size:22px;font-weight:700;color:var(--ink);margin:0;letter-spacing:-.3px}
+.section-subtitle{font-size:13px;color:var(--ink-3)}
+.recommend-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.recommend-card{display:flex;align-items:center;gap:14px;padding:18px;background:var(--surface);border:1px solid var(--line);border-radius:14px;cursor:pointer;transition:all .2s}
+.recommend-card:hover{border-color:#5b6bf2;transform:translateY(-2px);box-shadow:0 8px 24px rgba(91,107,242,.12)}
+.recommend-icon{flex-shrink:0;width:44px;height:44px;border-radius:11px;background:linear-gradient(135deg,#eef0ff 0%,#f3edff 100%);display:flex;align-items:center;justify-content:center;color:#5b6bf2}
+.recommend-info{flex:1;min-width:0}
+.recommend-name{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recommend-reason{font-size:12px;color:var(--ink-3)}
+.path-list{display:flex;flex-direction:column;gap:12px}
+.path-card{padding:20px 24px;background:var(--surface);border:1px solid var(--line);border-radius:14px;cursor:pointer;transition:all .2s}
+.path-card:hover{border-color:#5b6bf2;transform:translateY(-1px);box-shadow:0 6px 20px rgba(91,107,242,.1)}
+.path-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.path-card-header h3{font-size:17px;font-weight:600;color:var(--ink);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.path-status{padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;background:rgba(16,185,129,.1);color:#10b981}
+.path-status:contains("已完成"){background:rgba(107,114,128,.1);color:var(--ink-3)}
+.path-card-desc{font-size:14px;color:var(--ink-3);margin-bottom:14px;line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.path-card-progress{display:flex;align-items:center;gap:12px}
+.progress-bar{flex:1;height:6px;background:var(--bg-2);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,#5b6bf2 0%,#8a5cf6 100%);transition:width .4s ease;border-radius:3px}
+.path-card-progress span{font-size:12px;color:var(--ink-3);font-weight:600;font-family:'JetBrains Mono',monospace;flex-shrink:0}
+
+/* 路径详情页 */
+.path-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.path-header h1{font-size:28px;font-weight:700;color:var(--ink);margin:0}
+.path-stats{display:flex;align-items:center;gap:16px;font-size:14px;color:var(--ink-3)}
+.path-stats strong{color:var(--ink);font-family:'JetBrains Mono',monospace}
+.path-graph{display:flex;flex-direction:column;gap:20px;padding:32px;background:var(--surface);border:1px solid var(--line);border-radius:18px;position:relative}
+.path-node-container{display:flex;align-items:center;gap:20px}
+.node-icon{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#eef0ff 0%,#f3edff 100%);display:flex;align-items:center;justify-content:center;color:#5b6bf2;flex-shrink:0;border:3px solid var(--line);position:relative;z-index:2}
+.node-icon.current{background:linear-gradient(135deg,#5b6bf2 0%,#8a5cf6 100%);color:#fff;border-color:#5b6bf2;box-shadow:0 4px 16px rgba(91,107,242,.4)}
+.node-icon.completed{background:#10b981;color:#fff;border-color:#10b981}
+.node-icon.pending{opacity:.5}
+.node-number{font-size:14px;font-weight:700}
+.node-label{flex:1;padding:14px 20px;background:var(--bg);border:1px solid var(--line);border-radius:12px;font-size:15px;color:var(--ink);font-weight:500;transition:all .2s}
+.node-label.current{border-color:#5b6bf2;background:rgba(91,107,242,.04)}
+.node-label.completed{opacity:.7}
+.node-label.pending{opacity:.55}
+.node-badge{display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;background:rgba(91,107,242,.12);color:#5b6bf2;margin-top:4px}
+
+/* 学习页 */
+.learn-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.learn-header h1{font-size:24px;font-weight:700;color:var(--ink);margin:0}
+.learn-tabs{display:flex;gap:8px;padding:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:24px}
+.learn-tab{padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;color:var(--ink-3);cursor:pointer;border:none;background:transparent;transition:all .2s}
+.learn-tab.active{background:var(--ink);color:#fff}
+.learn-tab:hover:not(.active){background:var(--bg-2);color:var(--ink)}
+.learn-content{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:32px;min-height:400px;margin-bottom:24px}
+.learn-footer{display:flex;justify-content:flex-end;gap:12px}
+.learn-footer .btn-primary{padding:12px 28px;border-radius:10px;background:linear-gradient(135deg,#5b6bf2 0%,#8a5cf6 100%);color:#fff;border:none;font-size:14px;font-weight:600;cursor:pointer}
+.learn-footer .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+
+/* 测验页 */
+.quiz-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.quiz-header h1{font-size:22px;font-weight:700;color:var(--ink);margin:0}
+.quiz-info{display:flex;align-items:center;gap:20px;font-size:14px;color:var(--ink-3)}
+.quiz-info strong{color:var(--ink);font-family:'JetBrains Mono',monospace}
+.quiz-questions{display:flex;flex-direction:column;gap:16px;margin-bottom:24px}
+.quiz-question{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px;transition:all .2s}
+.quiz-question.correct{border-color:#10b981;background:rgba(16,185,129,.04)}
+.quiz-question.wrong{border-color:#ef4444;background:rgba(239,68,68,.04)}
+.quiz-question h3{font-size:16px;font-weight:600;color:var(--ink);margin:0 0 16px;line-height:1.6}
+.quiz-options{display:flex;flex-direction:column;gap:8px}
+.quiz-option{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--bg);border:1px solid var(--line);border-radius:10px;cursor:pointer;transition:all .15s;font-size:14px;color:var(--ink)}
+.quiz-option:hover{border-color:#5b6bf2;background:rgba(91,107,242,.04)}
+.quiz-option.selected{border-color:#5b6bf2;background:rgba(91,107,242,.08);font-weight:600}
+.quiz-option.correct-answer{background:rgba(16,185,129,.08);border-color:#10b981;color:#10b981;font-weight:600}
+.quiz-option.wrong-answer{background:rgba(239,68,68,.08);border-color:#ef4444;color:#ef4444}
+.quiz-submit{display:flex;justify-content:center;margin-top:24px}
+.quiz-submit .btn-primary{padding:14px 48px;border-radius:12px;background:linear-gradient(135deg,#5b6bf2 0%,#8a5cf6 100%);color:#fff;border:none;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 6px 20px rgba(91,107,242,.3)}
+.quiz-submit .btn-primary:disabled{opacity:.5;cursor:not-allowed}
+
+@media(max-width:768px){
+  .plan-page{padding:20px 16px}
+  .plan-hero{padding:32px 24px}
+  .plan-hero h1{font-size:28px}
+  .plan-search-box{flex-wrap:wrap;padding:6px}
+  .plan-search-box input{width:100%;padding:12px 8px}
+  .recommend-grid{grid-template-columns:1fr}
+  .path-card{padding:16px}
+  .path-graph{padding:20px}
+  .learn-content{padding:20px}
+}
