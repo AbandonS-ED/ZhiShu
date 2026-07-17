@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { studyPlanApi, exerciseApi, type LearningPath, type Exercise } from '@/lib/api'
+import { studyPlanApi, exerciseApi, wrongQuestionsApi, type LearningPath, type Exercise } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { usePageTimer } from '@/hooks/usePageTimer'
 import Icon from '@/components/Icon'
@@ -91,7 +91,7 @@ export default function FinalTestPage() {
     }))
   }
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     if (submitted) return
     
     const allAnswered = exercises.every((_, index) => answers[index]?.selected !== null)
@@ -102,6 +102,8 @@ export default function FinalTestPage() {
 
     // 计算每个知识点的正确率
     const knowledgeScores: Record<string, { correct: number; total: number }> = {}
+    const studentId = getStudentId()
+    const wrongExercises: { exercise: Exercise; answer: string }[] = []
     
     exercises.forEach((exercise, index) => {
       const answer = answers[index]
@@ -129,7 +131,27 @@ export default function FinalTestPage() {
         ...prev,
         [index]: { ...prev[index], correct: isCorrect }
       }))
+
+      // 收集错题，稍后批量加入
+      if (!isCorrect && studentId && exercise.exercise_id) {
+        wrongExercises.push({ exercise, answer: String(answer.selected) })
+      }
     })
+
+    // 批量加入错题本（不阻塞主流程）
+    if (studentId) {
+      wrongExercises.forEach(async ({ exercise, answer }) => {
+        try {
+          await wrongQuestionsApi.add({
+            student_id: studentId,
+            exercise_id: exercise.exercise_id,
+            wrong_answer: answer,
+          })
+        } catch (err) {
+          console.error('加入错题本失败:', err)
+        }
+      })
+    }
 
     // 计算总分
     let totalCorrect = 0

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { studyPlanApi, exerciseApi, type LearningPath, type LearningPathNode, type Exercise } from '@/lib/api'
+import { studyPlanApi, exerciseApi, wrongQuestionsApi, type LearningPath, type LearningPathNode, type Exercise } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { usePageTimer } from '@/hooks/usePageTimer'
 import Icon from '@/components/Icon'
@@ -119,6 +119,8 @@ export default function QuizNodePage() {
 
     let correctCount = 0
     let totalScore = 0
+    const studentId = getStudentId()
+    const wrongExercises: { exercise: Exercise; answer: string }[] = []
     
     exercises.forEach((exercise, index) => {
       const answer = answers[index]
@@ -146,7 +148,27 @@ export default function QuizNodePage() {
         ...prev,
         [index]: { ...prev[index], correct: isCorrect }
       }))
+
+      // 收集错题，稍后批量加入
+      if (!isCorrect && studentId && exercise.exercise_id) {
+        wrongExercises.push({ exercise, answer: String(answer.selected) })
+      }
     })
+
+    // 批量加入错题本（不阻塞主流程）
+    if (studentId) {
+      wrongExercises.forEach(async ({ exercise, answer }) => {
+        try {
+          await wrongQuestionsApi.add({
+            student_id: studentId,
+            exercise_id: exercise.exercise_id,
+            wrong_answer: answer,
+          })
+        } catch (err) {
+          console.error('加入错题本失败:', err)
+        }
+      })
+    }
 
     const finalScore = Math.round(totalScore / exercises.length)
     setScore(finalScore)
