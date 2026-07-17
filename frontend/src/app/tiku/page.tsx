@@ -304,7 +304,9 @@ export default function TikuPage() {
         student_id: getStudentId()!,
         exercise_id: id,
         wrong_answer: String.fromCharCode(65 + selected),
-      }).catch(() => {})
+      }).catch((err) => {
+        console.error('加入错题本失败:', err)
+      })
     }
   }, [answers, exercises, addRecent])
 
@@ -334,7 +336,9 @@ export default function TikuPage() {
         student_id: getStudentId()!,
         exercise_id: id,
         wrong_answer: selected ? '对' : '错',
-      }).catch(() => {})
+      }).catch((err) => {
+        console.error('加入错题本失败:', err)
+      })
     }
   }, [answers, exercises, addRecent])
 
