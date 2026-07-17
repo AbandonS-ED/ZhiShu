@@ -155,19 +155,17 @@ export default function QuizNodePage() {
       }
     })
 
-    // 批量加入错题本（不阻塞主流程）
+    // 批量加入错题本（Promise.allSettled 确保全部完成）
     if (studentId) {
-      wrongExercises.forEach(async ({ exercise, answer }) => {
-        try {
-          await wrongQuestionsApi.add({
+      await Promise.allSettled(
+        wrongExercises.map(({ exercise, answer }) =>
+          wrongQuestionsApi.add({
             student_id: studentId,
             exercise_id: exercise.exercise_id,
             wrong_answer: answer,
-          })
-        } catch (err) {
-          console.error('加入错题本失败:', err)
-        }
-      })
+          }).catch((err) => console.error('加入错题本失败:', err))
+        )
+      )
     }
 
     const finalScore = Math.round(totalScore / exercises.length)
