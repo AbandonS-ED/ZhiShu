@@ -206,9 +206,12 @@ cd frontend && npm run build                       # 28 页面
 
 ---
 
-## 📊 本轮 11 个 commits
+## 📊 本轮 commits（错题本修复 + 重复造轮子审计修复）
 
 ```
+e8a69a1 refactor: P1重复造轮子修复（_validate_uuid抽取、8个agent改用parse_json_response）
+ea3eadb refactor: P0重复造轮子修复（fetch→api.ts、alert→showToast、saveAuthStorage抽出、timezone统一）
+4d92730 fix: evaluation_service 改用 LLM 工厂（含 MiMo 切模型失效 bug）
 59f566b refactor: QuestionSnapshot 顶层 dataclass + 补全 exercise_type
 1e5369d feat: 错题本加入成功/失败给用户toast提示
 fa11a54 refactor: 抽出_resolve_question_source helper消除detail/analyze重复逻辑
@@ -226,114 +229,69 @@ c49a484 fix: 错题本 snapshot 补全 exercise_type + _to_dto type 提取修复
 
 ## 📌 全代码库「重复造轮子」审计（27 处，2026-07-17）
 
-> 状态：详细方案已写，下面 P0-1（最严重、有 bug）已修。
+> 状态：**P0 + P1-2/P1-3/P1-1 已修**，共 23 处已修复。
+> 剩余 P1-4/5/6/7 + P2 共 4 处为低优先级，后续重构顺手处理。
 > 来源：explore sub-agent 全代码库扫描（grep + read，只读）。
-> 严重等级：🟠 P0（含 bug 必须修） / 🟡 P1（风格不统一建议修） / 🟢 P2（可后续重构顺手修）
 
-### 🏆 Top 3 最严重（P0，含 bug）
+### 🏆 Top 3 最严重（P0，含 bug）— 全部已修 ✅
 
-#### P0-1：evaluation_service 绕过 LLM 工厂 — **含 MiMo 切模型失效 bug** ✅ 已修
+#### P0-1：evaluation_service 绕过 LLM 工厂 — **含 MiMo 切模型失效 bug** ✅
 - **位置**：`backend/app/services/evaluation_service.py:416-428`
-- **问题**：
-  ```python
-  # 选择 LLM 客户端
-  if settings.LLM_PROVIDER == "spark":
-      llm = SparkClient(api_key=settings.SPARK_API_KEY)
-  else:
-      llm = MiniMaxClient(api_key=..., base_url=...)
-  # ↑ 没有 mimo 分支！比赛切 LLM_PROVIDER=mimo 时评估报告会用 MiniMax 失效
-  ```
-- **修法**：直接 `llm = get_llm_client()`，所有 agent 都已这样用。
-- **已修**（本次提交）
+- **已修**（commit `4d92730`）：`llm = get_llm_client()`
 
-#### P0-2：3 处自造 fetch 绕过 api.ts
-- **位置**：
-  - `frontend/src/app/resources/components/AICreatePanel.tsx:68-93` — 手写 fetch + Bearer 拼接 + 26 行；应改 `resourceApi.createManual()`（api.ts:323 已存在）
-  - `frontend/src/app/admin/login/page.tsx:59-96` — 手写 fetch + 35 行；应改 `authApi.login()`
-  - `frontend/src/app/tiku/page.tsx:12,141-149` — `BASE_URL` 常量重复 + 端点 `/resource/exercises/pool` 未在 api.ts
-- **风险**：admin/login 的 fetch 无 401 跳转逻辑（绕过 api.ts 的统一处理）；tiku 的 `BASE_URL` 改了不通知 api.ts 会漂移
-- **修法**：
-  ```ts
-  // AICreatePanel.tsx 改为：
-  await resourceApi.createManual(data)
-  // admin/login/page.tsx 改为：
-  const res = await authApi.login({ student_no: no, password: pw })
-  // tiku/page.tsx：删除 BASE_URL 常量，把 /resource/exercises/pool 加到 api.ts:
-  exerciseApi: {
-    pool: (sid: string, count: number) =>
-      api.get(`/resource/exercises/pool?student_id=${sid}&count=${count}`)
-  }
-  ```
+#### P0-2：3 处自造 fetch 绕过 api.ts ✅
+- **已修**（commit `ea3eadb`）：
+  - `AICreatePanel.tsx` → `resourceApi.createManual()`
+  - `admin/login/page.tsx` → `authApi.login()`
+  - `tiku/page.tsx` → `exerciseApi.pool()`（新增端点）
 
-#### P0-3：8 个 agent 自造 `_parse_response`，脆弱 JSON 解析
-- **位置**：
-  - `backend/app/agents/exercise_agent.py:258-272`（顶层已 import parse_json_response，但没用！）
-  - `backend/app/agents/learning_path_agent.py:132-138`（裸 `json.loads`）
-  - `backend/app/agents/audio_agent.py:112-145`
-  - `backend/app/agents/document_agent.py:185-228`
-  - `backend/app/agents/initial_assessment_agent.py:357-408`
-  - `backend/app/agents/resource_creator_agent.py:324-343`
-  - `backend/app/agents/review_agent.py:231-241`
-  - `backend/app/agents/tutor_agent.py:158-183`
-- **正面范例**：`mindmap_agent.py:182-188`、所有 `services/*.py`（用 `parse_json_response`）
-- **现能力**：`parse_json_response(content, fallback)` 已处理 `think` 标签 / code block / 裸换行，但各 agent 的 `_parse_response` 只支持 `{...}` 边界提取
-- **修法**：每个 agent 把 `_parse_response(content)` 改为 `return parse_json_response(content, fallback_dict)`，删除函数定义
+#### P0-3：8 个 agent 自造 `_parse_response` ✅
+- **已修**（commit `e8a69a1`）：6 个 agent 改用 `parse_json_response`（2 个已正确使用）
 
-### 🟠 P0：6 处 `alert()` 替换为 `showToast()`
+### 🟠 P0：6 处 `alert()` → `showToast()` ✅
+- **已修**（commit `ea3eadb`）：CreateModal（3处）+ final-test + quiz + zixi
 
-| 文件 | 行号 | 内容 |
-|---|---|---|
-| `frontend/src/app/plan/[pathId]/final-test/page.tsx` | 100 | `alert('请完成所有题目')` |
-| `frontend/src/app/plan/[pathId]/quiz/[nodeId]/page.tsx` | 117 | `alert('请完成所有题目')` |
-| `frontend/src/app/resources/components/CreateModal.tsx` | 200, 400, 418 | `alert(...)` × 3 |
-| `frontend/src/app/zixi/page.tsx` | 213 | `alert('摄像头权限被拒绝')` |
-
-**修法**：import `showToast` from `@/lib/utils`，全部替换。
-
-### 🟠 P0：admin `showToast` 自造第二套
-
+### 🟠 P0：admin `showToast` 自造第二套 — ⏳ 未修（P1-7）
 - **位置**：`frontend/src/lib/admin/context.tsx:64-75`
-- **问题**：admin 单独实现 showToast（基于 `#adminToast` 预渲染 DOM），与 `lib/utils.ts:showToast` 功能重复，实现风格不同。
-- **修法**：让 `AdminContext` 通过 props/context 注入从 utils 导入的 showToast（或让 admin 用 provider 包装页面，utils.ts 已经在全局可用）
+- **原因**：admin 有独立的 toast DOM 节点 `#adminToast`，与 utils.ts 的实现方式不同
 
-### 🟠 P0：6 处绕过 `getStudentId()` + 4 处绕过 `logout()`
+### 🟠 P0：绕过 `getStudentId()` + `logout()` — ✅ 已修大部分
+- ✅ `AICreatePanel.tsx` → `getStudentId()`
+- ✅ `login/page.tsx` → `saveAuthStorage()` helper（消除两处重复）
+- ⏳ `Sidebar.tsx` → 跳过（需完整 student 对象，getStudentId 只返回 id）
 
-**绕过 getStudentId（已有工具不读）**：
+### 🟡 P1 — 已修
 
-| 位置 | 现实现 | 应改 |
+| 编号 | 状态 | 说明 |
 |---|---|---|
-| `components/layout/Sidebar.tsx:122-124` | `localStorage.getItem('zhishu_student')` + `JSON.parse` | `useAppStore((s) => s.student)` 或 `getStudentId()` |
-| `app/resources/components/AICreatePanel.tsx:76-78` | 同上重复 | `getStudentId()` |
+| P1-1 | ✅ | 8个agent `_parse_response` → `parse_json_response` |
+| P1-2 | ✅ | `_validate_uuid` 抽到 `core/validators.py`（6文件8处） |
+| P1-3 | ✅ | `evaluation_service` 4处 `datetime.utcnow()` → `datetime.now(timezone.utc)` |
 
-**手动清 localStorage（api.ts 401 处理）**：
-- `lib/api.ts:80-83`（学生 401）
-- `lib/api.ts:586-588`（admin 401）
-- **修法**：在 `lib/student.ts` 新增 `clearAuthStorage()` helper
+### 🟡 P1 — 未修（低优先级）
 
-**重复 auth 写入（login/page.tsx）**：
-- `app/login/page.tsx:164-166`（登录路径）和 `L185-187`（注册路径）完全一样的 3 行
-- **修法**：在 `lib/student.ts` 加 `saveAuthStorage(res)` helper，两处都用
+| 编号 | 内容 |
+|---|---|
+| P1-4 | tiku/profile `ConfirmDialog` 抽到 `components/ConfirmDialog.tsx` |
+| P1-5 | `appStore.ts` 僵尸 store（6字段5个未用），决定删或真用 |
+| P1-6 | 4处SSE手写reader改用 `lib/sse.ts` |
+| P1-7 | admin showToast 重复实现 |
 
-### 🟡 P1（建议修）
+### 🟢 P2 — 未修（后续重构顺手处理）
 
-| 编号 | 位置 | 修法 |
-|---|---|---|
-| P1-1 | `coordinator_agent.py:156-173`, `admin.py:367`, `evaluation_service.py:550-571` | 3 处服务层 `_parse_xxx_response` 改用 `parse_json_response` |
-| P1-2 | `api/resource.py:41,58,86,231` + `mindmap.py:25`, `evaluation.py:32`, `wrong_questions.py:44`, `chat.py:187`, `tutor.py:29` | 11 处 `_validate_uuid` 抽成 Pydantic Annotated 类型（每处重复 7 行） |
-| P1-3 | `evaluation_service.py:72,254,313,349` | `datetime.utcnow()` / `datetime.now()` → `datetime.now(timezone.utc)`（4 处，AGENTS.md 已记同类 bug） |
-| P1-4 | `app/tiku/page.tsx:87-100` + `app/profile/page.tsx:56-177` | 两个 `ConfirmDialog` 抽到 `components/ConfirmDialog.tsx`（tiku 是 14 行 CSS class，profile 是 122 行内联，差异巨大） |
-| P1-5 | `stores/appStore.ts` | 6 个字段 5 个字段未被使用（僵尸 store），决定删或真用 |
-| P1-6 | 4 处 SSE 流式页面手写 reader/decoder | 改用 `lib/sse.ts` 的 `createEventStream` |
-| P1-7 | `lib/admin/context.tsx:64-75` + `app/admin/layout.tsx:14-36` | admin token 双重 check 逻辑整合 |
+| 编号 | 内容 |
+|---|---|
+| P2-1 | `QuestionSnapshot` 是否改 dict（待评估） |
+| P2-2 | `AICreatePanel.tsx` 的 `simpleMarkdown` → `markdownToHtml()` |
+| P2-3 | 4处直接读 `localStorage.zhishu_daily_goal` → settings helper |
+| P2-4 | profile/evaluation 缓存模式抽 `cachedFetch` |
 
-### 🟢 P2（后续重构顺手处理）
+### ⚰️ 死代码（建议删，未修）
 
-| 编号 | 位置 | 内容 |
-|---|---|---|
-| P2-1 | `api/wrong_questions.py:23-32` | `QuestionSnapshot` 是否改 dict 传 LLM（待评估，权衡可读性） |
-| P2-2 | `AICreatePanel.tsx` 的 `simpleMarkdown` | 改用 `lib/markdown.ts:markdownToHtml()` |
-| P2-3 | 4 处直接读 `localStorage.zhishu_daily_goal` | 抽到 settings helper |
-| P2-4 | profile / evaluation 报告缓存模式 | 抽 `cachedFetch(key, ttl, fetcher)` |
+- `minimax_client.py:131-137` 全局单例（llm_factory 已统一）
+- `spark_client.py:127` 空 key 实例
+- `minimax_langchain.py` 整个文件（0处使用）
+- `student.ts:25` `requireLogin()` 0处调用
 
 ### ⚰️ 死代码（建议删）
 
