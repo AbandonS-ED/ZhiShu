@@ -143,88 +143,81 @@ cd frontend && npm run build                       # 28 页面
 
 ## 📌 待办任务（错题本联动优化）
 
-> 状态：in_progress
+> 状态：**全部完成** ✅
 > 最后更新：2026-07-17
 
-### 已完成（commits 275efd3..39fcf81）
-- [x] fix: AI 出题回填 exercise_id 解决错题本假 UUID 问题
-- [x] feat: 错题本支持 ExerciseBank 表查询 + 快照机制
-- [x] feat: plan/quiz + final-test 答错自动加入错题本
-- [x] fix: 错题本 snapshot 补全 exercise_type + _to_dto type 提取修复
-- [x] fix: 错题本 list 端点支持 ExerciseBank LEFT JOIN（修复 items 为空的 bug）
+### 已完成 commits（275efd3 → 59f566b，共 11 个）
 
-### P1 — 高优先级（性能 + 正确性）
+#### P0 — 必须修复（错题本核心功能）
+- [x] **275efd3** fix: AI 出题回填 exercise_id 解决错题本假 UUID 问题
+- [x] **2bbfbc4** feat: 错题本支持 ExerciseBank 表查询 + 快照机制
+- [x] **7d92e86** feat: plan/quiz + final-test 答错自动加入错题本
+- [x] **c49a484** fix: 错题本 snapshot 补全 exercise_type + _to_dto type 提取修复
+- [x] **39fcf81** fix: 错题本 list 端点支持 ExerciseBank LEFT JOIN（修复 items 为空的 bug）
 
-#### 任务 1：list 端点性能优化（移除双 LEFT JOIN）
-- **文件**：`backend/app/api/wrong_questions.py`
-- **改动**：L369-397，删除 `outerjoin(Exercise, ...)` 和 `outerjoin(ExerciseBank, ...)`
-- **新代码**：
-  ```python
-  query = select(WrongQuestion).where(WrongQuestion.student_id == student_id)
-  ```
-  L399：`items = [_to_dto(wq) for wq in rows]`（去掉 ex/bank 参数）
-- **验收**：`py_compile` 通过 + API 返回结构不变 + 响应更快
+#### P1 — 性能 + 正确性（细分完成后各起一个 commit）
+- [x] **a1d0757** perf: list 端点单表查询（移除双 LEFT JOIN）- 任务 1 ✅
+- [x] **ccfbd96** fix: Promise.allSettled 替代 forEach(async) - 任务 2 ✅
+- [x] **fa11a54** refactor: helper 提取 _resolve_question_source - 任务 4（提前做）✅
 
-#### 任务 2：消除 forEach(async) race condition
-- **文件**：
-  - `frontend/src/app/plan/[pathId]/quiz/[nodeId]/page.tsx`（L168-179 区域）
-  - `frontend/src/app/plan/[pathId]/final-test/page.tsx`（L154-165 区域）
-- **改动**：把 `wrongExercises.forEach(async ...)` 改为 `Promise.allSettled`
-- **示例代码**：
-  ```typescript
-  await Promise.allSettled(
-    wrongExercises.map(({ exercise, answer }) =>
-      wrongQuestionsApi.add({
-        student_id: studentId,
-        exercise_id: exercise.exercise_id,
-        wrong_answer: answer,
-      }).catch((err) => console.error('加入错题本失败:', err))
-    )
-  )
-  ```
-- **验收**：`npm run lint + build` 通过 + 浏览器实测答错 5 道题 → 错题本看到 5 条
+#### P2 — UX 改进
+- [x] **4237f0a** fix: console.error 替换静默吞错 .catch(()=>{})
+- [x] **1e5369d** feat: 错题本加入成功/失败 toast 提示 - 任务 3 ✅
 
-### P2 — UX 改进
-
-#### 任务 3：错题本前端 toast 提示
-- **文件**：3 个前端文件
-- **改动**：在 `wrongQuestionsApi.add` 的 `.catch` 里加 `alert()` 或现有 toast 组件
-- **位置**：
-  - `/tiku/page.tsx`（L302-308 和 L332-338）
-  - `plan/quiz/[nodeId]/page.tsx`（任务 2 改过的地方）
-  - `plan/[pathId]/final-test/page.tsx`（同上）
-- **验收**：答错后看到成功/失败提示
-
-### P3 — 代码重构（可跳过）
-
-#### 任务 4：抽出 _resolve_question_source helper
-- **文件**：`backend/app/api/wrong_questions.py`
-- **改动**：把 detail/analyze 端点里重复的 9 行 if-elif 抽成 helper
-- **验收**：`py_compile` 通过 + API 行为不变
+#### P3 — 代码重构
+- [x] **59f566b** refactor: QuestionSnapshot 顶层 dataclass + 补 exercise_type
 
 ---
 
-## 🐛 本次修复发现的已知问题（供后续参考）
+## 🐛 本次修复过程中发现 / 解决的已知问题（全部修完）
 
-### 错误处理静默吞掉
+### 错误处理静默吞掉 ✅ 已修
 - **位置**：`/tiku/page.tsx` L302-308 和 L332-338
 - **问题**：`.catch(() => {})` 静默吞掉错误，用户无感
-- **修复**：改成 `.catch(err => console.error + toast)`
+- **修复**：commit `4237f0a` 改成 `.catch(err => console.error(...))` 输出错误
+- **二次升级**：commit `1e5369d` 再加 `showToast` 给用户可见反馈
 
-### analyze 端点 SnapObj 不完整
-- **位置**：`backend/app/api/wrong_questions.py` L535-543
-- **问题**：SnapObj 没有 exercise_type 字段，如果分析逻辑用到会 AttributeError
-- **现状**：当前没触发，但需注意
+### analyze 端点 SnapObj 不完整 ✅ 已修
+- **位置**：`backend/app/api/wrong_questions.py`（原 L535-543）
+- **问题**：SnapObj 没有 exercise_type 字段，未来分析逻辑用到会 AttributeError
+- **修复**：commit `59f566b` 移到顶层 `QuestionSnapshot` dataclass，8 字段都有默认值
 
 ---
 
-## 📊 提交记录
+## 🟡 本轮 Review 发现的遗留问题（低优先级，可后续处理）
+
+### 1. toast 触发频率问题（tiku 单题答错）
+- **位置**：`/tiku/page.tsx` L308-313, L343-348
+- **场景**：用户连续答错 10 题 → 弹 10 次 toast，会视觉堆积
+- **建议**：tiku 单题答错只设错题列表"已加入"状态（持久可见），toast 只在 quiz/final-test 这种批量场景使用
+
+### 2. /tiku 答错加入错题本逻辑重复
+- **位置**：`/tiku/page.tsx` `answerChoice` + `answerJudge` 两处几乎一样（仅 wrong_answer 字段不同）
+- **建议**：抽个 `addWrongQuestion(ex, wrongAnswer)` helper，消除 11 行重复代码
+
+### 3. QuestionSnapshot.options 类型不够严格
+- **位置**：`backend/app/api/wrong_questions.py` L33
+- **现状**：`options: Optional[list] = None`
+- **建议**：改成 `Optional[List[str]] = None`，IDE 提示更友好（无功能影响）
+
+### 4. pytest 单元测试缺失
+- **位置**：`backend/tests/`（应该有，但没有 wrong_questions 测试）
+- **建议**：加 2-3 个 pytest 覆盖 Exercise + ExerciseBank 双 source + snapshot fallback 场景
+
+---
+
+## 📊 本轮 11 个 commits
 
 ```
+59f566b refactor: QuestionSnapshot 顶层 dataclass + 补全 exercise_type
+1e5369d feat: 错题本加入成功/失败给用户toast提示
+fa11a54 refactor: 抽出_resolve_question_source helper消除detail/analyze重复逻辑
+4237f0a fix: 错题本加入失败不再静默吞错，改为console.error输出
+ccfbd96 fix: Promise.allSettled替代forEach(async)消除race condition
+a1d0757 perf: 错题本list端点单表查询（移除双LEFT JOIN）
 39fcf81 fix: 错题本 list 端点支持 ExerciseBank LEFT JOIN
 c49a484 fix: 错题本 snapshot 补全 exercise_type + _to_dto type 提取修复
 7d92e86 feat: plan/quiz + final-test 答错自动加入错题本
 2bbfbc4 feat: 错题本支持 ExerciseBank 表查询 + 快照机制
 275efd3 fix: AI 出题回填 exercise_id 解决错题本假 UUID 问题
-2f8cec9 fix: start.ps1 -Dev 模式后端加 --reload（上一轮）
 ```
