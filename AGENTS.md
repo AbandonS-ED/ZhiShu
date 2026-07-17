@@ -138,3 +138,93 @@ cd frontend && npm run build                       # 28 页面
 - 涉及评分项（流式/防幻觉/多智能体/RAG）附 1-2 句说明
 - 前端改动需 `npm run lint` 0 errors + `npm run build` 30 页面通过
 - 比赛前**必做**：`.env` 改 `LLM_PROVIDER=spark` + 跑 `tests/smoke_test` 验证星火路径
+
+---
+
+## 📌 待办任务（错题本联动优化）
+
+> 状态：in_progress
+> 最后更新：2026-07-17
+
+### 已完成（commits 275efd3..39fcf81）
+- [x] fix: AI 出题回填 exercise_id 解决错题本假 UUID 问题
+- [x] feat: 错题本支持 ExerciseBank 表查询 + 快照机制
+- [x] feat: plan/quiz + final-test 答错自动加入错题本
+- [x] fix: 错题本 snapshot 补全 exercise_type + _to_dto type 提取修复
+- [x] fix: 错题本 list 端点支持 ExerciseBank LEFT JOIN（修复 items 为空的 bug）
+
+### P1 — 高优先级（性能 + 正确性）
+
+#### 任务 1：list 端点性能优化（移除双 LEFT JOIN）
+- **文件**：`backend/app/api/wrong_questions.py`
+- **改动**：L369-397，删除 `outerjoin(Exercise, ...)` 和 `outerjoin(ExerciseBank, ...)`
+- **新代码**：
+  ```python
+  query = select(WrongQuestion).where(WrongQuestion.student_id == student_id)
+  ```
+  L399：`items = [_to_dto(wq) for wq in rows]`（去掉 ex/bank 参数）
+- **验收**：`py_compile` 通过 + API 返回结构不变 + 响应更快
+
+#### 任务 2：消除 forEach(async) race condition
+- **文件**：
+  - `frontend/src/app/plan/[pathId]/quiz/[nodeId]/page.tsx`（L168-179 区域）
+  - `frontend/src/app/plan/[pathId]/final-test/page.tsx`（L154-165 区域）
+- **改动**：把 `wrongExercises.forEach(async ...)` 改为 `Promise.allSettled`
+- **示例代码**：
+  ```typescript
+  await Promise.allSettled(
+    wrongExercises.map(({ exercise, answer }) =>
+      wrongQuestionsApi.add({
+        student_id: studentId,
+        exercise_id: exercise.exercise_id,
+        wrong_answer: answer,
+      }).catch((err) => console.error('加入错题本失败:', err))
+    )
+  )
+  ```
+- **验收**：`npm run lint + build` 通过 + 浏览器实测答错 5 道题 → 错题本看到 5 条
+
+### P2 — UX 改进
+
+#### 任务 3：错题本前端 toast 提示
+- **文件**：3 个前端文件
+- **改动**：在 `wrongQuestionsApi.add` 的 `.catch` 里加 `alert()` 或现有 toast 组件
+- **位置**：
+  - `/tiku/page.tsx`（L302-308 和 L332-338）
+  - `plan/quiz/[nodeId]/page.tsx`（任务 2 改过的地方）
+  - `plan/[pathId]/final-test/page.tsx`（同上）
+- **验收**：答错后看到成功/失败提示
+
+### P3 — 代码重构（可跳过）
+
+#### 任务 4：抽出 _resolve_question_source helper
+- **文件**：`backend/app/api/wrong_questions.py`
+- **改动**：把 detail/analyze 端点里重复的 9 行 if-elif 抽成 helper
+- **验收**：`py_compile` 通过 + API 行为不变
+
+---
+
+## 🐛 本次修复发现的已知问题（供后续参考）
+
+### 错误处理静默吞掉
+- **位置**：`/tiku/page.tsx` L302-308 和 L332-338
+- **问题**：`.catch(() => {})` 静默吞掉错误，用户无感
+- **修复**：改成 `.catch(err => console.error + toast)`
+
+### analyze 端点 SnapObj 不完整
+- **位置**：`backend/app/api/wrong_questions.py` L535-543
+- **问题**：SnapObj 没有 exercise_type 字段，如果分析逻辑用到会 AttributeError
+- **现状**：当前没触发，但需注意
+
+---
+
+## 📊 提交记录
+
+```
+39fcf81 fix: 错题本 list 端点支持 ExerciseBank LEFT JOIN
+c49a484 fix: 错题本 snapshot 补全 exercise_type + _to_dto type 提取修复
+7d92e86 feat: plan/quiz + final-test 答错自动加入错题本
+2bbfbc4 feat: 错题本支持 ExerciseBank 表查询 + 快照机制
+275efd3 fix: AI 出题回填 exercise_id 解决错题本假 UUID 问题
+2f8cec9 fix: start.ps1 -Dev 模式后端加 --reload（上一轮）
+```
