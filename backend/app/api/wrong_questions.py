@@ -208,9 +208,18 @@ def _to_dto(wq: WrongQuestion, exercise: Optional[Exercise] = None, bank_item: O
         "created_at": wq.created_at.isoformat() if wq.created_at else None,
     }
     if question_data:
+        # exercise_type: 优先从 snapshot 取，其次 exercise，再次 bank_item
+        ex_type = "unknown"
+        if wq.question_snapshot and wq.question_snapshot.get("exercise_type"):
+            ex_type = wq.question_snapshot["exercise_type"]
+        elif exercise:
+            ex_type = exercise.exercise_type
+        elif bank_item:
+            ex_type = bank_item.exercise_type
+
         result["exercise"] = {
             "id": str(wq.exercise_id or wq.exercise_bank_id),
-            "type": exercise.exercise_type if exercise else (bank_item.exercise_type if bank_item else "unknown"),
+            "type": ex_type,
             **question_data,
         }
     return result
@@ -246,6 +255,7 @@ async def add_wrong_question(
             "explanation": exercise.explanation,
             "difficulty": exercise.difficulty,
             "knowledge_point": exercise.knowledge_point,
+            "exercise_type": exercise.exercise_type,
             "source": "exercise",
         }
     else:
@@ -262,6 +272,7 @@ async def add_wrong_question(
                 "explanation": bank_item.explanation,
                 "difficulty": bank_item.difficulty,
                 "knowledge_point": bank_item.knowledge_point,
+                "exercise_type": bank_item.exercise_type,
                 "source": bank_item.source,
             }
         else:
