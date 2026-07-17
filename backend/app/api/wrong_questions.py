@@ -156,6 +156,19 @@ async def _call_llm_for_similar(exercise: Exercise, count: int = 3) -> list:
         return []
 
 
+async def _resolve_question_source(db, wq: WrongQuestion):
+    """根据 source_type 自动从对应表查题目对象"""
+    exercise = None
+    bank_item = None
+    if wq.source_type == "exercise" and wq.exercise_id:
+        result = await db.execute(select(Exercise).where(Exercise.id == wq.exercise_id))
+        exercise = result.scalar_one_or_none()
+    elif wq.source_type == "bank" and wq.exercise_bank_id:
+        result = await db.execute(select(ExerciseBank).where(ExerciseBank.id == wq.exercise_bank_id))
+        bank_item = result.scalar_one_or_none()
+    return exercise, bank_item
+
+
 def _to_dto(wq: WrongQuestion, exercise: Optional[Exercise] = None, bank_item: Optional[ExerciseBank] = None) -> dict:
     """转为前端需要的 DTO"""
     # 优先用 question_snapshot（防止源表删数据后无法显示）
@@ -483,15 +496,7 @@ async def get_wrong_question_detail(
     if wq.student_id != user.id:
         raise HTTPException(status_code=403, detail="只能查看自己的错题")
 
-    exercise = None
-    bank_item = None
-    if wq.source_type == "exercise" and wq.exercise_id:
-        ex_result = await db.execute(select(Exercise).where(Exercise.id == wq.exercise_id))
-        exercise = ex_result.scalar_one_or_none()
-    elif wq.source_type == "bank" and wq.exercise_bank_id:
-        bank_result = await db.execute(select(ExerciseBank).where(ExerciseBank.id == wq.exercise_bank_id))
-        bank_item = bank_result.scalar_one_or_none()
-
+    exercise, bank_item = await _resolve_question_source(db, wq)
     return _to_dto(wq, exercise, bank_item)
 
 
@@ -509,14 +514,7 @@ async def analyze_wrong_question(
     if wq.student_id != user.id:
         raise HTTPException(status_code=403, detail="只能分析自己的错题")
 
-    exercise = None
-    bank_item = None
-    if wq.source_type == "exercise" and wq.exercise_id:
-        ex_result = await db.execute(select(Exercise).where(Exercise.id == wq.exercise_id))
-        exercise = ex_result.scalar_one_or_none()
-    elif wq.source_type == "bank" and wq.exercise_bank_id:
-        bank_result = await db.execute(select(ExerciseBank).where(ExerciseBank.id == wq.exercise_bank_id))
-        bank_item = bank_result.scalar_one_or_none()
+    exercise, bank_item = await _resolve_question_source(db, wq)
 
     # 用 snapshot 或查到的对象来调用分析
     source_obj = exercise if exercise else bank_item
