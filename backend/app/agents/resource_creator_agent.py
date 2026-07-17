@@ -323,33 +323,20 @@ class ResourceCreatorAgent:
 
     def _parse_response(self, content: str) -> dict:
         """解析LLM响应"""
-        try:
-            # 尝试直接解析JSON
-            import json
-            json_start = content.find("{")
-            json_end = content.rfind("}") + 1
-            if json_start >= 0 and json_end > json_start:
-                json_str = content[json_start:json_end]
-                result = json.loads(json_str)
-                
-                # 确保所有必需字段存在
-                return {
-                    "knowledge": result.get("knowledge", ""),
-                    "code": result.get("code", ""),  # 允许为空
-                    "mermaid_code": result.get("mermaid_code", ""),
-                    "exercises": result.get("exercises", []),
-                    "message": result.get("message", "已生成学习资源")
-                }
-        except Exception as e:
-            logger.warning("JSON解析失败: %s", e)
-        
-        # 解析失败返回默认结构
-        return {
+        result = parse_json_response(content, {
             "knowledge": content,
             "code": "",
             "mermaid_code": "",
             "exercises": [],
             "message": "已生成学习资源"
+        })
+        # 确保所有必需字段存在
+        return {
+            "knowledge": result.get("knowledge", content),
+            "code": result.get("code", ""),
+            "mermaid_code": result.get("mermaid_code", ""),
+            "exercises": result.get("exercises", []),
+            "message": result.get("message", "已生成学习资源")
         }
 
 

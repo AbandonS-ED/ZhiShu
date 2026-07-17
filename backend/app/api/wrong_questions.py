@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from app.core.database import get_db
 from app.core.dependencies import valid_student_id, get_current_user
+from app.core.validators import _validate_uuid
 from app.models.student import Student
 from app.models.exercise import Exercise
 from app.models.exercise_bank import ExerciseBank
@@ -42,11 +43,7 @@ class AddWrongQuestionRequest(BaseModel):
     @field_validator("student_id", "exercise_id")
     @classmethod
     def _validate_uuid(cls, v: str) -> str:
-        try:
-            uuid.UUID(v)
-            return v
-        except (ValueError, AttributeError, TypeError):
-            raise ValueError(f"无效的 UUID: {v}")
+        return _validate_uuid(v)
 
 
 class ReviewWrongQuestionRequest(BaseModel):

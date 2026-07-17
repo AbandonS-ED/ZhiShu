@@ -4,12 +4,17 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 from app.services.llm_factory import get_llm_client
+from app.services.json_parser import parse_json_response
 
 logger = logging.getLogger(__name__)
 
 
 class LearningPathAgent:
     """学习路径生成Agent - 生成像教材目录一样详细的学习路径"""
+
+    def _parse_response(self, content: str) -> dict:
+        """解析LLM响应"""
+        return parse_json_response(content, self._get_default_path("未知"))
 
     async def generate_path(
         self,
@@ -130,28 +135,21 @@ class LearningPathAgent:
             content = response.get("content", "")
             
             # 解析JSON
-            try:
-                json_start = content.find("{")
-                json_end = content.rfind("}") + 1
-                if json_start >= 0 and json_end > json_start:
-                    json_str = content[json_start:json_end]
-                    path_data = json.loads(json_str)
-                    
-                    # 验证数据结构
-                    if "nodes" in path_data and len(path_data["nodes"]) > 0:
-                        # 确保第一个节点是current状态
-                        for i, node in enumerate(path_data["nodes"]):
-                            node["id"] = f"node_{i + 1}"
-                            node["order"] = i + 1
-                            node["status"] = "current" if i == 0 else "pending"
-                            if i == 0:
-                                node["prerequisites"] = []
-                            elif "prerequisites" not in node:
-                                node["prerequisites"] = [f"node_{i}"]
-                        
-                        return path_data
-            except json.JSONDecodeError as e:
-                logger.warning("JSON解析失败: %s", e)
+            path_data = self._parse_response(content)
+            
+            # 验证数据结构
+            if "nodes" in path_data and len(path_data["nodes"]) > 0:
+                # 确保第一个节点是current状态
+                for i, node in enumerate(path_data["nodes"]):
+                    node["id"] = f"node_{i + 1}"
+                    node["order"] = i + 1
+                    node["status"] = "current" if i == 0 else "pending"
+                    if i == 0:
+                        node["prerequisites"] = []
+                    elif "prerequisites" not in node:
+                        node["prerequisites"] = [f"node_{i}"]
+                
+                return path_data
             
             # 如果AI生成失败，使用默认路径
             return self._get_default_path(target_knowledge)

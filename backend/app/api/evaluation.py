@@ -9,6 +9,7 @@ from sqlalchemy import select
 from fastapi import HTTPException
 from app.core.database import get_db
 from app.core.dependencies import valid_student_id, get_current_user
+from app.core.validators import _validate_uuid_optional
 from app.models.student import Student
 from app.models.evaluation_report import EvaluationReport
 from app.services.evaluation_service import evaluation_service
@@ -30,13 +31,7 @@ class RecordActionRequest(BaseModel):
     @field_validator("student_id", "course_id")
     @classmethod
     def _validate_uuid(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        try:
-            uuid.UUID(v)
-            return v
-        except (ValueError, AttributeError, TypeError):
-            raise ValueError(f"无效的 UUID: {v}")
+        return _validate_uuid_optional(v)
 
 
 @router.post("/record")

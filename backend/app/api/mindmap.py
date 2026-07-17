@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.validators import _validate_uuid
 from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.agents.mindmap_agent import mindmap_agent
@@ -21,11 +22,7 @@ class MindMapGenRequest(BaseModel):
     @field_validator("student_id")
     @classmethod
     def validate_uuid(cls, v: str) -> str:
-        try:
-            uuid.UUID(v)
-            return v
-        except (ValueError, AttributeError, TypeError):
-            raise ValueError(f"无效的 UUID: {v}")
+        return _validate_uuid(v)
 
 
 @router.post("/generate")

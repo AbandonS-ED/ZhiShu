@@ -5,6 +5,7 @@ import logging
 import re
 
 from app.services.llm_factory import get_llm_client
+from app.services.json_parser import parse_json_response
 from app.core.profile_dimensions import (
     DIMENSIONS, DIM_CN, DIMENSION_DETAILS, DIMENSION_KEYWORDS,
     INITIAL_SCORE, INITIAL_CONFIDENCE, CONFIDENCE_THRESHOLD,
@@ -367,8 +368,9 @@ class InitialAssessmentAgent:
             parts = text.split("---ASSESS_DATA---", 1)
             text = parts[0].strip()
             json_str = parts[1].strip()
-            try:
-                data = json.loads(json_str)
+            # 使用 parse_json_response 解析 JSON 部分
+            data = parse_json_response(json_str, {})
+            if data:
                 done = bool(data.get("done", False))
                 has_assess_data = True
                 for d in DIMENSIONS:
@@ -387,8 +389,6 @@ class InitialAssessmentAgent:
                             "score": max(0, min(100, llm_score)),
                             "confidence": final_confidence,
                         }
-            except (json.JSONDecodeError, KeyError):
-                logger.warning(f"Failed to parse ASSESS_DATA from response")
 
         # 去掉文本前后的换行和空格
         text = text.strip()

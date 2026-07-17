@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.validators import _validate_uuid_optional
 from app.models.student import Student
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
@@ -185,13 +186,7 @@ class ChatRequest(BaseModel):
     @field_validator("student_id", "session_id")
     @classmethod
     def _validate_uuid(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        try:
-            uuid.UUID(v)
-            return v
-        except (ValueError, AttributeError, TypeError):
-            raise ValueError(f"无效的 UUID: {v}")
+        return _validate_uuid_optional(v)
 
 
 # ====================================================================

@@ -7,6 +7,7 @@
 import json
 from app.services.llm_factory import get_llm_client
 from app.services.anti_hallucination import anti_hallucination
+from app.services.json_parser import parse_json_response
 
 
 class TutorAgent:
@@ -156,7 +157,6 @@ class TutorAgent:
         return "\n".join(parts)
 
     def _parse_response(self, content: str) -> dict:
-        from app.services.json_parser import parse_json_response
         return parse_json_response(content, {
             "answer": content,
             "confidence": 0.5,

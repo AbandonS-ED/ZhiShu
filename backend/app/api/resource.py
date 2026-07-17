@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, valid_student_id
+from app.core.validators import _validate_uuid
 from app.models.student import Student
 from app.models.resource import Resource
 from app.models.student_profile import StudentProfile
@@ -39,11 +40,7 @@ class StreamCreateRequest(BaseModel):
     @field_validator("student_id")
     @classmethod
     def _validate_uuid(cls, v: str) -> str:
-        try:
-            uuid.UUID(v)
-            return v
-        except (ValueError, AttributeError, TypeError):
-            raise ValueError(f"无效的 UUID: {v}")
+        return _validate_uuid(v)
 
 
 class ManualCreateRequest(BaseModel):
@@ -56,11 +53,7 @@ class ManualCreateRequest(BaseModel):
     @field_validator("student_id")
     @classmethod
     def _validate_uuid(cls, v: str) -> str:
-        try:
-            uuid.UUID(v)
-            return v
-        except (ValueError, AttributeError, TypeError):
-            raise ValueError(f"无效的 UUID: {v}")
+        return _validate_uuid(v)
 
 
 class ReviewRequest(BaseModel):
@@ -84,11 +77,7 @@ class ExerciseGenerateRequest(BaseModel):
     @field_validator("student_id")
     @classmethod
     def _validate_uuid(cls, v: str) -> str:
-        try:
-            uuid.UUID(v)
-            return v
-        except (ValueError, AttributeError, TypeError):
-            raise ValueError(f"无效的 UUID: {v}")
+        return _validate_uuid(v)
 
 
 # ====================================================================
@@ -229,11 +218,7 @@ class SaveResourceRequest(BaseModel):
     @field_validator("student_id")
     @classmethod
     def _validate_uuid(cls, v: str) -> str:
-        try:
-            uuid.UUID(v)
-            return v
-        except (ValueError, AttributeError, TypeError):
-            raise ValueError(f"无效的 UUID: {v}")
+        return _validate_uuid(v)
 
 
 @router.post("/save")

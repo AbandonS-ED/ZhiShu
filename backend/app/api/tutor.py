@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.validators import _validate_uuid_optional
 from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.agents.tutor_agent import tutor_agent
@@ -27,13 +28,7 @@ class AskRequest(BaseModel):
     @field_validator("student_id", "course_id")
     @classmethod
     def _validate_uuid(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        try:
-            uuid.UUID(v)
-            return v
-        except (ValueError, AttributeError, TypeError):
-            raise ValueError(f"无效的 UUID: {v}")
+        return _validate_uuid_optional(v)
 
 
 @router.post("/ask")

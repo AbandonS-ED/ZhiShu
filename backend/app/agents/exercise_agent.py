@@ -257,19 +257,7 @@ class ExerciseAgent:
 
     def _parse_response(self, content: str) -> dict:
         """解析LLM响应"""
-        import json
-        
-        try:
-            json_start = content.find("{")
-            json_end = content.rfind("}") + 1
-            if json_start >= 0 and json_end > json_start:
-                json_str = content[json_start:json_end]
-                result = json.loads(json_str)
-                return result
-        except json.JSONDecodeError as e:
-            logger.warning("JSON解析失败: %s", e)
-        
-        return {"exercises": []}
+        return parse_json_response(content, {"exercises": []})
 
 
 # 创建全局实例

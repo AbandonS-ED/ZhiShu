@@ -183,21 +183,12 @@ class DocumentAgent:
         return "\n".join(parts)
 
     def _parse_response(self, content: str) -> dict:
-        """解析 LLM 返回的 JSON 内容，同时清理 think 标签"""
-        # 去掉 <think>...</think> 标签
-        cleaned = self._strip_think(content)
-        result = parse_json_response(cleaned, {
+        """解析 LLM 返回的 JSON 内容"""
+        return parse_json_response(content, {
             "knowledge": "",
             "code": "",
             "audio_script": "",
         })
-
-        # 再次清理结果中各字段的 think 标签
-        for key in list(result.keys()):
-            val = result[key]
-            if isinstance(val, str):
-                result[key] = self._strip_think(val).strip()
-        return result
 
     @staticmethod
     def _strip_think(text: str) -> str:
