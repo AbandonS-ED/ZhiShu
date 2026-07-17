@@ -18,6 +18,7 @@ from app.agents.resource_creator_agent import resource_creator_agent
 from app.agents.review_agent import review_agent
 from app.agents.document_agent import document_agent
 from app.agents.exercise_agent import exercise_agent
+from app.agents.scoring_agent import scoring_agent
 from app.services.anti_hallucination import anti_hallucination
 from app.services.json_parser import parse_json_response
 from app.core.sse_utils import sse_stream_response, sse_progress, sse_result, sse_done, sse_error
@@ -89,6 +90,13 @@ class ExerciseGenerateRequest(BaseModel):
             return v
         except (ValueError, AttributeError, TypeError):
             raise ValueError(f"无效的 UUID: {v}")
+
+
+class ScoreAnswerRequest(BaseModel):
+    question: str
+    correct_answer: str
+    student_answer: str
+    knowledge_point: str = ""
 
 
 # ====================================================================
@@ -723,3 +731,26 @@ async def get_exercise_pool(
             for ex in exercises
         ]
     }
+
+
+# ====================================================================
+# 12. POST /score-answer — AI 智能评分
+# ====================================================================
+
+@router.post("/score-answer")
+async def score_answer(
+    req: ScoreAnswerRequest,
+    user: Student = Depends(get_current_user),
+):
+    """AI 智能评分简答题"""
+    try:
+        result = await scoring_agent.score_answer(
+            question=req.question,
+            correct_answer=req.correct_answer,
+            student_answer=req.student_answer,
+            knowledge_point=req.knowledge_point,
+        )
+        return result
+    except Exception as e:
+        logger.exception("[score-answer] 异常")
+        raise HTTPException(status_code=500, detail=f"评分失败: {str(e)}")

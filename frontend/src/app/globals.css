@@ -3931,6 +3931,141 @@ body:has(.login-page){
   color: var(--ink-3);
 }
 
+/* ─── AI 评分反馈样式 ─── */
+.ai-feedback {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.score-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.score-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.score-value {
+  font-size: 18px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.score-value.pass {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.score-value.fail {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.feedback-section,
+.suggestion-section {
+  margin-top: 12px;
+}
+
+.feedback-section h4,
+.suggestion-section h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+}
+
+.feedback-section p,
+.suggestion-section p {
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* ─── 评分状态样式 ─── */
+.scoring-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--warm-soft);
+  border: 1px solid var(--warm);
+  border-radius: var(--r-xs);
+  color: var(--warm);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.scoring-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--warm);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── 评分进度条样式 ─── */
+.scoring-progress {
+  margin-bottom: 24px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.progress-bar {
+  height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--warm), var(--warm-dark));
+  border-radius: 4px;
+  transition: width 0.3s ease-out;
+}
+
+.progress-text {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink-3);
+  text-align: center;
+}
+
 .reference-answer {
   margin-top: 16px;
   padding: 16px;
