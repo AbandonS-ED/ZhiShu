@@ -7,7 +7,7 @@ import uuid
 import json
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from app.models.learning_record import LearningRecord
@@ -70,7 +70,7 @@ class EvaluationService:
             }
         """
         sid = uuid.UUID(student_id)
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(timezone.utc) - timedelta(days=days)
 
         # 总行为数
         total_result = await db.execute(
@@ -252,7 +252,7 @@ class EvaluationService:
 
         report_data = {
             "student_id": student_id,
-            "generated_at": datetime.now().isoformat(),  # 使用本地时间
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "summary": {
                 "total_exercises": total_exercises,
                 "avg_score": round(avg_score * 100, 1),
@@ -311,7 +311,7 @@ class EvaluationService:
     async def _get_exercise_details(self, db: AsyncSession, student_id: str) -> dict:
         """获取练习详情（用于 LLM 分析）"""
         sid = uuid.UUID(student_id)
-        since = datetime.utcnow() - timedelta(days=30)
+        since = datetime.now(timezone.utc) - timedelta(days=30)
 
         # 按知识点统计练习次数和平均分
         result = await db.execute(
@@ -347,7 +347,7 @@ class EvaluationService:
     async def _calculate_trend(self, db: AsyncSession, student_id: str) -> dict:
         """计算近期趋势（近7天 vs 之前7天）"""
         sid = uuid.UUID(student_id)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         recent_start = now - timedelta(days=7)
         prev_start = now - timedelta(days=14)
 

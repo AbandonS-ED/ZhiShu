@@ -44,3 +44,15 @@ export function logout() {
   clearStudentIdCache()
   window.location.href = '/login'
 }
+
+// 统一登录数据写入（login + register 复用）
+export function saveAuthStorage(res: {
+  token: string
+  refresh_token?: string
+  student?: { id?: string } | null
+}) {
+  localStorage.setItem('zhishu_token', res.token)
+  if (res.refresh_token) localStorage.setItem('zhishu_refresh_token', res.refresh_token)
+  if (res.student) localStorage.setItem('zhishu_student', JSON.stringify(res.student))
+  clearStudentIdCache()
+}

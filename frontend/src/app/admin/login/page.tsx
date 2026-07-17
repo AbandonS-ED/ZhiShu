@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAdmin } from '@/lib/admin/context'
+import { authApi } from '@/lib/api'
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -56,20 +57,7 @@ export default function AdminLoginPage() {
     setBtnOff(true)
 
     try {
-      const res = await fetch('http://localhost:8001/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ student_no: no, password: pw }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => null)
-        const msg = body?.detail || '账号或密码错误，或无管理员权限'
-        showErr(msg)
-        setBtnOff(false)
-        setLoading(false)
-        return
-      }
-      const data = await res.json()
+      const data = await authApi.login({ student_no: no, password: pw })
       const role = (data?.student?.role || 'student').toString()
       if (role !== 'admin') {
         showErr('该账号不是管理员，无权访问管理后台')

@@ -97,7 +97,7 @@ export default function FinalTestPage() {
     
     const allAnswered = exercises.every((_, index) => answers[index]?.selected !== null)
     if (!allAnswered) {
-      alert('请完成所有题目')
+      showToast('请完成所有题目')
       return
     }
 

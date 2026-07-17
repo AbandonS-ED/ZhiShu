@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { useResourceCreate } from '../hooks/useResourceCreate'
 import type { ResourceContent, ReviewResult } from '../types'
+import { resourceApi } from '@/lib/api'
+import { getStudentId } from '@/lib/student'
 
 const TABS = [
   { key: 'knowledge', label: '知识讲解' },
@@ -65,25 +67,13 @@ export default function AICreatePanel({ onSaved, onClose }: AICreatePanelProps) 
     setSaving(true)
     setSaveError('')
     try {
-      const token = localStorage.getItem('zhishu_token')
-      const res = await fetch('http://localhost:8001/api/v1/resource/create/manual', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          student_id: localStorage.getItem('zhishu_student')
-            ? JSON.parse(localStorage.getItem('zhishu_student')!).id
-            : '',
-          title: messages.find(m => m.role === 'user')?.content?.slice(0, 50) || 'AI 生成资源',
-          resource_type: activeTab,
-          content: currentContent,
-          knowledge_point: messages.find(m => m.role === 'user')?.content || '',
-        }),
+      const data = await resourceApi.createManual({
+        student_id: getStudentId() || '',
+        title: messages.find(m => m.role === 'user')?.content?.slice(0, 50) || 'AI 生成资源',
+        resource_type: activeTab,
+        content: currentContent,
+        knowledge_point: messages.find(m => m.role === 'user')?.content || '',
       })
-      if (!res.ok) throw new Error('保存失败')
-      const data = await res.json()
       onSaved?.(data.resource_id)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : '保存失败')

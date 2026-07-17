@@ -206,6 +206,10 @@ export const chatApi = {
 // ===== Exercise =====
 
 export const exerciseApi = {
+  pool: (student_id: string, count = 30) =>
+    request<{ exercises: Exercise[] }>(
+      `/resource/exercises/pool?student_id=${student_id}&count=${count}`
+    ),
   generateStream(
     student_id: string,
     knowledge_point: string,

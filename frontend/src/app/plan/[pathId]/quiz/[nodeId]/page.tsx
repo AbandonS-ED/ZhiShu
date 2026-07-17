@@ -114,7 +114,7 @@ export default function QuizNodePage() {
       return selected !== null && selected !== undefined && selected !== ''
     })
     if (!allAnswered) {
-      alert('请完成所有题目')
+      showToast('请完成所有题目')
       return
     }
 

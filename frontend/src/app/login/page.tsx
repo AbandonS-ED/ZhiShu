@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authApi } from '@/lib/api'
-import { clearStudentIdCache } from '@/lib/student'
+import { saveAuthStorage } from '@/lib/student'
 
 type Tab = 'login' | 'register'
 
@@ -161,10 +161,7 @@ export default function LoginPage() {
     try {
       if (tab === 'login') {
         const res = await authApi.login({ student_no: studentNo, password })
-        localStorage.setItem('zhishu_token', res.token)
-        if (res.refresh_token) localStorage.setItem('zhishu_refresh_token', res.refresh_token)
-        if (res.student) localStorage.setItem('zhishu_student', JSON.stringify(res.student))
-        clearStudentIdCache() // 清除缓存，确保下次获取最新数据
+        saveAuthStorage(res)
         showAlert('success', '登录成功，正在跳转...')
         setTimeout(() => {
           setSuccessTitle('登录成功')
@@ -182,10 +179,7 @@ export default function LoginPage() {
           email,
           major,
         })
-        localStorage.setItem('zhishu_token', res.token)
-        if (res.refresh_token) localStorage.setItem('zhishu_refresh_token', res.refresh_token)
-        if (res.student) localStorage.setItem('zhishu_student', JSON.stringify(res.student))
-        clearStudentIdCache() // 清除缓存，确保下次获取最新数据
+        saveAuthStorage(res)
         showAlert('success', '注册成功！正在跳转...')
         setTimeout(() => {
           setSuccessTitle('注册成功')

@@ -9,7 +9,6 @@ import RobotIcon from '@/components/RobotIcon'
 import { usePageTimer } from '@/hooks/usePageTimer'
 import Icon from '@/components/Icon'
 
-const BASE_URL = 'http://localhost:8001/api/v1'
 const HIDDEN_KEY = 'zhishu_hidden_exercises'
 
 // 与 api.ts / types/index.ts 保持一致
@@ -138,10 +137,7 @@ export default function TikuPage() {
       const raw = localStorage.getItem(HIDDEN_KEY)
       if (raw) setHiddenIds(new Set(JSON.parse(raw)))
     } catch {}
-    fetch(`${BASE_URL}/resource/exercises/pool?student_id=${sid}&count=30`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('zhishu_token') || ''}` },
-    })
-      .then((r) => r.json())
+    exerciseApi.pool(sid, 30)
       .then((data) => {
         setExercises(data.exercises || [])
         setLoading(false)

@@ -23,6 +23,7 @@ import { useCameraPatrol, type StudyLabel, type StudyDifficulty } from '@/hooks/
 import { CameraToggle } from '@/components/CameraToggle'
 import { evaluationApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
+import { showToast } from '@/lib/utils'
 
 type Phase = 'idle' | 'running' | 'report'
 
@@ -210,7 +211,7 @@ export default function StudyPage() {
         return true
       } catch {
         if (typeof window !== 'undefined') {
-          window.alert('摄像头权限被拒绝。你仍可以无监控模式自习。')
+          showToast('摄像头权限被拒绝。你仍可以无监控模式自习。')
         }
         return false
       }

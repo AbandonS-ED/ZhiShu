@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Icon from '@/components/Icon'
 import { resourceApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
+import { showToast } from '@/lib/utils'
 import ResourceProgress from './ResourceProgress'
 import type { ResourceItem, CreateMessage } from '@/app/resources/types'
 
@@ -197,7 +198,7 @@ function AICreatePanel({ onCreated, onClose }: { onCreated: (r: ResourceItem) =>
         timestamp: Date.now()
       }])
     } catch (err: any) {
-      alert(err.message || '保存失败')
+      showToast(err.message || '保存失败')
     } finally {
       setSaving(false)
     }
@@ -397,7 +398,7 @@ function ManualCreatePanel({ onCreated, onClose }: { onCreated: (r: ResourceItem
   ]
 
   const submit = async () => {
-    if (!title.trim()) return alert('请输入标题')
+    if (!title.trim()) return showToast('请输入标题')
     setSubmitting(true)
     try {
       const payload: Record<string, unknown> = {}
@@ -415,7 +416,7 @@ function ManualCreatePanel({ onCreated, onClose }: { onCreated: (r: ResourceItem
       onCreated(res)
       setCreated(true)
     } catch (err: any) {
-      alert(err.message || '创建失败')
+      showToast(err.message || '创建失败')
     } finally {
       setSubmitting(false)
     }
