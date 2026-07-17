@@ -2,12 +2,14 @@
 // 统一 retry / timeout / abort 逻辑，减少 4 处重复实现
 
 export interface ChatEvent {
-  type: 'session' | 'progress' | 'result' | 'done' | 'error' | 'token'
+  type: 'session' | 'progress' | 'result' | 'done' | 'error' | 'token' | 'thinking' | 'analysis' | 'similar'
   session_id?: string
   progress?: number
   message?: string
   content?: string
   data?: any
+  step?: number
+  text?: string
 }
 
 const MAX_RETRIES = 2

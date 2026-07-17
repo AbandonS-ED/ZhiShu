@@ -1,10 +1,10 @@
 # 端到端冒烟测试报告
 
-> 最后更新：2026-07-17（学习计划模块合并 + 数值校准）
+> 最后更新：2026-07-18（学习计划模块合并 + 数值校准）
 
 ## 测试概览
 
-智枢 (SmartHub) 项目共进行了 **7 次**端到端冒烟测试，全部 **9/9 PASS**。
+智枢 (SmartHub) 项目共进行了 **8 次**端到端冒烟测试，全部 **9/9 PASS**。
 
 | 次数 | 日期 | 背景 | 结果 |
 |------|------|------|------|
@@ -15,7 +15,8 @@
 | 5 | 2026-06-11 | 管理后台 + 角色权限 | ✅ 9/9 PASS |
 | 6 | 2026-06-27 | 评估报告 AI 化 | ✅ 9/9 PASS |
 | 7 | 2026-06-28 | P1 全量修复 + SQLAlchemy 2.0 兼容 | ✅ 9/9 PASS |
-
+| 8 | 2026-07-18 | 错题分析 Agent 化 + SSE 流式 | ✅ 后端 py_compile + 前端 lint/build 0 errors |
+ 
 ---
 
 ## 最新变更（2026-07-17）
@@ -27,6 +28,26 @@
 - 服务数量：18 个（+ study_plan_service）
 - 数据库表：15 张（+ wrong_questions / study_plans / study_plan_steps + learning_paths 节点扩展）
 - **学习计划模块** (合并 wyy 分支): 输入知识点 → AI 生成学习路径 (10-15 节点) → 节点学习 → AI 测验 → 综合测试
+
+---
+
+## 第八次（2026-07-18）— 错题分析 Agent 化 + SSE 流式
+
+> **背景**: 把两次独立 LLM 调用改为真正的 Agent（4 步思考链：错因分类→策略讲解→针对性同类题→反思重生成），SSE 流式展示思考过程
+
+### 验证清单
+
+| 验证项 | 方法 | 结果 |
+|---|---|---|
+| WrongQuestionAgent py_compile | `python -m py_compile wrong_question_agent.py` | ✅ PASS |
+| wrong_questions.py py_compile | `python -m py_compile wrong_questions.py` | ✅ PASS |
+| 前端 Lint | `npm run lint` | ✅ 0 errors |
+| 前端 Build | `npm run build` | ✅ 28 页面（含 wrong-questions/[id] SSE 渲染） |
+| 向后兼容 | 旧 `POST /{wrong_id}/analyze` 端点保留 | ✅ 未改原端点 |
+| createEventStream 复用 | analyzeStream 改用 createEventStream | ✅ 自带 retry+timeout+abort |
+| _reflect 重生成机制 | 同类题不合格时重调 _generate_similar | ✅ 返回 tuple + analyze() 重试 |
+| 双点击 guard | analysingRef 防止连续点击同时分析 | ✅ ref guard + finally 释放 |
+| SSE 思考链渲染 | 前端逐条追加 thinking log + 流式分析/同类题 | ✅ 实时展示 Agent 思考过程 |
 
 ---
 

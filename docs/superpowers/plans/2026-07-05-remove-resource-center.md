@@ -1,5 +1,7 @@
 # 资源中心功能删除 & 重建准备 实施计划
 
+> ⚠️ **未实施**（2026-07-18）：资源中心未被删除，当前版本保留 AI 生成 + 手动创建 + 我的资源 + 详情弹窗 + 学习进度动画 + 收藏功能。本文档是 2026-07-05 的研究分支方案，未进入主分支。
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 彻底删除资源中心功能，保留 sidebar 导航入口（显示占位页），DROP 三张数据库表，清理所有模块中的资源引用代码。

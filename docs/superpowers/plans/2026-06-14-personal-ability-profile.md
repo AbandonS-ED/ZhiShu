@@ -1,5 +1,7 @@
 # 个人底层能力画像 Implementation Plan
 
+> ⚠️ **实现状态**（2026-07-18）：本文档描述的能力画像迁移计划，7 维画像（comprehension/memory/application/imagination/focus/knowledge_base/learning_goal）已由 `initial_assessment_agent` 落地。部分细化子任务（如自定义维度升级）未实施。其他 6 维画像模型（knowledge_mastery/learning_style/cognitive_level/interest_preferences/weak_topics/learning_pace）仍存在于 charts 页面。本文档保留作为实施过程存档。
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the old 6-dimension learning profile with a new 7-dimension personal ability profile (comprehension/memory/application/imagination/focus/knowledge_base/learning_goal), with AI-guided initial assessment.

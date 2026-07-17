@@ -1,10 +1,10 @@
 # 智枢 (SmartHub) — AI Coding 工具使用说明
 
-> ⚠️ **PARTIALLY DEPRECATED · 2026-06-09**（最后同步：2026-06-28 — 实际 LangGraph StateGraph 10 节点 / shadcn/ui 仍 0 引用，结论不变）
+> ⚠️ **PARTIALLY DEPRECATED · 2026-06-09**（最后同步：2026-07-18 — 实际 16 Agent / 69 API 端点 / LangGraph StateGraph 10 节点）
 >
 > 本文档 §4 关键代码片段（LangGraph Master Agent + pgvector RAG）和 §3.6 前端开发阶段（提到 shadcn/ui）描述的代码 / 架构**与实际不符**：
 >
-> - 实际未用 LangGraph StateGraph，Master Agent 是直接调 LLM + 关键词快路由
+> - 实际已用 LangGraph StateGraph 10 节点（intent_recognition → task_planning → conditional_route → 6 Agent → result_aggregation → response_generation）
 > - 实际未用 shadcn/ui / ReactFlow / Mermaid（虽然 package.json 装了但 0 引用）
 >
 > §3.1-§3.5（项目初始化、数据库、讯飞 API、多智能体、RAG）大致准确，可作历史参考。
@@ -55,7 +55,7 @@ Claude Code 是 Anthropic 推出的 AI 辅助编程工具，能够：
 
 **好的提示词**：
 ```
-请在 app/agents/ 目录下创建 profile_agent.py，实现学生画像智能体：
+请在 app/agents/ 目录下创建 initial_assessment_agent.py，实现学生画像智能体：
 1. 使用LangChain的ChatPromptTemplate
 2. 支持6维度画像提取（knowledge_level, cognitive_style, learning_goals, error_patterns, learning_pace, interests）
 3. 支持画像更新（版本管理）
@@ -207,14 +207,14 @@ class MasterAgent:
         # 添加节点
         workflow.add_node("intent_recognizer", self._recognize_intent)
         workflow.add_node("task_planner", self._plan_tasks)
-        workflow.add_node("profile_agent", self._call_profile_agent)
+        workflow.add_node("initial_assessment_agent", self._call_initial_assessment_agent)
         # ... 更多节点
         
         # 条件路由
         workflow.add_conditional_edges(
             "task_planner",
             self._route_to_agents,
-            {"profile": "profile_agent", "document": "document_agent", ...}
+            {"profile": "initial_assessment_agent", "document": "document_agent", ...}
         )
         
         return workflow.compile()

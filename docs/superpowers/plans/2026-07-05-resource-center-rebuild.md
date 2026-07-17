@@ -1,5 +1,7 @@
 # 资源中心重建 Implementation Plan
 
+> ⚠️ **未实施**（2026-07-18）：资源中心功能在 2026-07-05 后已有大幅迭代（AI 生成 + 手动创建 + 进度动画 + 我的资源过滤 + 详情标签页 + 收藏 + 批量生成），但具体实现路径与此设计稿不完全一致。本文档保留作为参考。
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 重建资源中心，支持 AI 辅助创建（对话式迭代）+ 手动创建（模板填写）+ 三重智能审核

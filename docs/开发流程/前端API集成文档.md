@@ -1,10 +1,10 @@
 # 智枢 (SmartHub) 前端 API 集成文档
 
-> ⚠️ **DEPRECATED · 2026-06-09**（最后同步：2026-06-28 — `lib/api.ts` 已扩到 10 模块 + auth 6 端点 + 统一 SSE 工具 `sse.ts`，本文档结论仍然成立）
+> ⚠️ **DEPRECATED · 2026-06-09**（最后同步：2026-07-18 — 实际 16 Agent / 69 API 端点 / 9 真流式 / 30 页面 / 110 pytest）
 >
 > 本文档描述的 `ApiClient` 类、Token 刷新、SWR 集成、Auth 模块等**全部未在项目中实现**。
 >
-> **实际项目**（2026-06-09）只用了一个轻量 `lib/api.ts`：7 个 module（profile/chat/resource/exercise/path/tutor/dashboard/evaluation），用 `fetch` + `ReadableStream` 解析 SSE，无 Token / SWR / Auth。
+> **实际项目**（2026-07-18）：`lib/api.ts` 60+ 端点、`lib/sse.ts` 统一 SSE 工具（3 次重试+指数退避+120s 超时）、`lib/student.ts` 学生信息辅助。端口 8001。无 Token / SWR / Auth / WebSocket。
 >
 > 真实前端 API 用法见 [`frontend/src/lib/api.ts`](../../frontend/src/lib/api.ts) 和 [`frontend/src/lib/student.ts`](../../frontend/src/lib/student.ts)。**不要按本文档动手开发。**
 >
@@ -1237,5 +1237,5 @@ describe("profileApi", () => {
 ---
 
 **文档版本**: v1.0  
-**最后更新**: 2026-06-06  
+**最后更新**: 2026-07-18  
 **维护者**: SmartHub 开发团队

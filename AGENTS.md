@@ -82,7 +82,7 @@ cd frontend && npm run build                       # 28 页面
 - **MiMo v2.5**: 中国集群 `api-key` 头认证（非 `Authorization: Bearer`），`/chat/completions` 兼容。mimo-v2.5-pro 推理消耗过多 token，降级用 mimo-v2.5
 - **防幻觉**: 6 Agent 接 `validate()`（Document/Exercise 走三层，其他走 `skip_llm=True` 快速模式）
 - **RAG**: `document_parser → text_chunker → embedding → vector_store.search → reranker`
-- **认证**: bcrypt + JWT（HS256，7 天），全 **62** 端点 `Depends(get_current_user)` 门禁
+- **认证**: bcrypt + JWT（HS256，7 天），全 **63** 端点 `Depends(get_current_user)` 门禁
 - **手机验证码**: 内存存储 + 5 分钟有效期，控制台 print 模拟短信，注册时校验
 - **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，11 管理端点（含 Agent 监控 + 文档管理 + 用户删除）
 - **Agent 监控**: `agent_metrics.py` 内存计数器 + `threading.Lock` 线程安全，30s 自动刷新
@@ -94,7 +94,7 @@ cd frontend && npm run build                       # 28 页面
 - **评估报告**: 优先读 `evaluation_reports` 缓存表；无缓存则实时调 LLM 生成；Celery 每天 4 点预生成
 - **资源中心**: AI 生成 + 手动创建 + 进度动画（4步骤+倒计时）+ 保存功能 + 我的资源（过滤系统自动生成）+ 资源详情（标签页+练习题答案）
 - **设置页**: 个人中心（学习概览+快捷入口+信息编辑含major/grade+密码切换+每日目标localStorage可配置+退出登录+骨架屏+响应式）
-- **错题本**: wrong_questions 表 + 7 端点 + AI 错因分析(5类错误: 计算/概念/审题/粗心/未分析) + 同类题推荐 + 掌握度算法(答对+20%上限100) + /tiku 答错自动收录
+- **错题本**: wrong_questions 表 + 8 端点 + AI 错因分析(5类错误: 计算/概念/审题/粗心/未分析 + Agent 4步思考链 + SSE流式) + 同类题推荐 + 掌握度算法(答对+20%上限100) + /tiku 答错自动收录
 - **学习计划**: study_plans/study_plan_steps/learning_paths 3 表 + 6 端点 + learning_path_agent (AI 教材目录式路径生成 10-15 节点) + study_plan_service (758 行核心服务) + 前端 5 页面(/plan 首页+ 4 子页面) + 节点状态管理(completed/current/pending) + 测验解锁机制 + 综合测试
 - **一键启停**: `start.ps1` + `stop.ps1`，杀所有 python/node 进程解决孤儿 socket
 
@@ -141,12 +141,14 @@ cd frontend && npm run build                       # 28 页面
 
 ---
 
-## 📌 待办任务（错题本联动优化）
+## 📌 待办任务（错题本联动优化 + 错题 Agent 化）
 
 > 状态：**全部完成** ✅
-> 最后更新：2026-07-17
+> 最后更新：2026-07-18
 
-### 已完成 commits（275efd3 → 59f566b，共 11 个）
+### 已完成的 commits 两轮
+
+#### 第一轮（275efd3 → 59f566b，共 11 个）
 
 #### P0 — 必须修复（错题本核心功能）
 - [x] **275efd3** fix: AI 出题回填 exercise_id 解决错题本假 UUID 问题
@@ -166,6 +168,25 @@ cd frontend && npm run build                       # 28 页面
 
 #### P3 — 代码重构
 - [x] **59f566b** refactor: QuestionSnapshot 顶层 dataclass + 补 exercise_type
+
+#### 第二轮（本轮：错题分析 Agent 化 — WrongQuestionAgent 4 步思考链 + SSE 流式）
+
+| 文件 | 改动 |
+|------|------|
+| `backend/app/agents/wrong_question_agent.py` | 🆕 新建 WrongQuestionAgent（4 步：错因分类 → 策略讲解 → 针对性同类题 → 反思重生成） |
+| `backend/app/api/wrong_questions.py` | ✏️ 新增 `POST /{wrong_id}/analyze/stream` SSE 端点 + logger 规范化 |
+| `frontend/src/lib/api.ts` | ✏️ 新增 `analyzeStream`（复用 createEventStream + settled guard + 140s 超时） |
+| `frontend/src/lib/sse.ts` | ✏️ ChatEvent 扩展 thinking/analysis/similar 类型 |
+| `frontend/src/app/wrong-questions/[id]/page.tsx` | ✏️ SSE 流式渲染（思考链日志 + 逐步追加分析结果 + 双点击 guard） |
+| `frontend/src/app/globals.css` | ✏️ 新增 wq-thinking-log / wq-thinking-step / wq-loading-dots 样式 |
+
+**Review 发现并修复的 5+3 个问题**：
+- 🔴 Bug1: `_reflect` 不合格未重生成 → 改为返回 tuple + analyze() 重调 `_generate_similar`
+- 🔴 Bug2: `__import__("logging")` 丑写法 → 顶部正规 import
+- 🔴 Bug3: 前端连续点击同时分析 → 加 `analysingRef` + finally 统一释放
+- 🟡 边界A: 重生成 thinking step=4 编号冲突 → 改为 step=5
+- 🟡 边界B/C: `analyzeStream` 超时竞争 → settled guard + 主动 cancel + 140s 兜底
+- 🟡 边界D: 前端文案 `第{log.step}/4步` → `第{log.step}步`
 
 ---
 
@@ -206,7 +227,9 @@ cd frontend && npm run build                       # 28 页面
 
 ---
 
-## 📊 本轮 commits（错题本修复 + 重复造轮子审计修复）
+## 📊 本轮 Commits
+
+### 第一轮（错题本修复 + 重复造轮子审计修复）
 
 ```
 e8a69a1 refactor: P1重复造轮子修复（_validate_uuid抽取、8个agent改用parse_json_response）
@@ -223,6 +246,17 @@ c49a484 fix: 错题本 snapshot 补全 exercise_type + _to_dto type 提取修复
 7d92e86 feat: plan/quiz + final-test 答错自动加入错题本
 2bbfbc4 feat: 错题本支持 ExerciseBank 表查询 + 快照机制
 275efd3 fix: AI 出题回填 exercise_id 解决错题本假 UUID 问题
+```
+
+### 第二轮（错题分析 Agent 化 — 未提交）
+
+```
+新建     backend/app/agents/wrong_question_agent.py      WrongQuestionAgent (4步思考链)
+修改     backend/app/api/wrong_questions.py               +POST /analyze/stream (SSE)
+修改     frontend/src/lib/api.ts                           +analyzeStream (createEventStream复用)
+修改     frontend/src/lib/sse.ts                           ChatEvent 类型扩展
+修改     frontend/src/app/wrong-questions/[id]/page.tsx    SSE 流式渲染
+修改     frontend/src/app/globals.css                       +思考链/loading样式
 ```
 
 ---

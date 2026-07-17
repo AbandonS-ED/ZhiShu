@@ -1,14 +1,16 @@
 """错题本 API — 传统错题集 + AI 错因分析 + 同类题推荐"""
+import asyncio
 import json
+import logging
 import uuid
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, field_validator
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy import select, func, desc
-from app.core.database import get_db
+from app.core.database import get_db, async_session
 from app.core.dependencies import valid_student_id, get_current_user
 from app.core.validators import _validate_uuid
 from app.models.student import Student
@@ -17,6 +19,12 @@ from app.models.exercise_bank import ExerciseBank
 from app.models.wrong_question import WrongQuestion
 from app.services.llm_factory import get_llm_client
 from app.services.json_parser import parse_json_response
+from app.agents.wrong_question_agent import wrong_question_agent, ERROR_TYPE_LABELS
+from app.agents.wrong_question_agent import wrong_question_agent
+from app.core.sse_utils import sse_event, sse_done, sse_error, sse_stream_response
+from fastapi.responses import StreamingResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -248,6 +256,33 @@ def _to_dto(wq: WrongQuestion, exercise: Optional[Exercise] = None, bank_item: O
     return result
 
 
+async def _background_classify_error(wq_id: str, snapshot: dict, wrong_answer: str):
+    """后台轻量错因分类 — 入库后异步触发，不阻塞响应"""
+    try:
+        async with async_session() as session:
+            data = await wrong_question_agent.classify_error_only(
+                question=snapshot.get("question", ""),
+                options=snapshot.get("options"),
+                answer=snapshot.get("answer", ""),
+                wrong_answer=wrong_answer,
+                knowledge_point=snapshot.get("knowledge_point", ""),
+            )
+
+            result = await session.execute(
+                select(WrongQuestion).where(WrongQuestion.id == uuid.UUID(wq_id))
+            )
+            wq = result.scalar_one_or_none()
+            if not wq:
+                return
+
+            wq.error_type = data.get("error_type", "unknown")
+            wq.error_analysis = data.get("error_analysis", "")
+            await session.commit()
+            logger.info("错因分类完成: %s -> %s", wq_id, wq.error_type)
+    except Exception as e:
+        logger.error("后台错因分类失败: %s — %s", wq_id, e)
+
+
 # ===== Endpoints =====
 
 @router.post("")
@@ -340,6 +375,11 @@ async def add_wrong_question(
     db.add(wq)
     await db.commit()
     await db.refresh(wq)
+
+    # 异步轻量错因分类（不阻塞响应）
+    if question_snapshot:
+        asyncio.create_task(_background_classify_error(str(wq.id), question_snapshot, req.wrong_answer))
+
     return {"id": str(wq.id), "status": "created"}
 
 
@@ -560,6 +600,85 @@ async def analyze_wrong_question(
     await db.refresh(wq)
 
     return _to_dto(wq, exercise, bank_item)
+
+
+@router.post("/{wrong_id}/analyze/stream")
+async def analyze_wrong_question_stream(
+    wrong_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    """AI 错因分析（Agent 流式版）— 4 步思考链 SSE 流式返回"""
+    wq_result = await db.execute(select(WrongQuestion).where(WrongQuestion.id == wrong_id))
+    wq = wq_result.scalar_one_or_none()
+    if not wq:
+        raise HTTPException(status_code=404, detail="错题不存在")
+    if wq.student_id != user.id:
+        raise HTTPException(status_code=403, detail="只能分析自己的错题")
+
+    exercise, bank_item = await _resolve_question_source(db, wq)
+
+    source_obj = exercise if exercise else bank_item
+    if not source_obj:
+        if wq.question_snapshot:
+            source_obj = QuestionSnapshot(
+                question=wq.question_snapshot.get("question", ""),
+                options=wq.question_snapshot.get("options"),
+                answer=wq.question_snapshot.get("answer", ""),
+                explanation=wq.question_snapshot.get("explanation", ""),
+                knowledge_point=wq.question_snapshot.get("knowledge_point", ""),
+                difficulty=wq.question_snapshot.get("difficulty", 50),
+                exercise_type=wq.question_snapshot.get("exercise_type", "unknown"),
+            )
+        else:
+            raise HTTPException(status_code=404, detail="题目不存在")
+
+    options = source_obj.options if hasattr(source_obj, "options") else None
+    if options and isinstance(options, str):
+        options = [options]
+
+    async def event_generator():
+        analysis_data = None
+        similar_data = None
+        try:
+            async for event in wrong_question_agent.analyze(
+                question=source_obj.question or "",
+                options=options,
+                answer=source_obj.answer or "",
+                wrong_answer=wq.wrong_answer,
+                knowledge_point=source_obj.knowledge_point or "",
+                difficulty=getattr(source_obj, "difficulty", 50) or 50,
+                exercise_type=getattr(source_obj, "exercise_type", "unknown") or "unknown",
+            ):
+                if event["event"] == "thinking":
+                    yield sse_event("thinking", step=event["step"], text=event["text"])
+                elif event["event"] == "analysis":
+                    analysis_data = event["data"]
+                    yield sse_event("analysis", data=event["data"])
+                elif event["event"] == "similar":
+                    similar_data = event["data"]
+                    yield sse_event("similar", data=event["data"])
+                elif event["event"] == "done":
+                    if analysis_data:
+                        wq.error_type = analysis_data.get("error_type", "unknown")
+                        wq.error_analysis = analysis_data.get("error_analysis", "")
+                        wq.ai_explanation = analysis_data.get("ai_explanation", "")
+                    if similar_data is not None:
+                        wq.similar_exercises = similar_data
+                    wq.updated_at = datetime.now(timezone.utc)
+                    await db.commit()
+                    yield sse_done()
+                elif event["event"] == "error":
+                    yield sse_error(event.get("message", "分析过程出错"))
+        except Exception as e:
+            logger.error("错题 Agent 分析异常: %s", e)
+            yield sse_error(f"分析异常: {str(e)[:200]}")
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+    })
 
 
 @router.post("/{wrong_id}/review")

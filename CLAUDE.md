@@ -15,7 +15,7 @@
 |---|---|---|---|
 | 前端 | Next.js (App Router) + Tailwind CSS + TypeScript | 14.2.5 | 本地 woff 字体，无 Google Fonts |
 | 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 | Python 3.11 |
-| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 15 Agent 模块 |
+| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 16 Agent 模块 |
 | LLM | 三客户端: MimoClient (当前) / MiniMaxClient / SparkClient | - | `LLM_PROVIDER=mimo\|minimax\|spark` 切换 |
 | 向量库 | pgvector (JSONB 降级方案) | - | embedding 用 JSONB 占位 |
 | 数据库 | PostgreSQL 18 + Redis | - | 14 张表 |
@@ -46,8 +46,8 @@ ZhiShu/
 │   └── src/hooks/usePageTimer.ts    # 页面停留计时器
 ├── backend/                         # FastAPI 后端
 │   ├── app/main.py                  # 应用入口 + 路由注册
-│   ├── app/api/                     # 12 个路由模块 (68 端点)
-│   ├── app/agents/                  # 15 个 Agent 模块 + StateGraph 编排
+│   ├── app/api/                     # 12 个路由模块 (69 端点)
+│   ├── app/agents/                  # 16 个 Agent 模块 + StateGraph 编排
 │   ├── app/services/                # 17 个服务模块
 │   ├── app/models/                  # 13 个数据模型
 │   ├── app/tasks/                   # Celery 异步任务
@@ -164,6 +164,7 @@ study_patrol / study_session_end → learning_records
 | `/api/v1/resource/learning-package/generate/stream` | ✅ 真流式 | `type=token` 逐 token |
 | `/api/v1/resource/exercises/generate/stream` | ✅ 真流式 | dual-format (题库出题) |
 | `/api/v1/resource/exercises/pool` | GET | 题池加载 |
+| `/api/v1/wrong-questions/{id}/analyze/stream` | ✅ 真流式 | Agent 4 步思考链 |
 
 ### 数据库表关系 (14 张表)
 
@@ -266,6 +267,8 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 密码输入框 autocomplete 属性 (current-password/new-password 防浏览器自动填充)
 - ✅ 错题本功能 (wrong_questions 表 + 7 端点 + AI 错因分析 + 同类题推荐 + 掌握度算法 + /tiku 答错自动收录)
 - ✅ 学习计划模块 (合并 wyy 分支：study_plans/study_plan_steps/learning_paths 3 表 + learning_path_agent + study_plan_service 758 行 + 6 端点 + 前端 5 页面：/plan 首页+4 子页面+综合测试)
+- ✅ 错题分析 Agent 化 (WrongQuestionAgent 4步思考链 + SSE 流式 + 5+3 轮 Review 修复)
+- ✅ `wrong_questions.py` logger 规范化 (__import__ 改为正规 import logging)
 
 ### P2 — 清理项
 

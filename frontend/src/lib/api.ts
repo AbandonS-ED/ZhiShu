@@ -556,6 +556,32 @@ export const wrongQuestionsApi = {
   get: (id: string) => request<WrongQuestion>(`/wrong-questions/${id}`),
   analyze: (id: string) =>
     request<AnalyzeResponse>(`/wrong-questions/${id}/analyze`, { method: 'POST' }),
+  analyzeStream: (id: string, onEvent: (e: ChatEvent) => void) => new Promise<void>((resolve, reject) => {
+    let cancel: (() => void) | null = null
+    let settled = false
+
+    cancel = createEventStream(`${BASE_URL}/wrong-questions/${id}/analyze/stream`, {}, (e) => {
+      onEvent(e)
+      if (settled) return
+      if (e.type === 'done') {
+        settled = true
+        resolve()
+        cancel?.()
+      } else if (e.type === 'error') {
+        settled = true
+        reject(new Error(e.message || '分析失败'))
+        cancel?.()
+      }
+    })
+
+    setTimeout(() => {
+      if (!settled) {
+        settled = true
+        cancel?.()
+        reject(new Error('分析超时，请稍后再试'))
+      }
+    }, 140_000)
+  }),
   review: (id: string, is_correct: boolean) =>
     request<{ mastery_level: number; is_mastered: boolean; review_count: number; correct_count: number }>(
       `/wrong-questions/${id}/review`,

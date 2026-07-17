@@ -4,7 +4,7 @@
 
 ## 项目简介
 
-智枢 (SmartHub) 是一个面向《人工智能导论》课程的多智能体个性化学习系统。通过 15 个 AI Agent 协同工作，为学生提供对话式学习画像评估、个性化学习资源生成、智能学习路径规划、RAG 智能辅导和效果评估等服务。
+智枢 (SmartHub) 是一个面向《人工智能导论》课程的多智能体个性化学习系统。通过 16 个 AI Agent 协同工作，为学生提供对话式学习画像评估、个性化学习资源生成、智能学习路径规划、RAG 智能辅导和效果评估等服务。
 
 ### 核心功能
 
@@ -82,7 +82,7 @@ ZhiShu/
 ├── backend/                       # FastAPI 后端
 │   └── app/
 │       ├── main.py                # 应用入口 + 路由注册
-│       ├── api/                   # 12 个路由模块 (68 端点)
+│       ├── api/                   # 12 个路由模块 (69 端点)
 │       ├── agents/                # 15 个 Agent 模块 + StateGraph 编排
 │       │   ├── master_agent.py    # LangGraph StateGraph 10 节点
 │       │   ├── state.py           # AgentState + IntentType
@@ -210,7 +210,7 @@ npm run dev
 6. `/admin/paths` → 学习路径管理
 7. `/admin/chats` → 对话记录（消息详情）
 8. `/admin/documents` → 知识库文档管理
-9. `/admin/agents` → Agent 监控面板（15 Agent 模块实时调用统计 + 30s 自动刷新）
+9. `/admin/agents` → Agent 监控面板（16 Agent 模块实时调用统计 + 30s 自动刷新）
 
 ## 测试
 
@@ -234,7 +234,7 @@ npm run build
 
 ## 技术亮点
 
-- **多智能体编排**: LangGraph StateGraph 10 节点 + 15 Agent 模块协同
+- **多智能体编排**: LangGraph StateGraph 10 节点 + 16 Agent 模块协同
 - **防幻觉机制**: PatternDetector + SourceValidator + LLMValidator 三层验证
 - **流式输出**: 8 个 SSE 端点 (对话/资源/练习/路径/画像评估/学习包/题库出题)
 - **RAG 管道**: 文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排
