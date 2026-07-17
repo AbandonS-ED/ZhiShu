@@ -366,13 +366,8 @@ async def list_wrong_questions(
     )
     by_error_type = {row[0]: row[1] for row in type_q.all()}
 
-    # === 分页数据（LEFT JOIN Exercise 和 ExerciseBank）===
-    query = (
-        select(WrongQuestion, Exercise, ExerciseBank)
-        .outerjoin(Exercise, WrongQuestion.exercise_id == Exercise.id)
-        .outerjoin(ExerciseBank, WrongQuestion.exercise_bank_id == ExerciseBank.id)
-        .where(WrongQuestion.student_id == student_id)
-    )
+    # === 分页数据（单表查询，快照已含完整题目）===
+    query = select(WrongQuestion).where(WrongQuestion.student_id == student_id)
 
     if filter_type == "unmastered":
         query = query.where(WrongQuestion.is_mastered == False)
@@ -393,8 +388,8 @@ async def list_wrong_questions(
     total = page_count_q.scalar() or 0
 
     page_result = await db.execute(page_query)
-    rows = page_result.all()
-    items = [_to_dto(wq, ex, bank) for wq, ex, bank in rows]
+    rows = page_result.scalars().all()
+    items = [_to_dto(wq) for wq in rows]
 
     return {
         "items": items,
