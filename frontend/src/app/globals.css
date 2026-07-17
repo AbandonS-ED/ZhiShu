@@ -2292,8 +2292,11 @@ body:has(.login-page){
 .result-actions{display:flex;gap:12px;justify-content:center;margin-top:32px}
 
 /* ===== Resources learn - 答题区大小 ===== */
-.quiz-medium{max-width:768px;margin:0 auto}
-.quiz-wide{max-width:1100px;margin:0 auto}
+.quiz-medium,.medium{max-width:768px;margin:0 auto}
+.quiz-wide,.wide{max-width:1100px;margin:0 auto}
+.final-result{max-width:640px;margin:40px auto;padding:40px;background:var(--surface);border:1px solid var(--line);border-radius:18px;text-align:center}
+.final-result h2{font-size:24px;font-weight:700;color:var(--ink);margin:0 0 12px}
+.final-result p{color:var(--ink-3);font-size:15px;line-height:1.6;margin:0 0 12px}
 
 /* ===== Login auth-root ===== */
 .auth-root{min-height:100vh;display:flex;flex-direction:column}
