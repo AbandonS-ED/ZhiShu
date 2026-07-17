@@ -6,7 +6,6 @@
 包含防幻觉验证（N3 评分项）。
 """
 
-import json
 import re
 import logging
 from app.services.llm_factory import get_llm_client
@@ -188,36 +187,7 @@ class DocumentAgent:
             "knowledge": "",
             "code": "",
             "audio_script": "",
-        })
-
-    @staticmethod
-    def _strip_think(text: str) -> str:
-        """去掉 <think>...</think> 标签（支持嵌套）"""
-        depth = 0
-        open_tag = "<think>"
-        close_tag = "</think>"
-        open_len = len(open_tag)
-        close_len = len(close_tag)
-        last_open_in_result = -1
-        i = 0
-        n = len(text)
-        result = ""
-        while i < n:
-            if depth == 0 and text[i:i + open_len] == open_tag:
-                last_open_in_result = len(result)
-                depth = 1
-                i += open_len
-            elif depth > 0 and text[i:i + close_len] == close_tag:
-                depth = 0
-                i += close_len
-            elif depth == 0:
-                result += text[i]
-                i += 1
-            else:
-                i += 1
-        if depth > 0 and last_open_in_result >= 0:
-            result = result[:last_open_in_result]
-        return result
+})
 
 
 document_agent = DocumentAgent()

@@ -4,7 +4,6 @@
 检索相关文档片段作为上下文，生成带来源引用的回答。
 """
 
-import json
 from app.services.llm_factory import get_llm_client
 from app.services.anti_hallucination import anti_hallucination
 from app.services.json_parser import parse_json_response

@@ -1,6 +1,5 @@
 """学习路径生成Agent - 专门负责生成详细的学习路径"""
 
-import json
 import logging
 from typing import Dict, Any, List, Optional
 from app.services.llm_factory import get_llm_client
@@ -14,7 +13,8 @@ class LearningPathAgent:
 
     def _parse_response(self, content: str) -> dict:
         """解析LLM响应"""
-        return parse_json_response(content, self._get_default_path("未知"))
+        # fallback 用空 dict，让 caller 走 _get_default_path(target_knowledge) 学科匹配降级
+        return parse_json_response(content, {})
 
     async def generate_path(
         self,

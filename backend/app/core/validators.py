@@ -1,7 +1,5 @@
 """Pydantic 验证器工具（减少 api 文件中重复的 _validate_uuid）"""
 import uuid
-from typing import Annotated, Optional
-from pydantic import field_validator
 
 
 def _validate_uuid(v: str) -> str:
