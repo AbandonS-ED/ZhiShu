@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { studyPlanApi, exerciseApi, wrongQuestionsApi, type LearningPath, type LearningPathNode, type Exercise } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
+import { showToast } from '@/lib/utils'
 import { usePageTimer } from '@/hooks/usePageTimer'
 import Icon from '@/components/Icon'
 import QuestionCard from './components/QuestionCard'
@@ -157,15 +158,21 @@ export default function QuizNodePage() {
 
     // 批量加入错题本（Promise.allSettled 确保全部完成）
     if (studentId) {
-      await Promise.allSettled(
+      const results = await Promise.allSettled(
         wrongExercises.map(({ exercise, answer }) =>
           wrongQuestionsApi.add({
             student_id: studentId,
             exercise_id: exercise.exercise_id,
             wrong_answer: answer,
-          }).catch((err) => console.error('加入错题本失败:', err))
+          })
         )
       )
+      const failed = results.filter(r => r.status === 'rejected').length
+      if (wrongExercises.length > 0 && failed === 0) {
+        showToast(`已加入错题本 ${wrongExercises.length} 道`)
+      } else if (failed > 0) {
+        showToast(`错题本：${wrongExercises.length - failed} 道加入成功，${failed} 道失败`)
+      }
     }
 
     const finalScore = Math.round(totalScore / exercises.length)

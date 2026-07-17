@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { exerciseApi, evaluationApi, profileApi, wrongQuestionsApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { markdownToHtml } from '@/lib/markdown'
+import { showToast } from '@/lib/utils'
 import RobotIcon from '@/components/RobotIcon'
 import { usePageTimer } from '@/hooks/usePageTimer'
 import Icon from '@/components/Icon'
@@ -304,8 +305,11 @@ export default function TikuPage() {
         student_id: getStudentId()!,
         exercise_id: id,
         wrong_answer: String.fromCharCode(65 + selected),
+      }).then(() => {
+        showToast('已加入错题本')
       }).catch((err) => {
         console.error('加入错题本失败:', err)
+        showToast('加入错题本失败')
       })
     }
   }, [answers, exercises, addRecent])
@@ -336,8 +340,11 @@ export default function TikuPage() {
         student_id: getStudentId()!,
         exercise_id: id,
         wrong_answer: selected ? '对' : '错',
+      }).then(() => {
+        showToast('已加入错题本')
       }).catch((err) => {
         console.error('加入错题本失败:', err)
+        showToast('加入错题本失败')
       })
     }
   }, [answers, exercises, addRecent])
