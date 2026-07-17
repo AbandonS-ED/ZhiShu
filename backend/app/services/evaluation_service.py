@@ -13,6 +13,7 @@ from sqlalchemy import select, func, and_
 from app.models.learning_record import LearningRecord
 from app.models.student_profile import StudentProfile
 from app.models.student import Student
+from app.services.llm_factory import get_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -414,18 +415,8 @@ class EvaluationService:
     ) -> dict:
         """用 LLM 生成评估报告，失败则降级到规则引擎"""
         try:
-            from app.core.config import settings
-            from app.services.minimax_client import MiniMaxClient
-
-            # 选择 LLM 客户端
-            if settings.LLM_PROVIDER == "spark":
-                from app.services.spark_client import SparkClient
-                llm = SparkClient(api_key=settings.SPARK_API_KEY)
-            else:
-                llm = MiniMaxClient(
-                    api_key=settings.MINIMAX_API_KEY,
-                    base_url=settings.MINIMAX_BASE_URL,
-                )
+            # 通过 LLM 工厂获取当前 provider 的客户端（与 13 个 agent 一致）
+            llm = get_llm_client()
 
             # 构造 Prompt
             prompt = self._build_report_prompt(
