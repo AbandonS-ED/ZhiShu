@@ -11,6 +11,7 @@ from app.core.database import get_db
 from app.core.dependencies import valid_student_id, get_current_user
 from app.models.student import Student
 from app.models.exercise import Exercise
+from app.models.exercise_bank import ExerciseBank
 from app.models.wrong_question import WrongQuestion
 from app.services.llm_factory import get_llm_client
 from app.services.json_parser import parse_json_response
@@ -155,11 +156,44 @@ async def _call_llm_for_similar(exercise: Exercise, count: int = 3) -> list:
         return []
 
 
-def _to_dto(wq: WrongQuestion, exercise: Optional[Exercise] = None) -> dict:
+def _to_dto(wq: WrongQuestion, exercise: Optional[Exercise] = None, bank_item: Optional[ExerciseBank] = None) -> dict:
     """转为前端需要的 DTO"""
+    # 优先用 question_snapshot（防止源表删数据后无法显示）
+    if wq.question_snapshot:
+        source = wq.question_snapshot
+        question_data = {
+            "question": source.get("question", ""),
+            "options": source.get("options"),
+            "answer": source.get("answer", ""),
+            "explanation": source.get("explanation", ""),
+            "knowledge_point": source.get("knowledge_point", ""),
+            "difficulty": source.get("difficulty", 50),
+        }
+    elif exercise:
+        question_data = {
+            "question": exercise.question,
+            "options": exercise.options,
+            "answer": exercise.answer,
+            "explanation": exercise.explanation,
+            "knowledge_point": exercise.knowledge_point,
+            "difficulty": exercise.difficulty,
+        }
+    elif bank_item:
+        question_data = {
+            "question": bank_item.question,
+            "options": bank_item.options,
+            "answer": bank_item.answer,
+            "explanation": bank_item.explanation,
+            "knowledge_point": bank_item.knowledge_point,
+            "difficulty": bank_item.difficulty,
+        }
+    else:
+        question_data = {}
+
     result = {
         "id": str(wq.id),
-        "exercise_id": str(wq.exercise_id),
+        "exercise_id": str(wq.exercise_id or wq.exercise_bank_id),
+        "source_type": wq.source_type,
         "wrong_answer": wq.wrong_answer,
         "correct_answer": wq.correct_answer,
         "error_type": wq.error_type,
@@ -173,16 +207,11 @@ def _to_dto(wq: WrongQuestion, exercise: Optional[Exercise] = None) -> dict:
         "last_reviewed_at": wq.last_reviewed_at.isoformat() if wq.last_reviewed_at else None,
         "created_at": wq.created_at.isoformat() if wq.created_at else None,
     }
-    if exercise:
+    if question_data:
         result["exercise"] = {
-            "id": str(exercise.id),
-            "type": exercise.exercise_type,
-            "question": exercise.question,
-            "options": exercise.options,
-            "answer": exercise.answer,
-            "explanation": exercise.explanation,
-            "knowledge_point": exercise.knowledge_point,
-            "difficulty": exercise.difficulty,
+            "id": str(wq.exercise_id or wq.exercise_bank_id),
+            "type": exercise.exercise_type if exercise else (bank_item.exercise_type if bank_item else "unknown"),
+            **question_data,
         }
     return result
 
@@ -195,35 +224,85 @@ async def add_wrong_question(
     db: AsyncSession = Depends(get_db),
     user: Student = Depends(get_current_user),
 ):
-    """添加错题（手动/自动）"""
+    """添加错题（手动/自动）— 同时支持 Exercise 和 ExerciseBank 表"""
     if str(user.id) != req.student_id:
         raise HTTPException(status_code=403, detail="只能添加自己的错题")
 
     exercise_uuid = uuid.UUID(req.exercise_id)
+    source_type = "exercise"
+    correct_answer = ""
+    question_snapshot = None
+
+    # 先查 Exercise 表（学生专属练习）
     ex_result = await db.execute(select(Exercise).where(Exercise.id == exercise_uuid))
     exercise = ex_result.scalar_one_or_none()
-    if not exercise:
-        raise HTTPException(status_code=404, detail="题目不存在")
+    if exercise:
+        source_type = "exercise"
+        correct_answer = exercise.answer
+        question_snapshot = {
+            "question": exercise.question,
+            "options": exercise.options,
+            "answer": exercise.answer,
+            "explanation": exercise.explanation,
+            "difficulty": exercise.difficulty,
+            "knowledge_point": exercise.knowledge_point,
+            "source": "exercise",
+        }
+    else:
+        # 再查 ExerciseBank 表（公共题库 / AI 生成）
+        bank_result = await db.execute(select(ExerciseBank).where(ExerciseBank.id == exercise_uuid))
+        bank_item = bank_result.scalar_one_or_none()
+        if bank_item:
+            source_type = "bank"
+            correct_answer = bank_item.answer
+            question_snapshot = {
+                "question": bank_item.question,
+                "options": bank_item.options,
+                "answer": bank_item.answer,
+                "explanation": bank_item.explanation,
+                "difficulty": bank_item.difficulty,
+                "knowledge_point": bank_item.knowledge_point,
+                "source": bank_item.source,
+            }
+        else:
+            raise HTTPException(status_code=404, detail="题目不存在")
 
-    # 查重：同一题未掌握时不重复添加
-    existing = await db.execute(
-        select(WrongQuestion).where(
-            WrongQuestion.student_id == user.id,
-            WrongQuestion.exercise_id == exercise_uuid,
-            WrongQuestion.is_mastered == False,
+    # 查重：同一题未掌握时不重复添加（同时支持两种 source）
+    if source_type == "exercise":
+        existing = await db.execute(
+            select(WrongQuestion).where(
+                WrongQuestion.student_id == user.id,
+                WrongQuestion.exercise_id == exercise_uuid,
+                WrongQuestion.is_mastered == False,
+            )
         )
-    )
+    else:
+        existing = await db.execute(
+            select(WrongQuestion).where(
+                WrongQuestion.student_id == user.id,
+                WrongQuestion.exercise_bank_id == exercise_uuid,
+                WrongQuestion.is_mastered == False,
+            )
+        )
     old = existing.scalar_one_or_none()
     if old:
         return {"id": str(old.id), "status": "exists", "message": "该题已在错题本中"}
 
-    wq = WrongQuestion(
-        student_id=user.id,
-        exercise_id=exercise_uuid,
-        wrong_answer=req.wrong_answer,
-        correct_answer=exercise.answer,
-        error_type="unknown",
-    )
+    # 创建错题记录
+    wq_data = {
+        "student_id": user.id,
+        "wrong_answer": req.wrong_answer,
+        "correct_answer": correct_answer,
+        "error_type": "unknown",
+        "source_type": source_type,
+        "question_snapshot": question_snapshot,
+    }
+    if source_type == "exercise":
+        wq_data["exercise_id"] = exercise_uuid
+    else:
+        wq_data["exercise_bank_id"] = exercise_uuid
+
+    wq = WrongQuestion(**wq_data)
     db.add(wq)
     await db.commit()
     await db.refresh(wq)
@@ -384,20 +463,24 @@ async def get_wrong_question_detail(
     user: Student = Depends(get_current_user),
 ):
     """错题详情"""
-    result = await db.execute(
-        select(WrongQuestion, Exercise)
-        .join(Exercise, WrongQuestion.exercise_id == Exercise.id)
-        .where(WrongQuestion.id == wrong_id)
-    )
-    row = result.first()
-    if not row:
+    # 先查 WrongQuestion
+    wq_result = await db.execute(select(WrongQuestion).where(WrongQuestion.id == wrong_id))
+    wq = wq_result.scalar_one_or_none()
+    if not wq:
         raise HTTPException(status_code=404, detail="错题不存在")
-
-    wq, exercise = row
     if wq.student_id != user.id:
         raise HTTPException(status_code=403, detail="只能查看自己的错题")
 
-    return _to_dto(wq, exercise)
+    exercise = None
+    bank_item = None
+    if wq.source_type == "exercise" and wq.exercise_id:
+        ex_result = await db.execute(select(Exercise).where(Exercise.id == wq.exercise_id))
+        exercise = ex_result.scalar_one_or_none()
+    elif wq.source_type == "bank" and wq.exercise_bank_id:
+        bank_result = await db.execute(select(ExerciseBank).where(ExerciseBank.id == wq.exercise_bank_id))
+        bank_item = bank_result.scalar_one_or_none()
+
+    return _to_dto(wq, exercise, bank_item)
 
 
 @router.post("/{wrong_id}/analyze")
@@ -407,24 +490,44 @@ async def analyze_wrong_question(
     user: Student = Depends(get_current_user),
 ):
     """AI 错因分析（一步到位：错因 + 讲解 + 同类题）"""
-    result = await db.execute(
-        select(WrongQuestion, Exercise)
-        .join(Exercise, WrongQuestion.exercise_id == Exercise.id)
-        .where(WrongQuestion.id == wrong_id)
-    )
-    row = result.first()
-    if not row:
+    wq_result = await db.execute(select(WrongQuestion).where(WrongQuestion.id == wrong_id))
+    wq = wq_result.scalar_one_or_none()
+    if not wq:
         raise HTTPException(status_code=404, detail="错题不存在")
-
-    wq, exercise = row
     if wq.student_id != user.id:
         raise HTTPException(status_code=403, detail="只能分析自己的错题")
 
+    exercise = None
+    bank_item = None
+    if wq.source_type == "exercise" and wq.exercise_id:
+        ex_result = await db.execute(select(Exercise).where(Exercise.id == wq.exercise_id))
+        exercise = ex_result.scalar_one_or_none()
+    elif wq.source_type == "bank" and wq.exercise_bank_id:
+        bank_result = await db.execute(select(ExerciseBank).where(ExerciseBank.id == wq.exercise_bank_id))
+        bank_item = bank_result.scalar_one_or_none()
+
+    # 用 snapshot 或查到的对象来调用分析
+    source_obj = exercise if exercise else bank_item
+    if not source_obj:
+        # 用 question_snapshot 构建临时对象
+        if wq.question_snapshot:
+            class SnapObj:
+                def __init__(self, snap):
+                    self.question = snap.get("question", "")
+                    self.options = snap.get("options")
+                    self.answer = snap.get("answer", "")
+                    self.explanation = snap.get("explanation", "")
+                    self.knowledge_point = snap.get("knowledge_point", "")
+                    self.difficulty = snap.get("difficulty", 50)
+            source_obj = SnapObj(wq.question_snapshot)
+        else:
+            raise HTTPException(status_code=404, detail="题目不存在")
+
     # 1. AI 错因分析 + 讲解
-    analysis = await _call_llm_for_analysis(exercise, wq.wrong_answer)
+    analysis = await _call_llm_for_analysis(source_obj, wq.wrong_answer)
 
     # 2. AI 生成同类题
-    similar = await _call_llm_for_similar(exercise, count=3)
+    similar = await _call_llm_for_similar(source_obj, count=3)
 
     # 3. 保存到数据库
     wq.error_type = analysis.get("error_type", "unknown")
@@ -436,7 +539,7 @@ async def analyze_wrong_question(
     await db.commit()
     await db.refresh(wq)
 
-    return _to_dto(wq, exercise)
+    return _to_dto(wq, exercise, bank_item)
 
 
 @router.post("/{wrong_id}/review")

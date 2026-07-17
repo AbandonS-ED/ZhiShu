@@ -10,7 +10,11 @@ class WrongQuestion(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False, index=True)
-    exercise_id = Column(UUID(as_uuid=True), ForeignKey("exercises.id"), nullable=False, index=True)
+    exercise_id = Column(UUID(as_uuid=True), ForeignKey("exercises.id"), nullable=True, index=True)
+    exercise_bank_id = Column(UUID(as_uuid=True), ForeignKey("exercise_bank.id"), nullable=True, index=True)
+    source_type = Column(String(20), default="exercise", nullable=False)  # exercise 或 bank
+    question_snapshot = Column(JSONB, nullable=True)  # 题目快照（防止源表删数据后无法显示）
+
     wrong_answer = Column(Text, nullable=False)
     correct_answer = Column(Text, nullable=True)
 
