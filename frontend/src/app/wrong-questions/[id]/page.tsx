@@ -9,12 +9,12 @@ import { usePageTimer } from '@/hooks/usePageTimer'
 import Icon from '@/components/Icon'
 import type { WrongQuestion } from '@/types'
 
-const ERROR_TYPE_LABEL: Record<string, { label: string; color: string }> = {
-  calculation: { label: '计算失误', color: '#f59e0b' },
-  concept: { label: '概念不清', color: '#ef4444' },
-  reading: { label: '审题错误', color: '#8b5cf6' },
-  carelessness: { label: '粗心大意', color: '#3b82f6' },
-  unknown: { label: '未分析', color: '#6b7280' },
+const ERROR_TYPE_LABEL: Record<string, { label: string; bg: string; fg: string }> = {
+  calculation: { label: '计算失误', bg: '#fef3c7', fg: '#92400e' },
+  concept: { label: '概念不清', bg: '#fee2e2', fg: '#991b1b' },
+  reading: { label: '审题错误', bg: '#ede9fe', fg: '#5b21b6' },
+  carelessness: { label: '粗心大意', bg: '#dbeafe', fg: '#1e40af' },
+  unknown: { label: '未分析', bg: 'var(--bg-subtle)', fg: 'var(--ink-3)' },
 }
 
 export default function WrongQuestionDetailPage() {
@@ -132,7 +132,7 @@ export default function WrongQuestionDetailPage() {
         <section className="wq-card wq-detail-card">
           <div className="wq-card-head">
             <h2>原题</h2>
-            <span className="wq-error-tag" style={{ background: meta.color }}>{meta.label}</span>
+            <span className="wq-error-tag" style={{ background: meta.bg, color: meta.fg }}>{meta.label}</span>
           </div>
 
           <div className="wq-detail-question">{ex?.question}</div>
