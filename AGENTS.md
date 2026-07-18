@@ -82,7 +82,7 @@ cd frontend && npm run build                       # 28 页面
 - **MiMo v2.5**: 中国集群 `api-key` 头认证（非 `Authorization: Bearer`），`/chat/completions` 兼容。mimo-v2.5-pro 推理消耗过多 token，降级用 mimo-v2.5
 - **防幻觉**: 6 Agent 接 `validate()`（Document/Exercise 走三层，其他走 `skip_llm=True` 快速模式）
 - **RAG**: `document_parser → text_chunker → embedding → vector_store.search → reranker`
-- **认证**: bcrypt + JWT（HS256，7 天），全 **63** 端点 `Depends(get_current_user)` 门禁
+- **认证**: bcrypt + JWT（HS256，7 天），全 **64** 端点 `Depends(get_current_user)` 门禁
 - **手机验证码**: 内存存储 + 5 分钟有效期，控制台 print 模拟短信，注册时校验
 - **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，11 管理端点（含 Agent 监控 + 文档管理 + 用户删除）
 - **Agent 监控**: `agent_metrics.py` 内存计数器 + `threading.Lock` 线程安全，30s 自动刷新
@@ -131,12 +131,15 @@ cd frontend && npm run build                       # 28 页面
 | DAILY_GOAL replaceAll 误伤 | `replaceAll('DAILY_GOAL','dailyGoal')` 把常量名也改了 | 常量名用大写，变量名用小写 |
 | setting 页死代码 | `useRouter` 导入但未使用 | 删除未使用的 import 和变量 |
 | 密码输入框自动填充 | 浏览器自动填充 `test123456` 到当前密码框 | 添加 `autocomplete="current-password"` / `autocomplete="new-password"` 属性 |
+| asyncpg JSONB 不检测内存修改 | `profile.dimensions` 在内存中更新后 `commit()` 不发 UPDATE，画像从未持久化 | `from sqlalchemy.orm.attributes import flag_modified` + `flag_modified(profile, "dimensions")` 强制标记脏 |
+| 画像更新多 worker 竞争 | 2 个 uvicorn worker 同时写同一学生画像互相覆盖 | `pg_try_advisory_lock(12345)` 乐观锁，拿不到锁的 worker 跳过 |
+| chat.py 内联 LLM 更新画像 | 93 行 `_update_profile_by_conversation()` 绕过 profile_service 直接调 LLM | 已删除，所有画像写入统一走 `profile_service.py`（`apply_llm_updates` / `apply_rule_updates` / `merge_and_save_assessment`） |
 
 ## 提交规范
 
 - `feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `test:` 开头
 - 涉及评分项（流式/防幻觉/多智能体/RAG）附 1-2 句说明
-- 前端改动需 `npm run lint` 0 errors + `npm run build` 30 页面通过
+- 前端改动需 `npm run lint` 0 errors + `npm run build` 28 页面通过
 - 比赛前**必做**：`.env` 改 `LLM_PROVIDER=spark` + 跑 `tests/smoke_test` 验证星火路径
 
 ---

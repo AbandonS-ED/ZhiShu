@@ -22,9 +22,9 @@
 ## 最新变更（2026-07-18）
 
 合并 wyy 分支 AI 智能评分 + 错题分层分析 + 文档全量同步：
-- 后端 70 个 API 端点（新增 /resource/score-answer）
-- 前端 30 页面
-- Agent 数量：17 个 Agent 模块（+ ScoringAgent）
+- 后端 69 个 API 端点（新增 /resource/score-answer）
+- 前端 28 页面
+- Agent 数量：14 个 Agent 模块（+ ScoringAgent）
 - 服务数量：18 个
 - 数据库表：15 张
 - **AI 智能评分**: ScoringAgent 语义评分（5级评分标准·4维度反馈·关键词fallback）+ POST /resource/score-answer 端点

@@ -6,7 +6,6 @@ import { studyPlanApi, resourceApi, chatApi, type LearningPath, type LearningPat
 import { getStudentId } from '@/lib/student'
 import { markdownToHtml } from '@/lib/markdown'
 import { usePageTimer } from '@/hooks/usePageTimer'
-import Icon from '@/components/Icon'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -24,17 +23,15 @@ export default function LearnNodePage() {
   const [path, setPath] = useState<LearningPath | null>(null)
   const [currentNode, setCurrentNode] = useState<LearningPathNode | null>(null)
   const [loading, setLoading] = useState(true)
-  
-  // 学习模式：chat | resource
+
   const [mode, setMode] = useState<'chat' | 'resource'>('chat')
-  
-  // 对话相关
+
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  
-  // 资源相关
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
   const [resourceContent, setResourceContent] = useState('')
   const [resourceLoading, setResourceLoading] = useState(false)
   const [resourceGenerated, setResourceGenerated] = useState(false)
@@ -48,9 +45,7 @@ export default function LearnNodePage() {
           if (found) {
             setPath(found)
             const node = found.nodes.find(n => n.id === nodeId)
-            if (node) {
-              setCurrentNode(node)
-            }
+            if (node) setCurrentNode(node)
           }
         }
       } catch (err) {
@@ -66,22 +61,27 @@ export default function LearnNodePage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // 发送消息
+  const autoResize = useCallback((el: HTMLTextAreaElement) => {
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+  }, [])
+
   const handleSendMessage = useCallback(async () => {
     if (!inputMessage.trim() || chatLoading) return
-    
+
     const userMessage = inputMessage.trim()
     setInputMessage('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
     setMessages(prev => [...prev, { role: 'user', content: userMessage }])
     setChatLoading(true)
-    
+
     try {
       const studentId = getStudentId()
       const contextMessage = `我在学习"${currentNode?.knowledge_point}"。${userMessage}`
-      
+
       let assistantMessage = ''
       setMessages(prev => [...prev, { role: 'assistant', content: '', rendered: false }])
-      
+
       chatApi.stream(
         studentId,
         contextMessage,
@@ -107,255 +107,232 @@ export default function LearnNodePage() {
     }
   }, [inputMessage, chatLoading, currentNode])
 
-  // 生成学习资源
+  const handleTextareaKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }, [handleSendMessage])
+
   const handleGenerateResource = useCallback(async () => {
     if (resourceLoading) return
-    
+
     setResourceLoading(true)
     setResourceContent('')
-    
+
     try {
       const studentId = getStudentId()
       const message = `请生成关于"${currentNode?.knowledge_point}"的详细学习资源`
-      
-      console.log('调用资源生成API:', { studentId, message })
-      
+
       const response = await resourceApi.createStream({
         student_id: studentId,
         message: message
       })
-      
-      console.log('API响应状态:', response.status, response.ok)
-      
+
       if (!response.ok) {
         const errorText = await response.text()
-        console.error('API错误:', errorText)
         setResourceContent('资源生成失败: ' + errorText)
         return
       }
-      
+
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
       let fullContent = ''
-      
+
       if (reader) {
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-          
+
           const chunk = decoder.decode(value, { stream: true })
-          console.log('收到SSE数据:', chunk.substring(0, 200))
           const lines = chunk.split('\n')
-          
+
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               try {
                 const data = JSON.parse(line.slice(6))
-                console.log('解析SSE事件:', data.type, data)
                 if (data.type === 'token' && data.content) {
                   fullContent += data.content
                   setResourceContent(fullContent)
                 } else if (data.type === 'result' && data.data) {
                   const knowledge = data.data.content?.knowledge || ''
                   const code = data.data.content?.code || ''
-                  const message = data.data.content?.message || ''
-                  fullContent = [knowledge, code, message].filter(Boolean).join('\n\n')
+                  const msg = data.data.content?.message || ''
+                  fullContent = [knowledge, code, msg].filter(Boolean).join('\n\n')
                   setResourceContent(fullContent)
-                } else if (data.type === 'progress') {
-                  console.log('进度:', data.progress, data.message)
                 }
               } catch (e) {
-                console.log('解析SSE行失败:', line, e)
+                // skip malformed lines
               }
             }
           }
         }
       }
-      
-      console.log('最终内容长度:', fullContent.length)
-      
+
       if (fullContent) {
         setResourceGenerated(true)
       } else {
         setResourceContent('未收到资源内容，请重试')
       }
     } catch (err) {
-      console.error('生成资源失败:', err)
       setResourceContent('资源生成失败，请重试: ' + (err as Error).message)
     } finally {
       setResourceLoading(false)
     }
   }, [currentNode, resourceLoading])
 
-  // 学习完毕 - 跳转到测验
   const handleFinishLearning = useCallback(() => {
     router.push(`/plan/${pathId}/quiz/${nodeId}`)
   }, [pathId, nodeId, router])
 
   if (loading) {
     return (
-      <div className="plan-page">
-        <div className="plan-container">
-          <div className="loading-state">
-            <div className="loading-spinner" />
-            <p>加载中...</p>
-          </div>
-        </div>
+      <div className="loading-state">
+        <div className="loading-spinner" />
+        <p>加载中...</p>
       </div>
     )
   }
 
   if (!currentNode) {
     return (
-      <div className="plan-page">
-        <div className="plan-container">
-          <div className="error-state">
-            <p>知识点不存在</p>
-            <button className="btn-secondary" onClick={() => router.push(`/plan/${pathId}`)}>
-              返回路径
-            </button>
-          </div>
-        </div>
+      <div className="error-state">
+        <p>知识点不存在</p>
+        <button className="btn-secondary" onClick={() => router.push(`/plan/${pathId}`)}>
+          返回路径
+        </button>
       </div>
     )
   }
 
   return (
-    <div className="plan-page">
-      <div className="plan-container">
-        {/* 顶部导航 */}
-        <div className="learn-header">
-          <button className="back-btn" onClick={() => router.push(`/plan/${pathId}`)}>
-            <Icon name="arrowLeft" size={16} />
-            返回路径
+    <>
+      {/* ═══ LEARN BAR ═══ */}
+      <div className="learn-bar">
+        <a className="back-link" onClick={() => router.push(`/plan/${pathId}`)}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+          返回路径
+        </a>
+        <span className="learn-title">{currentNode.knowledge_point}</span>
+        <div className="mode-tabs">
+          <button className={`mode-tab ${mode === 'chat' ? 'active' : ''}`} onClick={() => setMode('chat')}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            AI 对话
           </button>
-          <h1>{currentNode.knowledge_point}</h1>
-          <div className="learn-tabs">
-            <button
-              className={`tab-btn ${mode === 'chat' ? 'active' : ''}`}
-              onClick={() => setMode('chat')}
-            >
-              <Icon name="chat" size={16} />
-              AI 对话
-            </button>
-            <button
-              className={`tab-btn ${mode === 'resource' ? 'active' : ''}`}
-              onClick={() => setMode('resource')}
-            >
-              <Icon name="book" size={16} />
-              学习资源
-            </button>
-          </div>
-        </div>
-
-        {/* 内容区域 */}
-        <div className="learn-content">
-          {/* AI对话模式 */}
-          {mode === 'chat' && (
-            <div className="chat-container">
-              <div className="chat-messages">
-                {messages.length === 0 && (
-                  <div className="chat-welcome">
-                    <Icon name="robot" size={48} />
-                    <h3>AI 学习助手</h3>
-                    <p>我可以帮你解答关于「{currentNode.knowledge_point}」的任何问题</p>
-                    <div className="chat-suggestions">
-                      <button onClick={() => { setInputMessage(`什么是${currentNode.knowledge_point}？`); }}>
-                        什么是{currentNode.knowledge_point}？
-                      </button>
-                      <button onClick={() => { setInputMessage(`请给我一个${currentNode.knowledge_point}的例子`); }}>
-                        给我一个例子
-                      </button>
-                      <button onClick={() => { setInputMessage(`${currentNode.knowledge_point}有哪些应用场景？`); }}>
-                        应用场景有哪些？
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                {messages.map((msg, index) => (
-                  <div key={index} className={`chat-message ${msg.role}`}>
-                    <div className="message-avatar">
-                      {msg.role === 'user' ? '你' : 'AI'}
-                    </div>
-                    <div 
-                      className="message-content"
-                      dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content) }}
-                    />
-                  </div>
-                ))}
-                
-                {chatLoading && messages[messages.length - 1]?.role !== 'assistant' && (
-                  <div className="chat-message assistant">
-                    <div className="message-avatar">AI</div>
-                    <div className="message-content loading">
-                      <div className="loading-dots">
-                        <span></span><span></span><span></span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                <div ref={messagesEndRef} />
-              </div>
-              
-              <div className="chat-input">
-                <input
-                  type="text"
-                  placeholder="输入你的问题..."
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                  disabled={chatLoading}
-                />
-                <button onClick={handleSendMessage} disabled={chatLoading || !inputMessage.trim()}>
-                  <Icon name="send" size={18} />
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 学习资源模式 */}
-          {mode === 'resource' && (
-            <div className="resource-container">
-              {!resourceGenerated && !resourceLoading && (
-                <div className="resource-generate" onClick={handleGenerateResource}>
-                  <Icon name="sparkles" size={48} />
-                  <h3>生成AI学习资源</h3>
-                  <p>点击生成关于「{currentNode.knowledge_point}」的详细学习资料</p>
-                </div>
-              )}
-              
-              {resourceLoading && (
-                <div className="resource-loading">
-                  <div className="loading-spinner" />
-                  <p>AI 正在生成学习资源...</p>
-                </div>
-              )}
-              
-              {resourceContent && (
-                <div className="resource-content">
-                  <div dangerouslySetInnerHTML={{ __html: markdownToHtml(resourceContent) }} />
-                  {resourceGenerated && (
-                    <button className="btn-regenerate" onClick={handleGenerateResource}>
-                      <Icon name="refresh" size={14} />
-                      重新生成
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* 底部操作 */}
-        <div className="learn-footer">
-          <button className="btn-primary btn-finish" onClick={handleFinishLearning}>
-            <Icon name="check" size={18} />
-            学习完毕，开始测验
+          <button className={`mode-tab ${mode === 'resource' ? 'active' : ''}`} onClick={() => setMode('resource')}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            学习资源
           </button>
         </div>
       </div>
-    </div>
+
+      {/* ═══ CHAT MODE ═══ */}
+      {mode === 'chat' && (
+        <div className="learn-chat-mode">
+          <div className="learn-chat-messages">
+            {messages.length === 0 && (
+              <div className="learn-chat-welcome">
+                <div className="cw-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8V4H8"/><rect x="2" y="2" width="20" height="8" rx="2"/><path d="M6 12v4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-4"/></svg>
+                </div>
+                <h3>AI 学习助手</h3>
+                <p>我可以帮你解答关于「{currentNode.knowledge_point}」的任何问题</p>
+                <div className="suggestions">
+                  <button className="suggest-btn" onClick={() => setInputMessage(`什么是${currentNode.knowledge_point}？请用通俗的方式讲解`)}>
+                    什么是{currentNode.knowledge_point}？
+                  </button>
+                  <button className="suggest-btn" onClick={() => setInputMessage(`请给我一个${currentNode.knowledge_point}的实际应用例子`)}>
+                    给我一个例子
+                  </button>
+                  <button className="suggest-btn" onClick={() => setInputMessage(`${currentNode.knowledge_point}有哪些应用场景？`)}>
+                    应用场景有哪些？
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {messages.map((msg, index) => (
+              <div key={index} className={`learn-msg ${msg.role}`}>
+                <div className="msg-av">{msg.role === 'user' ? '你' : 'AI'}</div>
+                <div
+                  className="msg-bubble"
+                  dangerouslySetInnerHTML={{ __html: markdownToHtml(msg.content) }}
+                />
+              </div>
+            ))}
+
+            {chatLoading && messages[messages.length - 1]?.role !== 'assistant' && (
+              <div className="learn-msg assistant">
+                <div className="msg-av">AI</div>
+                <div className="msg-bubble">
+                  <div className="typing"><span></span><span></span><span></span></div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="learn-chat-input">
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              placeholder="输入你的问题…（Enter 发送，Shift+Enter 换行）"
+              value={inputMessage}
+              onChange={(e) => { setInputMessage(e.target.value); autoResize(e.target) }}
+              onKeyDown={handleTextareaKeyDown}
+              disabled={chatLoading}
+            />
+            <button className="learn-chat-send" onClick={handleSendMessage} disabled={chatLoading || !inputMessage.trim()}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ RESOURCE MODE ═══ */}
+      {mode === 'resource' && (
+        <div className="learn-resource-mode">
+          {!resourceGenerated && !resourceLoading && (
+            <div className="resource-generate-cta" onClick={handleGenerateResource}>
+              <div className="rg-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              </div>
+              <h3>生成 AI 学习资源</h3>
+              <p>点击生成关于「{currentNode.knowledge_point}」的详细学习资料，包含讲解、示例代码和图解。</p>
+            </div>
+          )}
+
+          {resourceLoading && (
+            <div className="resource-loading-state">
+              <div className="rl-spinner"></div>
+              <h3>AI 正在生成学习资源</h3>
+              <p>正在组织关于「{currentNode.knowledge_point}」的讲解内容，请稍候...</p>
+            </div>
+          )}
+
+          {resourceContent && (
+            <div className="resource-rendered">
+              <div className="rc-prose" dangerouslySetInnerHTML={{ __html: markdownToHtml(resourceContent) }} />
+              {resourceGenerated && (
+                <button className="regenerate-btn" onClick={handleGenerateResource}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                  重新生成
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ FOOTER ═══ */}
+      <div className="learn-footer">
+        <span className="lf-hint">学完后点击右侧按钮进入小测验</span>
+        <button className="finish-btn" onClick={handleFinishLearning}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          学习完毕，开始测验
+        </button>
+      </div>
+    </>
   )
 }

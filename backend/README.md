@@ -2,13 +2,13 @@
 
 > 最后更新：2026-07-18（合并 wyy 分支 AI 智能评分 + 文档全量同步）
 
-基于 FastAPI + 17 Agent 的多智能体学习资源生成系统后端。
+基于 FastAPI + 14 Agent 的多智能体学习资源生成系统后端。
 
 ## 技术栈
 
 - **框架**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg
-- **Agent**: 17 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）
-- **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 **70** 业务端点门禁
+- **Agent**: 14 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）
+- **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 **69** 业务端点门禁
 - **角色**: `role` 字段（student / admin）+ `is_active` 软删除 + `last_login` 记录
 - **LLM**: 小米 MiMo v2.5（当前）→ MiniMax-M3 → 讯飞星火 V4（上线前切换 `LLM_PROVIDER=spark`）
 - **数据库**: PostgreSQL 18 + **15 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（Celery broker，当前未起 worker）
@@ -43,15 +43,15 @@ uvicorn app.main:app --host 0.0.0.0 --port 8001
 ```
 backend/
 ├── app/
-│   ├── main.py              # 入口（13 个 router + lifespan 初始化）= 68 唯一端点
-│   ├── api/                 # 13 个 router：auth / profile / resource / path / tutor / chat / mindmap / dashboard / evaluation / admin / admin_exercises / study_plan
+│   ├── main.py              # 入口（11 个 router + lifespan 初始化）= 69 唯一端点
+│   ├── api/                 # 11 个 router：auth / profile / resource / path / tutor / chat / mindmap / dashboard / evaluation / admin / admin_exercises / study_plan / wrong_questions
 │   ├── core/
 │   │   ├── config.py        # Settings（MINIMAX_* + SPARK_* + JWT_SECRET + LLM_PROVIDER）
 │   │   ├── database.py      # async SQLAlchemy + pgvector 可选
 │   │   ├── security.py      # 密码哈希（bcrypt）+ JWT 生成/验证
 │   │   ├── dependencies.py  # UUID 校验 + get_current_user 门禁
 │   │   └── celery_config.py # Celery 配置（未启用）
-│   ├── models/              # 13 个 Model
+│   ├── models/              # 14 个 Model
 │   │   ├── student.py       # 学生/管理员（student_no + password_hash + role + is_active + last_login）
 │   │   ├── student_profile.py # 7 维 JSONB 画像（comprehension/memory/application/imagination/focus/knowledge_base/learning_goal + confidence）
 │   │   ├── document_chunk.py  # RAG 文档分块（embedding 用 JSONB 占位）
@@ -63,8 +63,11 @@ backend/
 │   │   ├── chat_message.py  # 聊天消息
 │   │   ├── learning_record.py # 学习行为记录（F5 评估）
 │   │   ├── learning_activity_log.py # 学习行为日志
-│   │   └── evaluation_report.py # 预生成评估报告缓存
-│   ├── agents/              # 9 个 Agent
+│   │   ├── evaluation_report.py # 预生成评估报告缓存
+│   │   ├── study_plans.py     # 学习计划
+│   │   ├── study_plan_steps.py # 学习计划步骤
+│   │   └── wrong_question.py  # 错题本
+│   ├── agents/              # 14 个 Agent（含基础设施）
 │   │   ├── state.py           # AgentState TypedDict + IntentType（11 种意图）
 │   │   ├── communicator.py    # MessageBus pub/sub
 │   │   ├── initial_assessment_agent.py  # 对话式 7 维画像评估
@@ -75,6 +78,9 @@ backend/
 │   │   ├── mindmap_agent.py   # 思维导图 Mermaid 生成
 │   │   ├── audio_agent.py     # 音频脚本生成
 │   │   ├── behavior_analysis_agent.py # 行为分析 + 画像更新
+│   │   ├── wrong_question_agent.py # 错题分析（4 步思考链 + SSE 流式）
+│   │   ├── scoring_agent.py   # AI 智能评分
+│   │   ├── learning_path_agent.py # 学习计划路径生成
 │   │   └── master_agent.py    # LangGraph StateGraph **10 节点**
 │   └── services/              # 18 个 Service
 │       ├── minimax_client.py     # httpx OpenAI 兼容格式客户端
@@ -92,7 +98,9 @@ backend/
 │       ├── recommendation_service.py # 推荐服务
 │       ├── chat_recommendation_service.py # 对话推荐服务
 │       ├── llm_factory.py        # LLM 客户端工厂
-│       └── scheduled_analysis_service.py # 定时画像分析
+│       ├── scheduled_analysis_service.py # 定时画像分析（多 worker advisory lock）
+│       ├── profile_service.py    # 画像统一写入层（flag_modified + per-student Lock）
+│       └── study_plan_service.py # 学习计划核心服务（758 行）
 ├── scripts/
 │   ├── init_db.sql          # 手动建库 + 建表 SQL 脚本（**15 张表** + 14 索引 + admin 种子数据）
 │   ├── init_admin.py        # 自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号
@@ -105,9 +113,9 @@ backend/
 └── .env                     # API Key（已 gitignore）
 ```
 
-## API 路由（68 个唯一端点）
+## API 路由（69 个唯一端点）
 
-> 唯一端点 = 唯一路径 + 方法组合。`backend/app/main.py` 注册 13 router（含 study_plan router），含 `/` 和 `/health` 根路由。
+> 唯一端点 = 唯一路径 + 方法组合。`backend/app/main.py` 注册 11 个 router（含 study_plan / wrong_questions），含 `/` 和 `/health` 根路由。
 
 - `POST /profile/reset` / `GET /profile/assessment-status` / `PUT /profile/background`（profile 重置与背景）
 - `POST /resource/{id}/favorite`（资源收藏）
@@ -296,7 +304,7 @@ backend/
 
 - **密码哈希**：`bcrypt`（`core/security.py`）
 - **JWT**：HS256，7 天过期，密钥从 `JWT_SECRET` 环境变量读取
-- **门禁**：68 个业务端点全部加 `Depends(get_current_user)` + `student_id` 所有权校验
+- **门禁**：69 个业务端点全部加 `Depends(get_current_user)` + `student_id` 所有权校验
 - **角色隔离**：`students.role` 字段（`student` / `admin`），管理员通过 `_require_admin()` 额外校验
 - **软删除**：`is_active=false` 时登录返回 403
 - **登录审计**：登录成功后自动 `last_login = now()`

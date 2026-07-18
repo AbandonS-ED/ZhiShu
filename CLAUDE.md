@@ -15,7 +15,7 @@
 |---|---|---|---|
 | 前端 | Next.js (App Router) + Tailwind CSS + TypeScript | 14.2.5 | 本地 woff 字体，无 Google Fonts |
 | 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 | Python 3.11 |
-| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 17 Agent 模块 |
+| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 14 Agent 模块 |
 | LLM | 三客户端: MimoClient (当前) / MiniMaxClient / SparkClient | - | `LLM_PROVIDER=mimo\|minimax\|spark` 切换 |
 | 向量库 | pgvector (JSONB 降级方案) | - | embedding 用 JSONB 占位 |
 | 数据库 | PostgreSQL 18 + Redis | - | 14 张表 |
@@ -46,10 +46,10 @@ ZhiShu/
 │   └── src/hooks/usePageTimer.ts    # 页面停留计时器
 ├── backend/                         # FastAPI 后端
 │   ├── app/main.py                  # 应用入口 + 路由注册
-│   ├── app/api/                     # 12 个路由模块 (70 端点)
-│   ├── app/agents/                  # 17 个 Agent 模块 + StateGraph 编排
-│   ├── app/services/                # 17 个服务模块
-│   ├── app/models/                  # 13 个数据模型
+│   ├── app/api/                     # 11 个路由模块 (69 端点)
+│   ├── app/agents/                  # 14 个 Agent 文件 + StateGraph 编排
+│   ├── app/services/                # 18 个服务模块
+│   ├── app/models/                  # 14 个数据模型
 │   ├── app/tasks/                   # Celery 异步任务
 │   └── app/core/                    # 核心模块 (配置/数据库/安全)
 ├── tests/                           # 110 pytest + 冒烟测试
@@ -113,7 +113,7 @@ intent_recognition → task_planning → conditional_route
   → result_aggregation → response_generation
 ```
 
-`master_agent.py` 实际节点: `intent_recognition` + `task_planning` + 6 个 `run_*_agent` (document / mindmap / exercise / path / tutor / audio) + `result_aggregation` + `response_generation` = **10 个节点**。另有 `coordinator_agent` / `review_agent` / `resource_creator_agent` / `initial_assessment_agent` / `behavior_analysis_agent` 等辅助 Agent。
+`master_agent.py` 实际节点: `intent_recognition` + `task_planning` + 6 个 `run_*_agent` (document / mindmap / exercise / path / tutor / audio) + `result_aggregation` + `response_generation` = **10 个节点**。另有 `coordinator_agent` / `review_agent` / `resource_creator_agent` / `initial_assessment_agent` / `behavior_analysis_agent` / `wrong_question_agent` / `scoring_agent` / `learning_path_agent` 等辅助 Agent。
 
 ### 7 维学生画像
 
@@ -166,13 +166,14 @@ study_patrol / study_session_end → learning_records
 | `/api/v1/resource/exercises/pool` | GET | 题池加载 |
 | `/api/v1/wrong-questions/{id}/analyze/stream` | ✅ 真流式 | Agent 4 步思考链 |
 
-### 数据库表关系 (14 张表)
+### 数据库表关系 (15 张表)
 
-`students` 1:N `student_profiles` / `chat_sessions` / `resources` / `learning_paths` / `learning_plans` / `exercises` / `learning_records` / `evaluation_reports`
+`students` 1:N `student_profiles` / `chat_sessions` / `resources` / `learning_paths` / `exercises` / `learning_records` / `evaluation_reports` / `wrong_questions` / `study_plans` / `learning_activity_logs`
 
 `exercise_bank`: 公共题库 (admin 创建，独立于学生)
 `document_chunks`: RAG 知识库文档分块
 `learning_paths`: 学习路径（JSONB nodes 字段存储节点状态）
+`study_plan_steps`: 学习计划步骤
 
 ### 登录注册系统
 
@@ -203,6 +204,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 
 ### 已修复 (不必再查)
 
+- ✅ **画像更新架构**（commit `d495b75`）：统一 `profile_service.py` 写入层 + per-student `asyncio.Lock` + `flag_modified` JSONB 持久化修复 + `pg_try_advisory_lock(12345)` 多 worker 保护 + 删除 `chat.py` 内联 LLM
 - ✅ `database.py:3` 缺 `text()` → commit `c837fe3`
 - ✅ 前端 XSS 漏洞 → 已加 `escapeHtml()`
 - ✅ 内存泄漏 → 已加 `cancelAnimationFrame`
@@ -217,7 +219,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 对话页刷新修复 (sessionId 持久化 + loadSession 渲染)
 - ✅ 骨架屏 loading (4 页面 shimmer 动画)
 - ✅ 评估报告 AI 化 + 预生成缓存 + 定时生成
-- ✅ 管理后台 API 增强 (18 端点 + 17 Agent 模块 + 并行查询 + N+1 优化)
+- ✅ 管理后台 API 增强 (18 端点 + 14 Agent 模块 + 并行查询 + N+1 优化)
 - ✅ 手机验证码注册 (控制台输出 + 5 分钟有效期 + 手机号唯一)
 - ✅ 三页面接入真实 API (paths/chats/documents)
 - ✅ forEach async 批量操作修复 (users/page.tsx)
@@ -269,6 +271,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 学习计划模块 (合并 wyy 分支：study_plans/study_plan_steps/learning_paths 3 表 + learning_path_agent + study_plan_service 758 行 + 6 端点 + 前端 5 页面：/plan 首页+4 子页面+综合测试)
 - ✅ 错题分析 Agent 化 (WrongQuestionAgent 4步思考链 + SSE 流式 + 5+3 轮 Review 修复)
 - ✅ `wrong_questions.py` logger 规范化 (__import__ 改为正规 import logging)
+- ✅ 前端页面按 HTML 模板全量重写 (plan/learn/quiz/final-test 页面按 jihua 系列模板 1:1 复刻 + globals.css 模板 CSS 统一)
 
 ### P2 — 清理项
 
@@ -305,6 +308,9 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 | MiMo 流式空 choices | `choices[0]` IndexError | `_stream` 方法过滤 `choices is None or len==0` 的 chunk |
 | MiMo JSON 输出不完整 | max_tokens 太小导致截断 | exercise_agent max_tokens 2560→4096，_parse_response 加裸数组/缺字段容错 |
 | `exercise_bank.created_by` 类型 | UUID vs String(50) 不匹配 | 对齐 DB schema 为 `UUID` 类型 |
+| asyncpg JSONB 不检测内存修改 | `profile.dimensions` 内存修改后 `commit()` 不发 UPDATE | `flag_modified(profile, "dimensions")` 强制标记脏 |
+| 画像更新多 worker 竞争 | 2 个 uvicorn worker 同时写同一学生画像互相覆盖 | `pg_try_advisory_lock(12345)` 乐观锁 |
+| chat.py 内联 LLM 更新画像 | 93 行 `_update_profile_by_conversation()` 绕过统一写入层 | 已删除，统一走 `profile_service.py` |
 | marked v18 `setOptions()` | `marked.setOptions()` 崩溃 | 改用 `marked.parse(md, { breaks, gfm })` 选项传入 |
 | admin CSS 类名冲突 | `.admin-pg` 同时用于分页栏和页面容器 | 分页栏改名 `.admin-pgr`（后删除） |
 | exercises 弹窗缺 CSS | `admin-mask`/`admin-dialog` 不存在 | 复用 `.admin-mo`/`.admin-md` 已有体系 |
@@ -318,7 +324,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 
 - `feat:` / `fix:` / `refactor:` / `docs:` / `chore:` / `test:` 开头
 - 涉及评分项 (流式/防幻觉/多智能体) 附 1-2 句说明
-- 前端改动需 `npm run lint` 0 errors + `npm run build` 30 页面通过
+- 前端改动需 `npm run lint` 0 errors + `npm run build` 28 页面通过
 - 比赛前**必做**: `.env` 改 `LLM_PROVIDER=spark` + 跑 `tests/smoke_test` 验证星火路径
 
 ## 写新功能前先看

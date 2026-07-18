@@ -9,7 +9,7 @@
 ### 核心功能
 
 - **F1 对话式画像 (35%)** — 7 维学生画像评估（理解力/记忆力/应用转化/想象力/专注力/知识基础/学习目标）
-- **F2 多智能体资源生成 (45%)** — 17 Agent 协同生成学习资源（含防幻觉三层验证）
+- **F2 多智能体资源生成 (45%)** — 14 Agent 协同生成学习资源（含防幻觉三层验证）
 - **F3 学习路径规划** — DAG 可视化路径 + 每日学习计划
 - **F4 智能辅导** — RAG 问答 + 多轮对话上下文
 - **F5 效果评估** — LLM 生成评估报告 + 趋势分析
@@ -82,8 +82,8 @@ ZhiShu/
 ├── backend/                       # FastAPI 后端
 │   └── app/
 │       ├── main.py                # 应用入口 + 路由注册
-│       ├── api/                   # 12 个路由模块 (70 端点)
-│       ├── agents/                # 17 个 Agent 模块 + StateGraph 编排
+│       ├── api/                   # 11 个路由模块 (69 端点)
+│       ├── agents/                # 14 个 Agent 模块 + StateGraph 编排
 │       │   ├── master_agent.py    # LangGraph StateGraph 10 节点
 │       │   ├── state.py           # AgentState + IntentType
 │       │   ├── communicator.py    # MessageBus pub/sub
@@ -210,7 +210,7 @@ npm run dev
 6. `/admin/paths` → 学习路径管理
 7. `/admin/chats` → 对话记录（消息详情）
 8. `/admin/documents` → 知识库文档管理
-9. `/admin/agents` → Agent 监控面板（17 Agent 模块实时调用统计 + 30s 自动刷新）
+9. `/admin/agents` → Agent 监控面板（14 Agent 模块实时调用统计 + 30s 自动刷新）
 
 ## 测试
 
@@ -234,7 +234,7 @@ npm run build
 
 ## 技术亮点
 
-- **多智能体编排**: LangGraph StateGraph 10 节点 + 17 Agent 模块协同
+- **多智能体编排**: LangGraph StateGraph 10 节点 + 14 Agent 模块协同
 - **防幻觉机制**: PatternDetector + SourceValidator + LLMValidator 三层验证
 - **流式输出**: 8 个 SSE 端点 (对话/资源/练习/路径/画像评估/学习包/题库出题)
 - **RAG 管道**: 文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排

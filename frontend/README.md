@@ -40,7 +40,7 @@ src/
 │       ├── paths/          # /admin/paths 学习路径
 │       ├── chats/          # /admin/chats 对话记录
 │       ├── documents/      # /admin/documents 知识库
-│   └── agents/         # /admin/agents Agent 监控（17 Agent 模块）
+│   └── agents/         # /admin/agents Agent 监控（14 Agent 模块）
 ├── components/
 │   ├── layout/                # 学生端 Sidebar + Header
 │   └── RobotIcon.tsx          # ⭐ 极简机器人 SVG（替换 🤖 emoji）
@@ -65,7 +65,7 @@ src/
 ```bash
 npm install
 npm run dev       # http://localhost:3000
-npm run build     # 验证编译（✅ 通过：30 页面）
+npm run build     # 验证编译（✅ 通过：28 页面）
 npm run lint      # ESLint 检查（✅ 0 errors）
 ```
 
@@ -108,7 +108,7 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 | `/admin/paths` | 学习路径 | 表格 + DAG 详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/chats` | 对话记录 | 表格 + 对话详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/documents` | 知识库 | 表格 + 类型筛选 + **批量删除** | 硬编码 |
-| `/admin/agents` | Agent 监控 | 17 Agent 模块集群卡片 + 调用统计 + 错误率 | 硬编码 |
+| `/admin/agents` | Agent 监控 | 14 Agent 模块集群卡片 + 调用统计 + 错误率 | 硬编码 |
 
 ## 开发规范
 
