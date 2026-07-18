@@ -142,7 +142,10 @@ export default function QuizNodePage() {
       }))
 
       if (!isCorrect && studentId && exercise.exercise_id) {
-        wrongExercises.push({ exercise, answer: String(answer.selected) })
+        const wrongLabel = exercise.type === 'choice'
+          ? String.fromCharCode(65 + (answer.selected as number))
+          : String(answer.selected)
+        wrongExercises.push({ exercise, answer: wrongLabel })
       }
     })
 
