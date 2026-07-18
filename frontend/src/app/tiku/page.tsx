@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { exerciseApi, evaluationApi, profileApi, wrongQuestionsApi } from '@/lib/api'
+import { exerciseApi, evaluationApi, profileApi, wrongQuestionsApi, scoreApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { markdownToHtml } from '@/lib/markdown'
 import { showToast } from '@/lib/utils'
@@ -14,7 +14,7 @@ const HIDDEN_KEY = 'zhishu_hidden_exercises'
 // 与 api.ts / types/index.ts 保持一致
 interface Exercise {
   exercise_id: string
-  type: 'choice' | 'judge' | 'short_answer' | 'coding'
+  type: 'choice' | 'short_answer'
   question: string
   options?: string[]
   answer?: string
@@ -27,6 +27,7 @@ interface Exercise {
 interface Answer {
   selected: number | boolean | string | null
   correct: boolean | null
+  feedback?: string
 }
 
 interface RecentItem {
@@ -37,11 +38,11 @@ interface RecentItem {
 }
 
 function getTypeLabel(type: string) {
-  return { choice: '选择题', judge: '判断题', short_answer: '简答题', coding: '编程题' }[type] || type
+  return { choice: '选择题', short_answer: '简答题' }[type] || type
 }
 
 function getTypeClass(type: string) {
-  return { choice: 'type-choice', judge: 'type-judge', short_answer: 'type-short', coding: 'type-code' }[type] || ''
+  return { choice: 'type-choice', short_answer: 'type-short' }[type] || ''
 }
 
 function getDiffLabel(d?: number) {
@@ -345,12 +346,31 @@ export default function TikuPage() {
     }
   }, [answers, exercises, addRecent])
 
-  const answerShort = useCallback((id: string, value: string) => {
+  const answerShort = useCallback(async (id: string, value: string) => {
     if (!value.trim()) return
     const ex = exercises.find((e) => e.exercise_id === id)
+    if (!ex) return
+
+    // 先显示加载状态
     setAnswers((prev) => ({ ...prev, [id]: { selected: value, correct: null } }))
     setRevealed((prev) => new Set(prev).add(id))
-    if (ex) addRecent(ex, null)
+
+    // 调用AI评分
+    try {
+      const result = await scoreApi.scoreAnswer(
+        ex.question,
+        ex.answer || '',
+        value,
+        ex.knowledge_point || ''
+      )
+      // 更新评分结果
+      setAnswers((prev) => ({ ...prev, [id]: { selected: value, correct: result.correct, feedback: result.feedback } }))
+      addRecent(ex, result.correct)
+    } catch (err) {
+      console.error('评分失败:', err)
+      // 评分失败时显示为部分正确
+      addRecent(ex, null)
+    }
   }, [exercises, addRecent])
 
   const revealAnswer = useCallback((id: string) => {
@@ -624,7 +644,7 @@ export default function TikuPage() {
         <div className="ex-main">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <div className="ex-tabs">
-              {(['all', 'choice', 'judge', 'short_answer', 'coding'] as const).map((t) => (
+              {(['all', 'choice', 'short_answer'] as const).map((t) => (
                 <button
                   key={t}
                   className={`ex-tab${tab === t ? ' active' : ''}`}
@@ -711,13 +731,12 @@ export default function TikuPage() {
                     </div>
                   )}
 
-                  {/* Short answer / Code */}
-                  {(ex.type === 'short_answer' || ex.type === 'coding') && (
+                  {/* Short answer */}
+                  {ex.type === 'short_answer' && (
                     <>
                       <textarea
                         className="short-area"
-                        placeholder={ex.type === 'coding' ? '在此编写你的代码...' : '输入你的答案...'}
-                        style={ex.type === 'coding' ? { fontFamily: "'JetBrains Mono', monospace", fontSize: '12px' } : {}}
+                        placeholder="输入你的答案..."
                         disabled={isAnswered}
                         id={`sa-${ex.exercise_id}`}
                       />
@@ -736,14 +755,22 @@ export default function TikuPage() {
                   {/* Explanation */}
                   {(isAnswered || isRevealed) && (
                     <div className="ex-expl show">
-                      <div className={`expl-hd ${a?.correct === true ? 'correct-hd' : 'wrong-hd'}`}>
+                      <div className={`expl-hd ${a?.correct === true ? 'correct-hd' : a?.correct === false ? 'wrong-hd' : ''}`}>
                         {a?.correct === true ? '回答正确' : a?.correct === false ? '回答错误' : '参考答案与解析'} — 解析
                       </div>
-                      {(ex.type === 'short_answer' || ex.type === 'coding') && ex.answer && (
-                        <div style={{ padding: '10px', background: 'var(--surface)', borderRadius: 'var(--r-xs)', marginBottom: '8px', whiteSpace: 'pre-wrap', fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', lineHeight: 1.7 }}>
-                          {ex.answer}
+                      {ex.type === 'short_answer' && a?.feedback && (
+                        <div style={{ padding: '10px', background: a.correct ? 'var(--success-soft)' : 'var(--danger-soft)', borderRadius: 'var(--r-xs)', marginBottom: '8px', fontSize: '13px', lineHeight: 1.6 }}>
+                          {a.feedback}
                         </div>
                       )}
+                      {ex.type === 'short_answer' && ex.answer && (
+                        <div style={{ padding: '10px', background: 'var(--surface)', borderRadius: 'var(--r-xs)', marginBottom: '8px', whiteSpace: 'pre-wrap', fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', lineHeight: 1.7 }}>
+                          <strong>参考答案：</strong>{ex.answer}
+                        </div>
+                      )}
+                      {ex.explanation}
+                    </div>
+                  )}
                       {ex.explanation}
                     </div>
                   )}

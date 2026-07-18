@@ -4,7 +4,9 @@
 """
 
 import uuid
+import json
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -12,6 +14,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.student import Student
 from app.services.study_plan_service import study_plan_service
+from app.agents.learning_guide_agent import learning_guide_agent
 
 router = APIRouter()
 
@@ -31,6 +34,11 @@ class CompleteStepRequest(BaseModel):
 class GeneratePathRequest(BaseModel):
     target_knowledge: str = Field(..., description="目标知识点")
     current_level: str = Field("beginner", description="当前水平: beginner/intermediate/advanced")
+
+
+class LearningGuideRequest(BaseModel):
+    knowledge_point: str = Field(..., description="知识点名称")
+    path_context: str = Field("", description="所属路径名称（可选）")
 
 
 # ===== API 端点 =====
@@ -154,7 +162,6 @@ async def complete_node(
 ):
     """完成学习节点"""
     try:
-        import json
         from sqlalchemy import select, update
         from app.models.study_plan import LearningPath
         
@@ -196,3 +203,18 @@ async def complete_node(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"更新节点状态失败: {str(e)}")
+
+
+@router.post("/learning-guide")
+async def generate_learning_guide(
+    req: LearningGuideRequest,
+):
+    """生成结构化学习指引（LearningGuideAgent专用）"""
+    try:
+        guide = await learning_guide_agent.generate(
+            knowledge_point=req.knowledge_point,
+            path_context=req.path_context,
+        )
+        return {"success": True, "data": guide}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"生成学习指引失败: {str(e)}")

@@ -86,21 +86,24 @@ export default function PathDetailPage() {
 
         {/* ═══ PATH HEADER ═══ */}
         <div className="path-header">
-          <div className="ph-top">
+          {/* 区块①：图标 + 完整标题 */}
+          <div className="ph-col ph-col-1">
             <div className="ph-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 8.5a6 6 0 0 1 7 7"/></svg>
             </div>
-            <div className="ph-title-group">
-              <div className="ph-title">{path.name}</div>
-            </div>
+            <div className="ph-title">{path.name}</div>
+          </div>
+
+          {/* 区块②：状态标签 + 简介 */}
+          <div className="ph-col ph-col-2">
             <span className={`ph-status ${allCompleted ? 'complete' : 'active'}`}>
               {allCompleted ? '已完成' : '进行中'}
             </span>
+            <div className="ph-desc">{path.description || 'AI 为你量身定制的学习路径，涵盖核心知识点与实践练习。'}</div>
           </div>
 
-          <div className="ph-desc">{path.description || 'AI 为你量身定制的学习路径，涵盖核心知识点与实践练习。'}</div>
-
-          <div className="path-stats">
+          {/* 区块③：进度统计 */}
+          <div className="ph-col ph-col-3">
             <div className="ps-item">
               <div className="ps-icon green">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -110,6 +113,7 @@ export default function PathDetailPage() {
                 <span className="ps-label">已完成</span>
               </div>
             </div>
+            <div className="ps-divider" />
             <div className="ps-item">
               <div className="ps-icon warm">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/></svg>
@@ -119,7 +123,11 @@ export default function PathDetailPage() {
                 <span className="ps-label">预计剩余</span>
               </div>
             </div>
-            <div className="ps-item">
+          </div>
+
+          {/* 区块④：AI模块 + 进度条 */}
+          <div className="ph-col ph-col-4">
+            <div className="ps-item ai-item">
               <div className="ps-icon info">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
               </div>
@@ -128,15 +136,14 @@ export default function PathDetailPage() {
                 <span className="ps-label">画像驱动</span>
               </div>
             </div>
-          </div>
-
-          <div className="path-progress">
-            <div className="pp-track">
-              <div className={`pp-fill ${progress >= 50 ? '' : 'partial'}`} style={{ width: `${progress}%` }} />
-            </div>
-            <div className="pp-info">
-              <span>{path.nodes[0]?.knowledge_point || '开始'} → {path.nodes[path.nodes.length - 1]?.knowledge_point || '完成'}</span>
-              <span className="pp-pct">{progress}%</span>
+            <div className="path-progress">
+              <div className="pp-track">
+                <div className={`pp-fill ${progress >= 50 ? '' : 'partial'}`} style={{ width: `${progress}%` }} />
+              </div>
+              <div className="pp-info">
+                <span>{path.nodes[0]?.knowledge_point || '开始'} → {path.nodes[path.nodes.length - 1]?.knowledge_point || '完成'}</span>
+                <span className="pp-pct">{progress}%</span>
+              </div>
             </div>
           </div>
         </div>

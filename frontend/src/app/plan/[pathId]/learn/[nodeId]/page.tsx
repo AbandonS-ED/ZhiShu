@@ -13,6 +13,14 @@ interface ChatMessage {
   rendered?: boolean
 }
 
+interface LearningGuide {
+  what_to_learn: string
+  learning_goals: string[]
+  key_points: { title: string; description: string }[]
+  prerequisites: string[]
+  estimated_time: string
+}
+
 export default function LearnNodePage() {
   const router = useRouter()
   const params = useParams()
@@ -23,8 +31,11 @@ export default function LearnNodePage() {
   const [path, setPath] = useState<LearningPath | null>(null)
   const [currentNode, setCurrentNode] = useState<LearningPathNode | null>(null)
   const [loading, setLoading] = useState(true)
+  const [guide, setGuide] = useState<LearningGuide | null>(null)
+  const [guideLoading, setGuideLoading] = useState(false)
+  const [guideGenerated, setGuideGenerated] = useState(false)
 
-  const [mode, setMode] = useState<'chat' | 'resource'>('chat')
+  const [mode, setMode] = useState<'guide' | 'chat' | 'resource'>('guide')
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputMessage, setInputMessage] = useState('')
@@ -65,6 +76,45 @@ export default function LearnNodePage() {
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 120) + 'px'
   }, [])
+
+  const handleGenerateGuide = useCallback(async () => {
+    if (guideLoading || !currentNode) return
+
+    setGuideLoading(true)
+    setGuide(null)
+
+    try {
+      const result = await studyPlanApi.learningGuide({
+        knowledge_point: currentNode.knowledge_point,
+        path_context: path?.name || ''
+      })
+
+      if (result.success && result.data) {
+        setGuide(result.data)
+        setGuideGenerated(true)
+      }
+    } catch (err) {
+      console.error('生成学习指引失败:', err)
+      // Fallback guide
+      setGuide({
+        what_to_learn: `本节将学习${currentNode.knowledge_point}的核心概念和实践应用`,
+        learning_goals: [
+          `理解${currentNode.knowledge_point}的基本概念`,
+          `掌握${currentNode.knowledge_point}的核心原理`,
+          `能够应用${currentNode.knowledge_point}解决实际问题`
+        ],
+        key_points: [
+          { title: '核心概念', description: `${currentNode.knowledge_point}的定义和基本原理` },
+          { title: '实践应用', description: `如何在实际场景中运用${currentNode.knowledge_point}` }
+        ],
+        prerequisites: currentNode.prerequisites?.length > 0 ? ['完成前置知识点学习'] : ['无特殊前置要求'],
+        estimated_time: '1-2小时'
+      })
+      setGuideGenerated(true)
+    } finally {
+      setGuideLoading(false)
+    }
+  }, [currentNode, guideLoading, path])
 
   const handleSendMessage = useCallback(async () => {
     if (!inputMessage.trim() || chatLoading) return
@@ -215,16 +265,132 @@ export default function LearnNodePage() {
         </a>
         <span className="learn-title">{currentNode.knowledge_point}</span>
         <div className="mode-tabs">
+          <button className={`mode-tab ${mode === 'guide' ? 'active' : ''}`} onClick={() => setMode('guide')}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            学习指引
+          </button>
           <button className={`mode-tab ${mode === 'chat' ? 'active' : ''}`} onClick={() => setMode('chat')}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             AI 对话
           </button>
           <button className={`mode-tab ${mode === 'resource' ? 'active' : ''}`} onClick={() => setMode('resource')}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             学习资源
           </button>
         </div>
       </div>
+
+      {/* ═══ GUIDE MODE ═══ */}
+      {mode === 'guide' && (
+        <div className="learn-guide-mode">
+          {!guideGenerated && !guideLoading && (
+            <div className="guide-generate-cta" onClick={handleGenerateGuide}>
+              <div className="gg-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              </div>
+              <h3>生成学习指引</h3>
+              <p>AI 将为你分析「{currentNode.knowledge_point}」的学习要点，明确学习目标和重点</p>
+            </div>
+          )}
+
+          {guideLoading && (
+            <div className="guide-loading-state">
+              <div className="gl-spinner"></div>
+              <h3>AI 正在分析学习要点</h3>
+              <p>正在为「{currentNode.knowledge_point}」生成学习指引...</p>
+            </div>
+          )}
+
+          {guide && (
+            <div className="guide-content">
+              {/* 学什么 */}
+              <div className="guide-section guide-what">
+                <div className="gs-header">
+                  <div className="gs-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                  </div>
+                  <h3>学什么</h3>
+                </div>
+                <p className="gs-desc">{guide.what_to_learn}</p>
+              </div>
+
+              {/* 学习目标 */}
+              <div className="guide-section guide-goals">
+                <div className="gs-header">
+                  <div className="gs-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                  </div>
+                  <h3>学习目标</h3>
+                </div>
+                <ul className="gs-list">
+                  {guide.learning_goals.map((goal, i) => (
+                    <li key={i}>
+                      <span className="gs-check">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                      </span>
+                      {goal}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* 重点难点 */}
+              <div className="guide-section guide-keys">
+                <div className="gs-header">
+                  <div className="gs-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  </div>
+                  <h3>重点难点</h3>
+                </div>
+                <div className="gs-keys-grid">
+                  {guide.key_points.map((point, i) => (
+                    <div key={i} className="gs-key-card">
+                      <div className="gsk-title">{point.title}</div>
+                      <div className="gsk-desc">{point.description}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 前置知识 + 预计时间 */}
+              <div className="guide-section guide-meta">
+                <div className="gs-meta-row">
+                  <div className="gs-meta-item">
+                    <div className="gs-meta-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+                    </div>
+                    <div className="gs-meta-body">
+                      <div className="gs-meta-label">前置知识</div>
+                      <div className="gs-meta-value">{guide.prerequisites.join('、')}</div>
+                    </div>
+                  </div>
+                  <div className="gs-meta-item">
+                    <div className="gs-meta-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/></svg>
+                    </div>
+                    <div className="gs-meta-body">
+                      <div className="gs-meta-label">预计时间</div>
+                      <div className="gs-meta-value">{guide.estimated_time}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 开始学习按钮 */}
+              <div className="guide-actions">
+                <button className="guide-start-btn" onClick={() => setMode('chat')}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  开始学习，与 AI 对话
+                </button>
+                <button className="guide-resource-btn" onClick={() => setMode('resource')}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                  直接生成学习资源
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ═══ CHAT MODE ═══ */}
       {mode === 'chat' && (
