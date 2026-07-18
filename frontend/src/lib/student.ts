@@ -7,7 +7,7 @@ let cachedStudentId: string | null = null
 export function getStudentId(): string {
   // 如果已缓存，直接返回
   if (cachedStudentId !== null) return cachedStudentId
-  
+
   if (typeof window === 'undefined') return ''
   try {
     const raw = localStorage.getItem(LOGIN_KEY)
@@ -20,14 +20,6 @@ export function getStudentId(): string {
     }
   } catch {}
   return ''
-}
-
-export function requireLogin(): string {
-  const id = getStudentId()
-  if (!id && typeof window !== 'undefined') {
-    window.location.href = '/login'
-  }
-  return id
 }
 
 // 清除缓存（登录/登出时调用）
