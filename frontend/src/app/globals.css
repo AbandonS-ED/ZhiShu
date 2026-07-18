@@ -1986,7 +1986,7 @@ body:has(.login-page){
 
 .wq-stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .wq-stat-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:18px 22px 16px;display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden}
-.wq-stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--ink) 0%,var(--warm) 100%)}
+.wq-stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--warm)}
 .wq-stat-label{font-size:12px;color:var(--ink-3)}
 .wq-stat-value{font-size:24px;font-weight:600;font-feature-settings:"tnum"}
 
@@ -2024,7 +2024,7 @@ body:has(.login-page){
 .wq-card-progress{margin-top:8px}
 .wq-progress-bar{height:6px;background:var(--line);border-radius:999px;overflow:hidden}
 .wq-progress-bar.large{height:10px}
-.wq-progress-fill{height:100%;background:linear-gradient(90deg,var(--ink) 0%,var(--warm) 100%);border-radius:999px;transition:width .4s}
+.wq-progress-fill{height:100%;background:var(--warm);border-radius:999px;transition:width .4s}
 
 .wq-pager{display:flex;align-items:center;justify-content:center;gap:8px;padding:16px;font-size:12.5px;color:var(--ink-3)}
 .wq-pager button{padding:6px 12px;border:1px solid var(--line);background:var(--surface);border-radius:var(--r-xs);cursor:pointer;font-size:12.5px;color:var(--ink);transition:all .15s}
