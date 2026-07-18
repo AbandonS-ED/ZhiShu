@@ -122,6 +122,3 @@ class SparkClient:
         """关闭客户端"""
         if self._client and not self._client.is_closed:
             await self._client.aclose()
-
-
-spark_client = SparkClient(api_key="")

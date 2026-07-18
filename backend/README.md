@@ -82,18 +82,20 @@ backend/
 │   │   ├── scoring_agent.py   # AI 智能评分
 │   │   ├── learning_path_agent.py # 学习计划路径生成
 │   │   └── master_agent.py    # LangGraph StateGraph **10 节点**
-│   └── services/              # 18 个 Service
+│   └── services/              # 13 个 Service
 │       ├── minimax_client.py     # httpx OpenAI 兼容格式客户端
-│       ├── minimax_langchain.py  # LangChain BaseChatModel 封装
 │       ├── spark_client.py       # 讯飞星火 V4 客户端
+│       ├── mimo_client.py        # 小米 MiMo v2.5（api-key 认证 + 流式/非流式）
 │       ├── anti_hallucination.py # 防幻觉三层验证
-│       ├── content_safety.py     # 内容安全（敏感词过滤 + LLM 语义检查）
-│       ├── document_parser.py    # 文档解析器（PDF/DOCX/PPTX/MD/TXT）
-│       ├── embedding_service.py  # 向量化服务（MiniMax embeddings API）
+│       ├── chat_recommendation_service.py # 对话推荐服务
+│       ├── embedding_service.py  # 向量化服务（MiMo embeddings API）
 │       ├── evaluation_service.py # 效果评估（行为跟踪 + 统计分析）
 │       ├── json_parser.py        # JSON 解析工具
+│       ├── llm_factory.py        # LLM 客户端工厂
+│       ├── profile_service.py    # 画像统一写入层
 │       ├── reranker.py           # LLM 语义重排
-│       ├── text_chunker.py       # 语义切片器（800字限制 + 重叠窗口）
+│       ├── scheduled_analysis_service.py # 定时画像分析
+│       ├── study_plan_service.py # 学习计划核心服务（758 行）
 │       ├── vector_store.py       # pgvector 检索 + JSONB 降级方案
 │       ├── recommendation_service.py # 推荐服务
 │       ├── chat_recommendation_service.py # 对话推荐服务
@@ -264,20 +266,19 @@ backend/
 | 文件 | 功能 | 状态 |
 |------|------|------|
 | `services/minimax_client.py` | httpx 直接调用 MiniMax-M3（OpenAI 兼容格式） | ✅ 可用 |
-| `services/minimax_langchain.py` | LangChain BaseChatModel 封装 | ✅ 可用 |
 | `services/spark_client.py` | 讯飞星火 V4 客户端（同步 + 流式） | ✅ 已实现 |
 | `services/mimo_client.py` | 小米 MiMo v2.5 客户端（`api-key` 头认证 + 流式/非流式 + 空 choices 容错） | ✅ 已实现 |
+| `services/llm_factory.py` | LLM 客户端工厂（按 `LLM_PROVIDER` 切换 mimo/minimax/spark） | ✅ 已实现 |
 | `services/anti_hallucination.py` | 防幻觉三层验证（模式检测+来源验证+LLM语义校验） | ✅ 已实现 |
-| `services/content_safety.py` | 内容安全（敏感词过滤 + LLM 语义检查） | ✅ 已实现 |
-| `services/document_parser.py` | 文档解析器（PDF/DOCX/PPTX/MD/TXT） | ✅ 已实现 |
 | `services/embedding_service.py` | 向量化服务（MiniMax embeddings API） | ✅ 已实现 |
 | `services/evaluation_service.py` | 效果评估（**LLM 报告生成 + 趋势 + 知识点统计 + 规则引擎降级**） | ✅ 已实现 |
 | `services/json_parser.py` | JSON 解析工具（消除重复代码） | ✅ 已实现 |
 | `services/reranker.py` | LLM 语义重排 | ✅ 已实现 |
-| `services/text_chunker.py` | 语义切片器（800字限制 + 重叠窗口） | ✅ 已实现 |
 | `services/vector_store.py` | pgvector 检索 + JSONB 降级方案 | ✅ 已实现 |
-| `services/recommendation_service.py` | 推荐服务（多维度打分推荐） | ✅ 已实现 |
 | `services/chat_recommendation_service.py` | 对话推荐服务（基于会话上下文） | ✅ 已实现 |
+| `services/profile_service.py` | 画像统一写入层（apply_llm_updates + flag_modified + per-student Lock） | ✅ 已实现 |
+| `services/scheduled_analysis_service.py` | 定时画像分析（多 worker advisory lock） | ✅ 已实现 |
+| `services/study_plan_service.py` | 学习计划核心服务（758 行：AI 生成计划 + AI 生成路径 + 步骤完成 + 进度追踪） | ✅ 已实现 |
 | `services/llm_factory.py` | LLM 客户端工厂（MiniMax/Spark/MiMo） | ✅ 已实现 |
 | `services/scheduled_analysis_service.py` | 定时画像分析（每日自动分析） | ✅ 已实现 |
 
