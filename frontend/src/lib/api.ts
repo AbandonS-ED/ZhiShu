@@ -34,6 +34,20 @@ import { clearStudentIdCache } from './student'
 
 export type { ChatEvent }
 
+// 清除画像缓存（行为更新后调用，确保下次进画像页读最新数据）
+function clearProfileCache() {
+  try {
+    const raw = localStorage.getItem('zhishu_student')
+    if (raw) {
+      const sid = JSON.parse(raw)?.id
+      if (sid) {
+        localStorage.removeItem(`profile_${sid}`)
+        localStorage.removeItem(`profile_time_${sid}`)
+      }
+    }
+  } catch { /* ignore */ }
+}
+
 // 学习包生成 SSE 事件类型
 export interface GenerationEvent {
   type: 'progress' | 'token' | 'result' | 'error' | 'done'
@@ -146,7 +160,7 @@ export const profileApi = {
     request<{ status: string; message: string; updated: boolean }>('/profile/update-behavior', {
       method: 'POST',
       body: JSON.stringify(data),
-    }),
+    }).then(r => { clearProfileCache(); return r }),
 
   analyzeBehavior: (behavior_type: string, behavior_data: Record<string, unknown> = {}) =>
     request<{ status: string; updates?: Array<{ dimension: string; score_change: number; reason: string }>; summary?: string; updated_count?: number }>(
@@ -155,13 +169,13 @@ export const profileApi = {
         method: 'POST',
         body: JSON.stringify({ behavior_type, behavior_data }),
       }
-    ),
+    ).then(r => { clearProfileCache(); return r }),
 
   forceAnalyze: () =>
     request<{ status: string; updates?: Array<{ dimension: string; score_change: number; reason: string }>; summary?: string; updated_count?: number }>(
       '/profile/force-analyze',
       { method: 'POST' }
-    ),
+    ).then(r => { clearProfileCache(); return r }),
 
   getAnalysisStatus: () =>
     request<{ has_profile: boolean; last_analyzed_at: string | null; assessment_status: string }>(
@@ -359,6 +373,9 @@ export const resourceApi = {
 
   list: (studentId: string) =>
     request<ResourceItem[]>(`/resource/list?student_id=${studentId}`),
+
+  getById: (resourceId: string) =>
+    request<ResourceItem>(`/resource/${resourceId}`),
 
   save: (data: SaveResourceRequest) =>
     request<ResourceItem>('/resource/save', {

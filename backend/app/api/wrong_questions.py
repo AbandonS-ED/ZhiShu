@@ -715,6 +715,30 @@ async def review_wrong_question(
     await db.commit()
     await db.refresh(wq)
 
+    # 画像联动：错题回顾 → memory 维度
+    try:
+        from app.services.profile_service import apply_rule_updates
+        rule_updates = []
+        if req.is_correct:
+            rule_updates.append({
+                "dimension": "memory",
+                "score_change": 3 if wq.is_mastered else 1,
+                "reason": f"错题回顾正确（掌握度{wq.mastery_level}%）" + ("，已掌握" if wq.is_mastered else ""),
+            })
+        else:
+            rule_updates.append({
+                "dimension": "memory",
+                "score_change": -1,
+                "reason": "错题回顾仍需加强",
+            })
+        await apply_rule_updates(
+            db=db,
+            student_id=str(user.id),
+            rule_updates=rule_updates,
+        )
+    except Exception as e:
+        logger.warning(f"[wrong_questions] 画像更新失败: {e}")
+
     return _to_dto(wq)
 
 

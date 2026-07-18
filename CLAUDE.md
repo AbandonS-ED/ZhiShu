@@ -46,13 +46,13 @@ ZhiShu/
 │   └── src/hooks/usePageTimer.ts    # 页面停留计时器
 ├── backend/                         # FastAPI 后端
 │   ├── app/main.py                  # 应用入口 + 路由注册
-│   ├── app/api/                     # 11 个路由模块 (69 端点)
+│   ├── app/api/                     # 11 个路由模块 (71 端点)
 │   ├── app/agents/                  # 15 个 Agent 文件 + StateGraph 编排
-│   ├── app/services/                # 14 个服务模块
-│   ├── app/models/                  # 14 个数据模型
+│   ├── app/services/                # 15 个服务模块
+│   ├── app/models/                  # 13 个数据模型
 │   ├── app/tasks/                   # Celery 异步任务
 │   └── app/core/                    # 核心模块 (配置/数据库/安全)
-├── tests/                           # 110 pytest + 冒烟测试
+├── tests/                           # 106 pytest + 冒烟测试
 ├── docs/                            # 设计文档
 ├── scripts/                         # 数据库初始化脚本
 ├── docker-compose.yml               # Docker 编排
@@ -97,7 +97,7 @@ cd backend && celery -A app.core.celery_config worker --loglevel=info
 cd backend && celery -A app.core.celery_config beat --loglevel=info
 
 # 测试
-cd backend && python -m pytest tests/ -v          # 110 pytest
+cd backend && python -m pytest tests/ -v          # 106 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
 cd frontend && npm run build                       # 28 页面
@@ -165,6 +165,27 @@ study_patrol / study_session_end → learning_records
 | `/api/v1/resource/exercises/generate/stream` | ✅ 真流式 | dual-format (题库出题) |
 | `/api/v1/resource/exercises/pool` | GET | 题池加载 |
 | `/api/v1/wrong-questions/{id}/analyze/stream` | ✅ 真流式 | Agent 4 步思考链 |
+
+### 画像更新双路径架构
+
+```
+规则引擎 apply_rule_updates（即时/高频/确定性规则）:
+  每次答题 → application（正确率映射）
+  每次学习 → memory + focus（学习时长映射）
+  节点完成 → learning_goal（每节点 +2，全完成 +5）
+  评估报告 → comprehension + knowledge_base（≥80 +3 / ≥60 +2 / <40 -1）
+  错题回顾 → memory（答对 +1 / 掌握 +3 / 答错 -1）
+  思维导图 → imagination（每次 +1）
+
+AI 分析 analyzeBehavior（批量/低频/LLM 深度洞察）:
+  tiku 每 5 题 → 全 7 维 AI 推断
+  zixi 结束时 → 全 7 维 AI 推断
+  resources 学习 → analyzeBehavior('study')
+  duihua 对话 → analyzeBehavior('chat')
+  定时分析 → 每 4 小时 scheduled_analysis_service
+
+画像缓存 5 分钟 + 行为更新后自动清 localStorage
+```
 
 ### 数据库表关系 (13 张表)
 

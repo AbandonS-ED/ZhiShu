@@ -124,6 +124,19 @@ export default function TikuPage() {
   const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastMsgTimeRef = useRef(0)
 
+  // AI 分析节流：每 5 题调一次 analyzeBehavior
+  const analyzeCountRef = useRef(0)
+  const maybeAnalyzeBehavior = useCallback((ex: Exercise, correct: boolean) => {
+    analyzeCountRef.current++
+    if (analyzeCountRef.current % 5 !== 0) return
+    profileApi.analyzeBehavior('exercise', {
+      knowledge_point: ex.knowledge_point,
+      correct,
+      question_type: ex.type,
+      total_answered: analyzeCountRef.current,
+    }).catch(err => console.error('[tiku] analyzeBehavior 失败:', err))
+  }, [])
+
   // 从 URL 读取 ?kp=xxx，自动填入知识点输入框
   useEffect(() => {
     const kp = new URLSearchParams(window.location.search).get('kp')
@@ -290,12 +303,16 @@ export default function TikuPage() {
       knowledge_point: ex.knowledge_point,
       score: correct ? 100 : 0,
     }).catch(err => console.error('[tiku] 后台上报失败:', err))
-    // 使用 AI Agent 分析练习行为并更新画像
-    profileApi.analyzeBehavior('exercise', {
-      knowledge_point: ex.knowledge_point,
-      correct: correct,
-      question_type: ex.type,
-    }).catch(err => console.error('[tiku] 后台上报失败:', err))
+    // 规则引擎：答题正确率 → 应用转化维度
+    const newAnswers = { ...answers, [id]: { selected, correct } }
+    const total = Object.keys(newAnswers).length
+    const correctCount = Object.values(newAnswers).filter(a => a.correct === true).length
+    if (total >= 3) {
+      profileApi.updateBehavior({ exercise_correct_rate: correctCount / total })
+        .catch(err => console.error('[tiku] updateBehavior 失败:', err))
+    }
+    // AI Agent 分析：每 5 题批量调一次
+    maybeAnalyzeBehavior(ex, correct)
     // 答错自动加入错题本
     if (!correct) {
       const sid = getStudentId()
@@ -311,7 +328,7 @@ export default function TikuPage() {
         showToast('加入错题本失败')
       })
     }
-  }, [answers, exercises, addRecent])
+  }, [answers, exercises, addRecent, maybeAnalyzeBehavior])
 
   const answerJudge = useCallback((id: string, selected: boolean) => {
     if (answers[id]) return
@@ -327,12 +344,16 @@ export default function TikuPage() {
       knowledge_point: ex.knowledge_point,
       score: correct ? 100 : 0,
     }).catch(err => console.error('[tiku] 后台上报失败:', err))
-    // 使用 AI Agent 分析练习行为并更新画像
-    profileApi.analyzeBehavior('exercise', {
-      knowledge_point: ex.knowledge_point,
-      correct: correct,
-      question_type: ex.type,
-    }).catch(err => console.error('[tiku] 后台上报失败:', err))
+    // 规则引擎：答题正确率 → 应用转化维度
+    const newAnswers = { ...answers, [id]: { selected, correct } }
+    const total = Object.keys(newAnswers).length
+    const correctCount = Object.values(newAnswers).filter(a => a.correct === true).length
+    if (total >= 3) {
+      profileApi.updateBehavior({ exercise_correct_rate: correctCount / total })
+        .catch(err => console.error('[tiku] updateBehavior 失败:', err))
+    }
+    // AI Agent 分析：每 5 题批量调一次
+    maybeAnalyzeBehavior(ex, correct)
     // 答错自动加入错题本
     if (!correct) {
       const sid = getStudentId()
@@ -348,7 +369,7 @@ export default function TikuPage() {
         showToast('加入错题本失败')
       })
     }
-  }, [answers, exercises, addRecent])
+  }, [answers, exercises, addRecent, maybeAnalyzeBehavior])
 
   const answerShort = useCallback(async (id: string, value: string) => {
     if (!value.trim()) return

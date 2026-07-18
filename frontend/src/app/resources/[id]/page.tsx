@@ -27,13 +27,8 @@ export default function ResourceDetailPage() {
     setLoading(true)
     setError('')
     try {
-      const data = await resourceApi.list(studentId)
-      const found = data.find(r => r.resource_id === resourceId)
-      if (found) {
-        setResource(found)
-      } else {
-        setError('资源不存在')
-      }
+      const data = await resourceApi.getById(resourceId)
+      setResource(data)
     } catch (err: any) {
       setError(err.message || '加载失败')
     } finally {

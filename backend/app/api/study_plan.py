@@ -5,6 +5,7 @@
 
 import uuid
 import json
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +18,7 @@ from app.services.study_plan_service import study_plan_service
 from app.agents.learning_guide_agent import learning_guide_agent
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ===== 请求模型 =====
@@ -197,6 +199,23 @@ async def complete_node(
             update(LearningPath).where(LearningPath.id == uuid.UUID(path_id)).values(nodes=nodes)
         )
         await db.commit()
+
+        # 画像联动：完成节点 → learning_goal 维度
+        try:
+            from app.services.profile_service import apply_rule_updates
+            completed = sum(1 for n in nodes if n.get("status") == "completed")
+            all_done = completed == len(nodes)
+            await apply_rule_updates(
+                db=db,
+                student_id=str(current_user.id),
+                rule_updates=[{
+                    "dimension": "learning_goal",
+                    "score_change": 5 if all_done else 2,
+                    "reason": f"学习路径完成 {completed}/{len(nodes)}" + ("，全部完成" if all_done else ""),
+                }],
+            )
+        except Exception as e:
+            logger.warning(f"[study_plan] 画像更新失败: {e}")
         
         return {"success": True, "message": "节点已完成"}
     except HTTPException:

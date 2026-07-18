@@ -302,6 +302,30 @@ class EvaluationService:
             db.add(cached_record)
             await db.commit()
             logger.info(f"报告已缓存: student_id={student_id}, date={today}")
+
+            # 画像联动：评估分数 → comprehension + knowledge_base
+            try:
+                from app.services.profile_service import apply_rule_updates
+                score = report_data["overall_score"]
+                if score >= 80:
+                    boost = 3
+                elif score >= 60:
+                    boost = 2
+                elif score < 40:
+                    boost = -1
+                else:
+                    boost = 0
+                if boost != 0:
+                    await apply_rule_updates(
+                        db=db,
+                        student_id=student_id,
+                        rule_updates=[
+                            {"dimension": "comprehension", "score_change": boost, "reason": f"评估分数{score:.0f}"},
+                            {"dimension": "knowledge_base", "score_change": boost, "reason": f"评估分数{score:.0f}"},
+                        ],
+                    )
+            except Exception as e:
+                logger.warning(f"[evaluation] 画像更新失败: {e}")
         except Exception as e:
             logger.warning(f"报告缓存失败: {e}")
             await db.rollback()

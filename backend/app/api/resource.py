@@ -323,6 +323,44 @@ async def list_resources(
 
 
 # ====================================================================
+# 4b. GET /{resource_id} — 单个资源详情
+# ====================================================================
+
+@router.get("/{resource_id}")
+async def get_resource(
+    resource_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    """获取单个资源详情"""
+    try:
+        rid = uuid.UUID(resource_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="无效的资源 ID")
+
+    result = await db.execute(
+        select(Resource).where(Resource.id == rid)
+    )
+    r = result.scalar_one_or_none()
+    if not r:
+        raise HTTPException(status_code=404, detail="资源不存在")
+    if r.student_id != user.id and not r.is_preset:
+        raise HTTPException(status_code=403, detail="只能查看自己的资源")
+
+    return {
+        "resource_id": str(r.id),
+        "title": r.title,
+        "resource_type": r.resource_type,
+        "content": r.content,
+        "knowledge_point": r.knowledge_point,
+        "difficulty": r.difficulty,
+        "is_favorited": r.is_favorited,
+        "is_preset": r.is_preset,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+    }
+
+
+# ====================================================================
 # 5. POST /{resource_id}/favorite — 切换收藏
 # ====================================================================
 

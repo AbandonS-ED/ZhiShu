@@ -21,7 +21,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { useCameraPatrol, type StudyLabel, type StudyDifficulty } from '@/hooks/useCameraPatrol'
 import { CameraToggle } from '@/components/CameraToggle'
-import { evaluationApi } from '@/lib/api'
+import { evaluationApi, profileApi } from '@/lib/api'
 import { getStudentId } from '@/lib/student'
 import { showToast } from '@/lib/utils'
 
@@ -327,6 +327,16 @@ export default function StudyPage() {
           camera_enabled: cameraEnabled,
         },
       })
+      // 规则引擎：学习时长 → 记忆力 + 专注力
+      profileApi.updateBehavior({ study_duration: duration })
+        .catch(err => console.error('[zixi] updateBehavior 失败:', err))
+      // AI Agent 分析学习行为并更新画像
+      profileApi.analyzeBehavior('study', {
+        duration_minutes: duration,
+        focused_seconds: focusSeconds,
+        patrol_count: patrolHistoryRef.current.length,
+        focused_count: focusedCount,
+      }).catch(err => console.error('[zixi] analyzeBehavior 失败:', err))
     } catch (e) {
       console.warn('[study] finishSession 写记录失败', e)
     }
