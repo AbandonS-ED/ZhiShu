@@ -1,6 +1,7 @@
 """Admin API — 管理后台"""
 import asyncio
 import json
+import logging
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -21,6 +22,8 @@ from app.models.learning_activity_log import LearningActivityLog
 from app.models.evaluation_report import EvaluationReport
 from app.models.document_chunk import DocumentChunk
 from app.core.agent_metrics import agent_metrics
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
