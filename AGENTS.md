@@ -310,7 +310,7 @@ c49a484 fix: 错题本 snapshot 补全 exercise_type + _to_dto type 提取修复
 | 编号 | 内容 |
 |---|---|
 | P1-4 | tiku/profile `ConfirmDialog` 抽到 `components/ConfirmDialog.tsx` |
-| P1-5 | `appStore.ts` 僵尸 store（6字段5个未用），决定删或真用 |
+| P1-5 | ✅ | `appStore.ts` 僵尸 store → 已瘦身只留 student/setStudent |
 | P1-6 | 4处SSE手写reader改用 `lib/sse.ts` |
 | P1-7 | admin showToast 重复实现 |
 
@@ -323,21 +323,28 @@ c49a484 fix: 错题本 snapshot 补全 exercise_type + _to_dto type 提取修复
 | P2-3 | 4处直接读 `localStorage.zhishu_daily_goal` → settings helper |
 | P2-4 | profile/evaluation 缓存模式抽 `cachedFetch` |
 
-### ⚰️ 死代码（建议删，未修）
+### ⚰️ 死代码（已清理，2026-07-18）
 
-- `minimax_client.py:131-137` 全局单例（llm_factory 已统一）
-- `spark_client.py:127` 空 key 实例
-- `minimax_langchain.py` 整个文件（0处使用）
-- `student.ts:25` `requireLogin()` 0处调用
+全部已删除并提交（3 个 commit: `a0c3847` / `ee92dc9` / `f3b5302`），合计 ~2400 行。
 
-### ⚰️ 死代码（建议删）
-
-| 文件:行 | 内容 |
-|---|---|
-| `backend/app/services/minimax_client.py:131-137` | `minimax_client` 全局变量 + `init_minimax_client()` 单例（llm_factory 已统一管） |
-| `backend/app/services/spark_client.py:127` | `spark_client = SparkClient(api_key="")` 空 key 实例（也没人用） |
-| `backend/app/services/minimax_langchain.py`（整个文件，167 行） | `minimax_chat = MiniMaxChatModel()` 0 处使用 |
-| `frontend/src/lib/student.ts:25-31` | `requireLogin()` 0 处调用 |
+| 文件 | 内容 | 状态 |
+|---|---|---|
+| `backend/app/services/minimax_client.py:131-137` | 全局单例 + init_minimax_client() | ✅ 已删 |
+| `backend/app/services/spark_client.py:127` | 空 key 实例 | ✅ 已删 |
+| `backend/app/services/minimax_langchain.py` | 整个文件（0处使用） | ✅ 已删 |
+| `frontend/src/lib/student.ts:25-31` | requireLogin()（0处调用） | ✅ 已删 |
+| `backend/app/services/content_safety.py` | 内容安全（0处引用） | ✅ 已删 |
+| `backend/app/services/document_parser.py` | 文档解析（0处引用） | ✅ 已删 |
+| `backend/app/services/text_chunker.py` | 语义切片（0处引用） | ✅ 已删 |
+| `backend/app/services/recommendation_service.py` | 推荐服务（0处引用） | ✅ 已删 |
+| `frontend/src/app/resources/components/AICreatePanel.tsx` | 资源创建面板 | ✅ 已删 |
+| `frontend/src/app/resources/components/ManualCreatePanel.tsx` | 手动创建面板 | ✅ 已删 |
+| `frontend/src/app/resources/components/PhaseButton.tsx` | 阶段按钮 | ✅ 已删 |
+| `frontend/src/app/resources/components/ReviewPanel.tsx` | 复习面板 | ✅ 已删 |
+| `frontend/src/app/resources/hooks/useLearningPackage.ts` | 学习包 hook | ✅ 已删 |
+| `frontend/src/app/resources/hooks/useResourceCreate.ts` | 资源创建 hook | ✅ 已删 |
+| `frontend/src/app/resources/hooks/useReview.ts` | 复习 hook | ✅ 已删 |
+| `frontend/src/stores/appStore.ts` | 6 字段瘦身为 2 字段（只留 student/setStudent） | ✅ 已修 |
 
 ### ✅ 健康状况总结
 
@@ -349,5 +356,5 @@ c49a484 fix: 错题本 snapshot 补全 exercise_type + _to_dto type 提取修复
 - ✅ `getStudentId` / `logout` / `valid_student_id` / `valid_session_id` helper 已就绪（只是部分页面没用）
 
 **核心问题**：项目主体质量很高，重复**集中于"边界场景"**——个别特殊服务/页面跳出现有基础设施。
-修完 P0-1 至 P0-4，前端/后端架构统一性将达到生产级水平。
+P0 已全部修完，死代码已全部清理，前端/后端架构统一性达到生产级水平。
 

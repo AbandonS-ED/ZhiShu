@@ -11,7 +11,7 @@
 - **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 **69** 业务端点门禁
 - **角色**: `role` 字段（student / admin）+ `is_active` 软删除 + `last_login` 记录
 - **LLM**: 小米 MiMo v2.5（当前）→ MiniMax-M3 → 讯飞星火 V4（上线前切换 `LLM_PROVIDER=spark`）
-- **数据库**: PostgreSQL 18 + **15 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（Celery broker，当前未起 worker）
+- **数据库**: PostgreSQL 18 + **13 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（Celery broker，当前未起 worker）
 - **学习计划模块** (合并 wyy 分支): 输入知识点 → AI 生成学习路径 (10-15 节点) → 节点学习 → AI 测验 → 综合测试
 
 ## 快速开始
@@ -67,7 +67,7 @@ backend/
 │   │   ├── study_plans.py     # 学习计划
 │   │   ├── study_plan_steps.py # 学习计划步骤
 │   │   └── wrong_question.py  # 错题本
-│   ├── agents/              # 14 个 Agent（含基础设施）
+│   ├── agents/              # 14 个 Agent（含 Master Agent 编排器）
 │   │   ├── state.py           # AgentState TypedDict + IntentType（11 种意图）
 │   │   ├── communicator.py    # MessageBus pub/sub
 │   │   ├── initial_assessment_agent.py  # 对话式 7 维画像评估
@@ -82,27 +82,21 @@ backend/
 │   │   ├── scoring_agent.py   # AI 智能评分
 │   │   ├── learning_path_agent.py # 学习计划路径生成
 │   │   └── master_agent.py    # LangGraph StateGraph **10 节点**
-│   └── services/              # 13 个 Service
+│   └── services/              # 14 个 Service
 │       ├── minimax_client.py     # httpx OpenAI 兼容格式客户端
 │       ├── spark_client.py       # 讯飞星火 V4 客户端
 │       ├── mimo_client.py        # 小米 MiMo v2.5（api-key 认证 + 流式/非流式）
 │       ├── anti_hallucination.py # 防幻觉三层验证
 │       ├── chat_recommendation_service.py # 对话推荐服务
-│       ├── embedding_service.py  # 向量化服务（MiMo embeddings API）
-│       ├── evaluation_service.py # 效果评估（行为跟踪 + 统计分析）
+│       ├── embedding_service.py  # 向量化服务
+│       ├── evaluation_service.py # 效果评估（LLM 报告 + 趋势 + 规则降级）
 │       ├── json_parser.py        # JSON 解析工具
 │       ├── llm_factory.py        # LLM 客户端工厂
 │       ├── profile_service.py    # 画像统一写入层
 │       ├── reranker.py           # LLM 语义重排
-│       ├── scheduled_analysis_service.py # 定时画像分析
-│       ├── study_plan_service.py # 学习计划核心服务（758 行）
-│       ├── vector_store.py       # pgvector 检索 + JSONB 降级方案
-│       ├── recommendation_service.py # 推荐服务
-│       ├── chat_recommendation_service.py # 对话推荐服务
-│       ├── llm_factory.py        # LLM 客户端工厂
 │       ├── scheduled_analysis_service.py # 定时画像分析（多 worker advisory lock）
-│       ├── profile_service.py    # 画像统一写入层（flag_modified + per-student Lock）
-│       └── study_plan_service.py # 学习计划核心服务（758 行）
+│       ├── study_plan_service.py # 学习计划核心服务（758 行）
+│       └── vector_store.py       # pgvector 检索 + JSONB 降级方案
 ├── scripts/
 │   ├── init_db.sql          # 手动建库 + 建表 SQL 脚本（**15 张表** + 14 索引 + admin 种子数据）
 │   ├── init_admin.py        # 自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号
@@ -270,7 +264,7 @@ backend/
 | `services/mimo_client.py` | 小米 MiMo v2.5 客户端（`api-key` 头认证 + 流式/非流式 + 空 choices 容错） | ✅ 已实现 |
 | `services/llm_factory.py` | LLM 客户端工厂（按 `LLM_PROVIDER` 切换 mimo/minimax/spark） | ✅ 已实现 |
 | `services/anti_hallucination.py` | 防幻觉三层验证（模式检测+来源验证+LLM语义校验） | ✅ 已实现 |
-| `services/embedding_service.py` | 向量化服务（MiniMax embeddings API） | ✅ 已实现 |
+| `services/embedding_service.py` | 向量化服务 | ✅ 已实现 |
 | `services/evaluation_service.py` | 效果评估（**LLM 报告生成 + 趋势 + 知识点统计 + 规则引擎降级**） | ✅ 已实现 |
 | `services/json_parser.py` | JSON 解析工具（消除重复代码） | ✅ 已实现 |
 | `services/reranker.py` | LLM 语义重排 | ✅ 已实现 |
@@ -279,12 +273,10 @@ backend/
 | `services/profile_service.py` | 画像统一写入层（apply_llm_updates + flag_modified + per-student Lock） | ✅ 已实现 |
 | `services/scheduled_analysis_service.py` | 定时画像分析（多 worker advisory lock） | ✅ 已实现 |
 | `services/study_plan_service.py` | 学习计划核心服务（758 行：AI 生成计划 + AI 生成路径 + 步骤完成 + 进度追踪） | ✅ 已实现 |
-| `services/llm_factory.py` | LLM 客户端工厂（MiniMax/Spark/MiMo） | ✅ 已实现 |
-| `services/scheduled_analysis_service.py` | 定时画像分析（每日自动分析） | ✅ 已实现 |
 
 ## 数据库
 
-**15 张表 + 14 个索引**（开发阶段去掉外键约束）：
+**13 张表 + 14 个索引**（开发阶段去掉外键约束）：
 
 | 表名 | 用途 | 索引 |
 |------|------|------|
@@ -300,6 +292,9 @@ backend/
 | `learning_records` | 学习行为记录（F5 评估） | `idx_learning_records_student_id` + `idx_learning_records_action` + `idx_learning_records_created_at` |
 | `learning_activity_logs` | 学习行为日志 | — |
 | `evaluation_reports` | **预生成评估报告缓存**（Celery daily 4 点跑） | `idx_evaluation_reports_student_id` + 复合索引 `(student_id, report_date)` |
+| `wrong_questions` | 错题本（含 mastery_level/error_type/similar_exercises） | — |
+| `study_plans` | 学习计划主表 | — |
+| `study_plan_steps` | 学习计划步骤 | — |
 
 ## 认证与权限
 

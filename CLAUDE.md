@@ -18,7 +18,7 @@
 | Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 14 Agent 模块 |
 | LLM | 三客户端: MimoClient (当前) / MiniMaxClient / SparkClient | - | `LLM_PROVIDER=mimo\|minimax\|spark` 切换 |
 | 向量库 | pgvector (JSONB 降级方案) | - | embedding 用 JSONB 占位 |
-| 数据库 | PostgreSQL 18 + Redis | - | 14 张表 |
+| 数据库 | PostgreSQL 18 + Redis | - | 13 张表 |
 | 异步任务 | Celery (Redis broker) | - | 每日 4 点预生成评估报告 |
 
 ## 项目结构
@@ -48,7 +48,7 @@ ZhiShu/
 │   ├── app/main.py                  # 应用入口 + 路由注册
 │   ├── app/api/                     # 11 个路由模块 (69 端点)
 │   ├── app/agents/                  # 14 个 Agent 文件 + StateGraph 编排
-│   ├── app/services/                # 13 个服务模块
+│   ├── app/services/                # 14 个服务模块
 │   ├── app/models/                  # 14 个数据模型
 │   ├── app/tasks/                   # Celery 异步任务
 │   └── app/core/                    # 核心模块 (配置/数据库/安全)
@@ -166,7 +166,7 @@ study_patrol / study_session_end → learning_records
 | `/api/v1/resource/exercises/pool` | GET | 题池加载 |
 | `/api/v1/wrong-questions/{id}/analyze/stream` | ✅ 真流式 | Agent 4 步思考链 |
 
-### 数据库表关系 (15 张表)
+### 数据库表关系 (13 张表)
 
 `students` 1:N `student_profiles` / `chat_sessions` / `resources` / `learning_paths` / `exercises` / `learning_records` / `evaluation_reports` / `wrong_questions` / `study_plans` / `learning_activity_logs`
 
@@ -272,6 +272,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 错题分析 Agent 化 (WrongQuestionAgent 4步思考链 + SSE 流式 + 5+3 轮 Review 修复)
 - ✅ `wrong_questions.py` logger 规范化 (__import__ 改为正规 import logging)
 - ✅ 前端页面按 HTML 模板全量重写 (plan/learn/quiz/final-test 页面按 jihua 系列模板 1:1 复刻 + globals.css 模板 CSS 统一)
+- ✅ 全代码库死代码清理 (Batch 1: 删 5 个后端死服务 + 2 片段 -896行; Batch 2: 删 resources 4 组件 + 2 hooks -1449行; Batch 3: 删 requireLogin + 瘦身 appStore -54行 → 合计 ~2400 行)
 
 ### P2 — 清理项
 

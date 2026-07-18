@@ -1,7 +1,7 @@
 # 智枢 (SmartHub) - 前端项目
 
 > 多智能体学习资源生成系统 · 前端部分（学生端 20 页 + 管理后台 9 页 + 1 子页面）
-> 最后更新：2026-07-18（合并 wyy 分支 AI 智能评分 + 文档全量同步）
+> 最后更新：2026-07-18（全代码库死代码清理 + 文档全量同步）
 
 ## 技术栈
 
@@ -9,7 +9,7 @@
 - **样式**: Tailwind CSS 3.4 + 自定义 CSS（模板 1:1 复刻）
 - **状态管理**: React useState + Context（学生端 + 管理端独立 Context）+ Zustand（setting 页）
 - **路由隔离**: `/admin` 路由前缀，独立的 RootLayout 拦截
-- **Agent**: 17 个 Agent 模块协同工作
+- **Agent**: 14 个 Agent 模块协同工作
 - **学习计划模块** (合并 wyy 分支): 输入知识点 → AI 生成学习路径 (10-15 节点) → 节点学习 → AI 测验 → 综合测试
 
 ## 项目结构
@@ -55,7 +55,7 @@ src/
 │   ├── markdown.ts            # Markdown 转 HTML（marked 库隔离）
 │   ├── admin/context.tsx      # ⭐ 管理后台共享状态（AdminProvider + useAdmin）
 │   └── admin/components.tsx   # ⭐ 管理后台共享组件（AdminCheckbox + BatchDeleteBar + useSelection）
-├── stores/appStore.ts         # Zustand store（已接入 setting 页）
+├── stores/appStore.ts         # Zustand store（student/setStudent，已瘦身）
 ├── types/index.ts             # TS 13 接口定义
 └── fonts/                     # 本地字体（GeistVF, GeistMonoVF）
 ```
