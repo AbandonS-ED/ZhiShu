@@ -472,6 +472,63 @@ code, .mono { font-family: 'JetBrains Mono', monospace; font-weight: 400; }
 .rc-foot .rc-verified{display:flex;align-items:center;gap:3px;color:var(--success);font-weight:500}
 .rc-foot .rc-verified svg{width:11px;height:11px}
 
+/* ═══ RESOURCE PAGE v2 (template: zhiyuan.html) ═══ */
+.res-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;animation:emerge .5s var(--ease)}
+.res-toolbar .search-wrap{display:flex;align-items:center;gap:8px;padding:0 14px;border:1px solid var(--line);border-radius:var(--r-xs);background:var(--surface);transition:border-color .2s;flex:1 1 240px;max-width:360px}
+.res-toolbar .search-wrap:focus-within{border-color:var(--ink-4)}
+.res-toolbar .search-wrap svg{width:16px;height:16px;color:var(--ink-4);flex-shrink:0}
+.res-toolbar .search-wrap input{border:none;outline:none;background:transparent;padding:10px 0;font-size:13px;font-family:'Inter',sans-serif;color:var(--ink);width:100%}
+.res-toolbar .search-wrap input::placeholder{color:var(--ink-4)}
+.res-toolbar .filter-group{display:flex;gap:5px;flex-wrap:wrap}
+.res-toolbar .filter-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--line);background:var(--surface);font-size:12px;font-family:'Inter',sans-serif;font-weight:500;cursor:pointer;transition:all .2s var(--ease);color:var(--ink-3)}
+.res-toolbar .filter-btn:hover{border-color:var(--ink-4);color:var(--ink-2)}
+.res-toolbar .filter-btn.active{background:var(--warm-soft);color:var(--warm);border-color:rgba(196,122,58,0.2)}
+.res-toolbar .fav-btn{padding:6px 14px;border-radius:20px;border:1px solid var(--line);background:var(--surface);font-size:12px;font-family:'Inter',sans-serif;font-weight:500;cursor:pointer;transition:all .2s var(--ease);color:var(--ink-3);display:flex;align-items:center;gap:5px}
+.res-toolbar .fav-btn:hover{border-color:var(--ink-4);color:var(--ink-2)}
+.res-toolbar .fav-btn.active{background:var(--warm-soft);color:var(--warm);border-color:rgba(196,122,58,0.2)}
+.res-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;animation:emerge .5s var(--ease) .1s both}
+.res-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;transition:all .25s var(--ease);animation:emerge .5s var(--ease);cursor:pointer}
+.res-card:nth-child(2){animation-delay:.04s}.res-card:nth-child(3){animation-delay:.08s}.res-card:nth-child(4){animation-delay:.12s}.res-card:nth-child(5){animation-delay:.16s}.res-card:nth-child(6){animation-delay:.2s}
+.res-card:hover{border-color:var(--ink-4);transform:translateY(-2px);box-shadow:var(--shadow-sm)}
+.res-card:active{transform:translateY(0);box-shadow:none}
+.res-card .rc-head{padding:16px 20px 0;display:flex;align-items:flex-start;gap:12px}
+.res-card .rc-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.res-card .rc-icon svg{width:18px;height:18px}
+.res-card .rc-icon.knowledge{background:var(--info-soft);color:var(--info)}
+.res-card .rc-icon.code{background:var(--success-soft);color:var(--success)}
+.res-card .rc-icon.mindmap{background:rgba(139,92,246,0.08);color:#7c3aed}
+.res-card .rc-icon.exercise{background:var(--warm-soft);color:var(--warm)}
+.res-card .rc-title-group{flex:1;min-width:0}
+.res-card .rc-title{font-size:15px;color:var(--ink);font-weight:600;line-height:1.3;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'Newsreader',serif}
+.res-card .rc-kp{font-size:11.5px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.res-card .rc-actions{display:flex;gap:2px;flex-shrink:0}
+.res-card .rc-action{width:30px;height:30px;border-radius:7px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;color:var(--ink-4)}
+.res-card .rc-action:hover{background:var(--accent-soft);color:var(--ink-2)}
+.res-card .rc-action.fav-active{color:var(--warm)}
+.res-card .rc-action.fav-active svg{fill:var(--warm)}
+.res-card .rc-action.delete:hover{background:var(--danger-soft);color:var(--danger)}
+.res-card .rc-body{padding:12px 20px 0}
+.res-card .rc-preview{font-size:12.5px;color:var(--ink-3);line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.res-card .rc-foot{padding:12px 20px 16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.res-card .rc-type-tag{padding:3px 10px;border-radius:7px;font-size:10.5px;font-weight:600}
+.res-card .rc-type-tag.knowledge{background:var(--info-soft);color:var(--info)}
+.res-card .rc-type-tag.code{background:var(--success-soft);color:var(--success)}
+.res-card .rc-type-tag.mindmap{background:rgba(139,92,246,0.08);color:#7c3aed}
+.res-card .rc-type-tag.exercise{background:var(--warm-soft);color:var(--warm)}
+.res-card .rc-meta{font-size:11px;color:var(--ink-4);margin-left:auto;display:flex;align-items:center;gap:4px}
+.res-card .rc-meta svg{width:12px;height:12px}
+.res-stats{display:flex;gap:10px;margin-bottom:20px;animation:emerge .5s var(--ease)}
+.res-stats .rs-card{padding:14px 20px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);display:flex;align-items:center;gap:12px}
+.res-stats .rs-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.res-stats .rs-icon svg{width:16px;height:16px}
+.res-stats .rs-icon.warm{background:var(--warm-soft);color:var(--warm)}
+.res-stats .rs-icon.green{background:var(--success-soft);color:var(--success)}
+.res-stats .rs-icon.info{background:var(--info-soft);color:var(--info)}
+.res-stats .rs-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:400;color:var(--ink);line-height:1}
+.res-stats .rs-label{font-size:11px;color:var(--ink-4);margin-top:2px}
+@media(max-width:1100px){.res-grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}.res-stats{flex-wrap:wrap}}
+@media(max-width:768px){.res-grid{grid-template-columns:1fr}.res-stats{flex-direction:column}}
+
 /* ═══ PATH ═══ */
 .path-layout{display:grid;grid-template-columns:1fr 320px;gap:14px;height:calc(100vh - var(--header-h) - 56px)}
 .path-left{display:flex;flex-direction:column;gap:14px;overflow:hidden}
