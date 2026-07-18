@@ -4,7 +4,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, text, update as sql_update
 
 from app.core.database import async_session
 from app.models.student import Student
@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 # 分析间隔（小时）
 ANALYSIS_INTERVAL_HOURS = 4
+
+# PostgreSQL advisory lock ID（多 worker 互斥用）
+ADVISORY_LOCK_ID = 12345
 
 
 class ScheduledAnalysisService:
@@ -57,7 +60,8 @@ class ScheduledAnalysisService:
                 # 尝试获取 advisory lock（多 worker 只有一个执行）
                 async with async_session() as db:
                     result = await db.execute(
-                        __import__("sqlalchemy").text("SELECT pg_try_advisory_lock(12345)")
+                        text("SELECT pg_try_advisory_lock(:id)"),
+                        {"id": ADVISORY_LOCK_ID},
                     )
                     got_lock = result.scalar()
                     if not got_lock:
@@ -71,7 +75,8 @@ class ScheduledAnalysisService:
                     # 释放锁
                     async with async_session() as db:
                         await db.execute(
-                            __import__("sqlalchemy").text("SELECT pg_advisory_unlock(12345)")
+                            text("SELECT pg_advisory_unlock(:id)"),
+                            {"id": ADVISORY_LOCK_ID},
                         )
                         await db.commit()
 
@@ -139,7 +144,6 @@ class ScheduledAnalysisService:
         if result.get("status") in ("updated", "no_change"):
             try:
                 async with async_session() as update_db:
-                    from sqlalchemy import update as sql_update
                     await update_db.execute(
                         sql_update(StudentProfile)
                         .where(StudentProfile.student_id == student_id)
@@ -210,7 +214,6 @@ class ScheduledAnalysisService:
             if result.get("status") in ("updated", "no_change"):
                 try:
                     async with async_session() as update_db:
-                        from sqlalchemy import update as sql_update
                         await update_db.execute(
                             sql_update(StudentProfile)
                             .where(StudentProfile.student_id == student_id)

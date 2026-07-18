@@ -162,9 +162,13 @@ export default function FinalTestPage() {
     if (!submitted) return answers[qIdx]?.selected === optIdx ? 'selected' : ''
     const ex = exercises[qIdx]
     const answer = answers[qIdx]
-    const isCorrectOpt = ex.type === 'choice'
-      ? optIdx === (ex.answer?.charCodeAt(0) ?? 65) - 65
-      : optIdx === (ex.answer === 'true' || ex.answer === '对' ? 0 : 1)
+    let isCorrectOpt = false
+    if (ex.type === 'choice') {
+      const code = ex.answer?.charCodeAt(0)
+      isCorrectOpt = code !== undefined && optIdx === code - 65
+    } else {
+      isCorrectOpt = optIdx === (ex.answer === 'true' || ex.answer === '对' ? 0 : 1)
+    }
     const isUserOpt = answer?.selected === optIdx
     if (isCorrectOpt) return 'correct-opt'
     if (isUserOpt && !isCorrectOpt) return 'wrong-opt'

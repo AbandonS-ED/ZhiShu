@@ -240,6 +240,27 @@ class EvaluationService:
         # 计算近期趋势
         trend = await self._calculate_trend(db, student_id)
 
+        # 学习路径进度（取最新一条 LearningPath 的节点完成情况）
+        from app.models.study_plan import LearningPath
+        latest_path_result = await db.execute(
+            select(LearningPath.nodes)
+            .where(LearningPath.student_id == uuid.UUID(student_id))
+            .order_by(LearningPath.updated_at.desc())
+            .limit(1)
+        )
+        latest_nodes = latest_path_result.scalar() or []
+        if isinstance(latest_nodes, str):
+            try:
+                latest_nodes = json.loads(latest_nodes)
+            except Exception:
+                latest_nodes = []
+        total_nodes = len(latest_nodes) if isinstance(latest_nodes, list) else 0
+        completed_nodes = (
+            sum(1 for n in latest_nodes if isinstance(n, dict) and n.get("status") == "completed")
+            if isinstance(latest_nodes, list)
+            else 0
+        )
+
         # 尝试用 LLM 生成报告，失败则降级到规则引擎
         llm_report = await self._generate_llm_report(
             student_name=student_name,
