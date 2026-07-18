@@ -52,9 +52,9 @@ export default function AdminDashboardPage() {
       return
     }
     Promise.all([
-      adminApi.getStats().then(setStats).catch(() => {}),
-      adminApi.getTrends(7).then(setTrends).catch(() => {}),
-      adminApi.getUsers(1, 5).then((d) => setUsers(d.items)).catch(() => {}),
+      adminApi.getStats().then(setStats).catch(err => console.error('[admin] getStats 失败:', err)),
+      adminApi.getTrends(7).then(setTrends).catch(err => console.error('[admin] getTrends 失败:', err)),
+      adminApi.getUsers(1, 5).then((d) => setUsers(d.items)).catch(err => console.error('[admin] getUsers 失败:', err)),
     ]).finally(() => setLoading(false))
   }, [router])
 

@@ -335,9 +335,9 @@ export interface CourseProgress {
 }
 
 export const dashboardApi = {
-  getStats: (student_id: string = '00000000-0000-0000-0000-000000000001') =>
+  getStats: (student_id: string) =>
     request<DashboardStats>(`/dashboard/stats?student_id=${student_id}`),
-  getCourses: (student_id: string = '00000000-0000-0000-0000-000000000001') =>
+  getCourses: (student_id: string) =>
     request<{ courses: CourseProgress[] }>(`/dashboard/courses?student_id=${student_id}`),
 }
 

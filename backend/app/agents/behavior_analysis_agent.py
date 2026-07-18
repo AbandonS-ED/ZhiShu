@@ -216,7 +216,7 @@ class BehaviorAnalysisAgent:
         try:
             # 调用 LLM
             if get_llm_client() is None:
-                logger.warning("minimax_client not initialized, skipping analysis")
+                logger.warning("LLM client not initialized, skipping analysis")
                 return {"updates": [], "summary": "LLM未初始化，跳过分析"}
             
             response = await get_llm_client().chat(

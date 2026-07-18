@@ -226,7 +226,7 @@ export default function TikuPage() {
             resource_type: 'exercise',
             knowledge_point: data.knowledge_point || genInput.trim(),
             detail: { count: data.count || newExs.length },
-          }).catch(() => {})
+          }).catch(err => console.error('[tiku] recordAction 失败:', err))
         }
         if (e.type === 'error') {
           clearMsgQueue()
@@ -288,17 +288,19 @@ export default function TikuPage() {
       resource_type: 'exercise',
       knowledge_point: ex.knowledge_point,
       score: correct ? 100 : 0,
-    }).catch(() => {})
+    }).catch(err => console.error('[tiku] 后台上报失败:', err))
     // 使用 AI Agent 分析练习行为并更新画像
     profileApi.analyzeBehavior('exercise', {
       knowledge_point: ex.knowledge_point,
       correct: correct,
       question_type: ex.type,
-    }).catch(() => {})
+    }).catch(err => console.error('[tiku] 后台上报失败:', err))
     // 答错自动加入错题本
     if (!correct) {
+      const sid = getStudentId()
+      if (!sid) return
       wrongQuestionsApi.add({
-        student_id: getStudentId()!,
+        student_id: sid,
         exercise_id: id,
         wrong_answer: String.fromCharCode(65 + selected),
       }).then(() => {
@@ -323,17 +325,19 @@ export default function TikuPage() {
       resource_type: 'exercise',
       knowledge_point: ex.knowledge_point,
       score: correct ? 100 : 0,
-    }).catch(() => {})
+    }).catch(err => console.error('[tiku] 后台上报失败:', err))
     // 使用 AI Agent 分析练习行为并更新画像
     profileApi.analyzeBehavior('exercise', {
       knowledge_point: ex.knowledge_point,
       correct: correct,
       question_type: ex.type,
-    }).catch(() => {})
+    }).catch(err => console.error('[tiku] 后台上报失败:', err))
     // 答错自动加入错题本
     if (!correct) {
+      const sid = getStudentId()
+      if (!sid) return
       wrongQuestionsApi.add({
-        student_id: getStudentId()!,
+        student_id: sid,
         exercise_id: id,
         wrong_answer: selected ? '对' : '错',
       }).then(() => {

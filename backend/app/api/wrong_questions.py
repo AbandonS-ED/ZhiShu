@@ -20,7 +20,6 @@ from app.models.wrong_question import WrongQuestion
 from app.services.llm_factory import get_llm_client
 from app.services.json_parser import parse_json_response
 from app.agents.wrong_question_agent import wrong_question_agent, ERROR_TYPE_LABELS
-from app.agents.wrong_question_agent import wrong_question_agent
 from app.core.sse_utils import sse_event, sse_done, sse_error, sse_stream_response
 from fastapi.responses import StreamingResponse
 

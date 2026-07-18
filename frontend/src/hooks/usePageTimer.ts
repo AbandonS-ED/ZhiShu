@@ -23,7 +23,7 @@ export function usePageTimer(action: string, knowledgePoint?: string) {
           action,
           knowledge_point: knowledgePoint || action,
           duration_seconds: elapsed,
-        }).catch(() => {})
+        }).catch(err => console.error(`[usePageTimer] 上报失败 (${action}):`, err))
       } catch {
         // 静默
       }

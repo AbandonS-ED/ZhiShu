@@ -272,7 +272,7 @@ export default function PingguPage() {
         localStorage.setItem(cacheTimeKey, now)
         setLastGeneratedAt(now)
       })
-      .catch(() => {})
+      .catch(err => console.error('[pinggu] regenerateReport 失败:', err))
       .finally(() => {
         setEvalLoading(false)
         if (msgTimerRef.current) {

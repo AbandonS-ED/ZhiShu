@@ -60,7 +60,7 @@ export default function SettingPage() {
   useEffect(() => {
     const sid = getStudentId()
     if (!sid) return
-    dashboardApi.getStats(sid).then(setStats).catch(() => {})
+    dashboardApi.getStats(sid).then(setStats).catch(err => console.error('[setting] getStats 失败:', err))
   }, [])
 
   function syncLocal(student: AuthStudent) {
