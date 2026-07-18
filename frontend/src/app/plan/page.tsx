@@ -258,10 +258,10 @@ export default function PlanPage() {
       <div className={`generating-overlay ${showGenerating ? 'show' : ''}`}>
         <div className="generating-card">
           <div className="gen-spinner" />
-          <h3>正在生成学习路径</h3>
+          <h3>AI 正在规划学习路径</h3>
           <p>目标：{genTopic}</p>
           <div className="gen-steps">
-            {['分析知识图谱', '评估当前水平', '规划学习路径', '生成练习资源'].map((label, i) => (
+            {['分析主题结构', '拆分知识模块', '规划学习顺序', '生成路径详情'].map((label, i) => (
               <div key={i} className={`gen-step ${i < genStep ? 'done' : i === genStep ? 'active' : 'waiting'}`}>
                 <div className="gs-dot" />
                 {label}

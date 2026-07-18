@@ -792,4 +792,17 @@ export const studyPlanApi = {
     request<{ success: boolean; message: string }>(`/study-plan/paths/${pathId}/nodes/${nodeId}/complete`, {
       method: 'POST',
     }),
+
+  // 生成学习指引（LearningGuideAgent专用）
+  learningGuide: (data: { knowledge_point: string; path_context?: string }) =>
+    request<{ success: boolean; data: {
+      what_to_learn: string
+      learning_goals: string[]
+      key_points: { title: string; description: string }[]
+      prerequisites: string[]
+      estimated_time: string
+    } }>('/study-plan/learning-guide', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 }

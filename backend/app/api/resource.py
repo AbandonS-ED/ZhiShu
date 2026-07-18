@@ -73,7 +73,7 @@ class ExerciseGenerateRequest(BaseModel):
     knowledge_point: str
     count: int = 5
     exercise_type: str = "all"
-    types: List[str] = Field(default_factory=lambda: ["choice", "judge", "short_answer"])
+    types: List[str] = Field(default_factory=lambda: ["choice", "short_answer"])
 
     @field_validator("student_id")
     @classmethod

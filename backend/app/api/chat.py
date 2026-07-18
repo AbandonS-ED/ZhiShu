@@ -217,7 +217,7 @@ async def _handle_single_agent_stream(
     intent: str, last_msg: str, student_profile, session, db, student_id: str
 ):
     """document/mindmap/exercise/path/audio 意图：直接调用 Agent 实现真流式"""
-    from app.agents.document_agent import document_agent
+    from app.agents.document_agent import document_agent, SYSTEM_PROMPT_DEEP
     from app.agents.mindmap_agent import mindmap_agent
     from app.agents.exercise_agent import exercise_agent
     from app.services.llm_factory import get_llm_client
@@ -238,12 +238,12 @@ async def _handle_single_agent_stream(
         # 文档生成：流式返回
         yield f"data: {json.dumps({'type': 'progress', 'progress': 0.3, 'message': '正在生成学习文档...'}, ensure_ascii=False)}\n\n"
 
-        prompt = document_agent._build_prompt(kp, student_profile, "all")
+        prompt = document_agent._build_prompt(kp, student_profile, "all", "default")
         stream_text = ""
         prev_display_len = 0
         async for token in get_llm_client().chat_stream(
             messages=[{"role": "user", "content": prompt}],
-            system=document_agent.SYSTEM_PROMPT,
+            system=SYSTEM_PROMPT_DEEP,
             max_tokens=4096,
             temperature=0.7,
         ):
