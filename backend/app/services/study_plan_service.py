@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.study_plan import StudyPlan, StudyPlanStep, LearningPath
 from app.models.student_profile import StudentProfile
 from app.services.llm_factory import get_llm_client
+from app.services.json_parser import parse_json_response
 from app.agents.learning_path_agent import learning_path_agent
 
 logger = logging.getLogger(__name__)
@@ -464,22 +465,15 @@ class StudyPlanService:
             ]
             
             response = await llm.chat(messages, max_tokens=2000, temperature=0.7)
-            
-            # 解析响应
+
+            # 解析响应（统一用 parse_json_response，支持 think 标签/裸数组/JSON 代码块）
             content = response.get("content", "")
-            
-            # 尝试提取JSON
-            try:
-                # 查找JSON块
-                json_start = content.find("{")
-                json_end = content.rfind("}") + 1
-                if json_start >= 0 and json_end > json_start:
-                    json_str = content[json_start:json_end]
-                    plan_data = json.loads(json_str)
-                    return plan_data
-            except json.JSONDecodeError as e:
-                logger.warning("学习计划 JSON 解析失败，使用 fallback: %s", e)
-            
+            plan_data = parse_json_response(content)
+
+            # 检查解析结果是否有效（必须有 steps/title 等字段）
+            if plan_data and (plan_data.get("steps") or plan_data.get("title")):
+                return plan_data
+
             # 如果解析失败，返回默认计划
             return self._get_default_plan(knowledge_point, difficulty)
             

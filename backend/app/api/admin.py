@@ -440,14 +440,15 @@ async def get_agents(
     agents = agent_metrics.get_all()
 
     # 获取系统资源
+    cpu = 0.0
+    mem_mb = 0.0
     try:
         import psutil
         cpu = psutil.cpu_percent(interval=0.1)
         proc = psutil.Process()
         mem_mb = proc.memory_info().rss / 1024 / 1024
-    except ImportError:
-        cpu = 0.0
-        mem_mb = 0.0
+    except Exception as e:
+        logger.warning("psutil 获取系统资源失败: %s", e)
 
     return {
         "agents": agents,

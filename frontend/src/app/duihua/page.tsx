@@ -58,13 +58,6 @@ interface Session {
 
 const SESSION_STORAGE_KEY = 'zhishu_chat_session'
 
-const defaultSuggestions = [
-  { text: '讲解 A* 搜索算法的原理', tag: '搜索', tagClass: 'tag-info' },
-  { text: 'CNN 卷积神经网络原理', tag: 'CV', tagClass: 'tag-green' },
-  { text: '监督学习 vs 无监督学习', tag: 'ML', tagClass: 'tag-dark' },
-  { text: '出 5 道搜索算法练习题', tag: '练习', tagClass: 'tag-warm' },
-]
-
 export default function DuihuaPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')

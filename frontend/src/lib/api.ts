@@ -244,10 +244,6 @@ export const exerciseApi = {
         }),
       }
     ),
-  list: (student_id: string) =>
-    request<Array<Exercise & { created_at: string }>>(
-      `/resource/exercises/${student_id}`
-    ),
 }
 
 // ===== Scoring =====
@@ -357,12 +353,6 @@ export const resourceApi = {
 
   createManual: (data: ManualCreateRequest) =>
     request<ResourceItem>('/resource/create/manual', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  review: (data: ReviewRequest) =>
-    request<ReviewResult>('/resource/review', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -519,11 +509,6 @@ export const authApi = {
     request<{ message: string }>('/auth/send-code', {
       method: 'POST',
       body: JSON.stringify({ phone }),
-    }),
-  verifyCode: (phone: string, code: string) =>
-    request<{ message: string }>('/auth/verify-code', {
-      method: 'POST',
-      body: JSON.stringify({ phone, code }),
     }),
   getMe: () => request<AuthStudent>('/auth/me', { method: 'GET' }),
   updateMe: (data: { name?: string; email?: string; major?: string; grade?: string }) =>
@@ -791,33 +776,6 @@ export interface LearningPath {
 }
 
 export const studyPlanApi = {
-  // 创建学习计划
-  create: (data: { knowledge_point: string; difficulty?: string; prerequisites?: string[] }) =>
-    request<{ success: boolean; data: StudyPlan }>('/study-plan/create', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  // 获取学习计划列表
-  list: (status?: string) => {
-    const params = status ? `?status=${status}` : ''
-    return request<{ success: boolean; data: StudyPlan[] }>(`/study-plan/list${params}`)
-  },
-
-  // 获取学习计划详情
-  get: (planId: string) =>
-    request<{ success: boolean; data: StudyPlan }>(`/study-plan/${planId}`),
-
-  // 完成学习步骤
-  completeStep: (planId: string, stepId: string) =>
-    request<{ success: boolean; data: { completed_steps: number; total_steps: number; all_completed: boolean; plan_status: string } }>(
-      `/study-plan/${planId}/complete-step`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ step_id: stepId }),
-      }
-    ),
-
   // 生成学习路径
   generatePath: (data: { target_knowledge: string; current_level?: string }) =>
     request<{ success: boolean; data: LearningPath }>('/study-plan/generate-path', {

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, cast, Date, text
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.action_types import ACTION_MAP
 from app.models.student import Student
 
 from app.models.chat_message import ChatMessage
@@ -100,6 +101,20 @@ async def get_dashboard_stats(
 
     recent_resources = []
 
+    # 1.5 实际计算练习正确率（avg_score）— 取近 30 天 score 非空且 action=exercise 的平均分
+    avg_score_q = await db.execute(
+        select(func.avg(LearningRecord.score))
+        .where(
+            LearningRecord.student_id == sid,
+            LearningRecord.action == 'exercise',
+            LearningRecord.score.isnot(None),
+            LearningRecord.created_at >= thirty_days_ago,
+        )
+    )
+    avg_score_raw = avg_score_q.scalar()
+    if avg_score_raw is not None:
+        avg_score = round(float(avg_score_raw), 1)
+
     # 2. 最近聊天消息
     session_ids_result = await db.execute(
         select(ChatSession.id).where(ChatSession.student_id == sid)
@@ -143,28 +158,6 @@ async def get_dashboard_stats(
             "time": m.created_at.isoformat() if m.created_at else "",
             "color": "#8a9ba8",
         })
-
-    ACTION_MAP = {
-        "view":         {"type": "resource",  "title": "浏览资源",       "color": "#059669"},
-        "complete":     {"type": "resource",  "title": "完成学习",       "color": "#10B981"},
-        "generate":     {"type": "resource",  "title": "生成资源",       "color": "#059669"},
-        "exercise":     {"type": "exercise",  "title": "做练习题",       "color": "#F59E0B"},
-        "study_session_start": {"type": "study", "title": "开始自习",    "color": "#6366F1"},
-        "study_patrol": {"type": "study",      "title": "自习巡查",      "color": "#6366F1"},
-        "study_session_end":   {"type": "study", "title": "结束自习",    "color": "#6366F1"},
-        "path":         {"type": "path",       "title": "生成学习路径",  "color": "#10B981"},
-        "profile":      {"type": "profile",    "title": "更新学习画像",  "color": "#EC4899"},
-        "chat":         {"type": "chat",       "title": "智能对话",      "color": "#8a9ba8"},
-        "evaluation":   {"type": "resource",   "title": "评估学习",      "color": "#F59E0B"},
-        "resource":     {"type": "resource",   "title": "学习资源",      "color": "#059669"},
-        "assessment":   {"type": "profile",    "title": "画像评估",      "color": "#EC4899"},
-        "study_focus":  {"type": "study",      "title": "专注自习",      "color": "#6366F1"},
-        "like":         {"type": "chat",       "title": "对话反馈",      "color": "#8a9ba8"},
-        "dislike":      {"type": "chat",       "title": "对话反馈",      "color": "#8a9ba8"},
-        "learn_complete":    {"type": "resource", "title": "完成学习",   "color": "#10B981"},
-        "practice_complete": {"type": "exercise", "title": "完成练习",   "color": "#F59E0B"},
-        "review_complete":   {"type": "resource", "title": "完成复习",   "color": "#10B981"},
-    }
 
     for rec in recent_records:
         meta = ACTION_MAP.get(rec.action)

@@ -31,8 +31,13 @@ class LearningPathAgent:
             if student_profile:
                 dims = student_profile.get("dimensions", {})
                 if dims:
-                    weak = [k for k, v in dims.items() if v < 50]
-                    strong = [k for k, v in dims.items() if v >= 70]
+                    # dims 可能是 {k: int} 或 {k: {score: int, ...}}，统一取出 score
+                    def _score(v):
+                        if isinstance(v, dict):
+                            return v.get("score", 0)
+                        return v if isinstance(v, (int, float)) else 0
+                    weak = [k for k, v in dims.items() if _score(v) < 50]
+                    strong = [k for k, v in dims.items() if _score(v) >= 70]
                     if weak:
                         profile_info += f"学生薄弱点: {', '.join(weak)}\n"
                     if strong:

@@ -288,7 +288,8 @@ export default function StudyPage() {
   async function finishSession(completed: boolean) {
     const studentId = getStudentId()
     if (!studentId) {
-      setPhase('report')
+      showToast('登录已过期，请重新登录')
+      router.push('/login')
       return
     }
     const intervalSec = INTERVAL_SEC[difficulty]
