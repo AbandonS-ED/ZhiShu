@@ -14,7 +14,7 @@ const HIDDEN_KEY = 'zhishu_hidden_exercises'
 // 与 api.ts / types/index.ts 保持一致
 interface Exercise {
   exercise_id: string
-  type: 'choice' | 'short_answer'
+  type: 'choice' | 'judge' | 'short_answer' | 'coding'
   question: string
   options?: string[]
   answer?: string
@@ -38,11 +38,11 @@ interface RecentItem {
 }
 
 function getTypeLabel(type: string) {
-  return { choice: '选择题', short_answer: '简答题' }[type] || type
+  return { choice: '选择题', judge: '判断题', short_answer: '简答题', coding: '编程题' }[type] || type
 }
 
 function getTypeClass(type: string) {
-  return { choice: 'type-choice', short_answer: 'type-short' }[type] || ''
+  return { choice: 'type-choice', judge: 'type-judge', short_answer: 'type-short', coding: 'type-code' }[type] || ''
 }
 
 function getDiffLabel(d?: number) {
@@ -648,7 +648,7 @@ export default function TikuPage() {
         <div className="ex-main">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <div className="ex-tabs">
-              {(['all', 'choice', 'short_answer'] as const).map((t) => (
+              {(['all', 'choice', 'judge', 'short_answer', 'coding'] as const).map((t) => (
                 <button
                   key={t}
                   className={`ex-tab${tab === t ? ' active' : ''}`}
@@ -772,9 +772,6 @@ export default function TikuPage() {
                           <strong>参考答案：</strong>{ex.answer}
                         </div>
                       )}
-                      {ex.explanation}
-                    </div>
-                  )}
                       {ex.explanation}
                     </div>
                   )}
