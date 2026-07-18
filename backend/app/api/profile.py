@@ -14,6 +14,8 @@ from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.agents.initial_assessment_agent import initial_assessment_agent
 from app.agents.behavior_analysis_agent import behavior_analysis_agent
+from app.services.profile_service import apply_rule_updates, merge_and_save_assessment
+from sqlalchemy.orm.attributes import flag_modified
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -93,40 +95,14 @@ async def assess_stream(
                     ) if dims else False
 
                     if has_valid_dims:
-                        # 在 generator 内部创建新的数据库会话
+                        # 通过统一写入层合并维度（保留高置信度）
                         async with db_async_session() as db:
-                            # 获取或创建 profile
-                            profile_result = await db.execute(
-                                select(StudentProfile).where(StudentProfile.student_id == current_user.id)
+                            await merge_and_save_assessment(
+                                db=db,
+                                student_id=str(current_user.id),
+                                new_dims=dims,
+                                assessment_status="completed" if is_done else "in_progress",
                             )
-                            profile = profile_result.scalar_one_or_none()
-
-                            if profile:
-                                # 更新现有 profile（合并维度，保留高置信度的分数）
-                                old_dims = profile.dimensions or {}
-                                merged_dims = {}
-                                # 合并所有7个维度
-                                all_dims = set(list(old_dims.keys()) + list(dims.keys()))
-                                for dim_key in all_dims:
-                                    old_dim = old_dims.get(dim_key, {})
-                                    new_dim = dims.get(dim_key, {})
-                                    old_conf = old_dim.get("confidence", 0)
-                                    new_conf = new_dim.get("confidence", 0)
-                                    # 保留置信度更高的数据
-                                    if new_conf >= old_conf:
-                                        merged_dims[dim_key] = new_dim
-                                    else:
-                                        merged_dims[dim_key] = old_dim
-                                profile.dimensions = merged_dims
-                                profile.assessment_status = "completed" if is_done else "in_progress"
-                            else:
-                                profile = StudentProfile(
-                                    student_id=current_user.id,
-                                    dimensions=dims,
-                                    assessment_status="completed" if is_done else "in_progress",
-                                )
-                                db.add(profile)
-                            await db.commit()
 
                 except Exception as e:
                     logger.error(f"Failed to save profile: {e}")
@@ -196,15 +172,16 @@ async def reset_profile(
 
     if profile:
         profile.dimensions = {
-            "comprehension": {"score": 0, "confidence": 0},
-            "memory": {"score": 0, "confidence": 0},
-            "application": {"score": 0, "confidence": 0},
-            "imagination": {"score": 0, "confidence": 0},
-            "focus": {"score": 0, "confidence": 0},
-            "knowledge_base": {"score": 0, "confidence": 0},
-            "learning_goal": {"score": 0, "confidence": 0},
-        }
+                "comprehension": {"score": 0, "confidence": 0},
+                "memory": {"score": 0, "confidence": 0},
+                "application": {"score": 0, "confidence": 0},
+                "imagination": {"score": 0, "confidence": 0},
+                "focus": {"score": 0, "confidence": 0},
+                "knowledge_base": {"score": 0, "confidence": 0},
+                "learning_goal": {"score": 0, "confidence": 0},
+            }
         profile.assessment_status = "pending"
+        flag_modified(profile, "dimensions")
         await db.commit()
     else:
         profile = StudentProfile(
@@ -285,6 +262,7 @@ async def update_background(
 
     if profile:
         profile.background = req.background
+        flag_modified(profile, "background")
     else:
         profile = StudentProfile(
             student_id=current_user.id,
@@ -320,72 +298,62 @@ async def update_profile_by_behavior(
     db: AsyncSession = Depends(get_db),
 ):
     """根据学习行为自动更新画像（随学随新）"""
-    result = await db.execute(
-        select(StudentProfile).where(StudentProfile.student_id == current_user.id)
-    )
-    profile = result.scalar_one_or_none()
+    rule_updates = []
 
-    if not profile:
-        return {"status": "ok", "message": "无画像数据，跳过更新"}
-
-    dims = profile.dimensions or {}
-    updated = False
-
-    # 根据行为数据更新维度
     if req.exercise_correct_rate is not None:
         rule = UPDATE_RULES["exercise_correct_rate"]
-        dim = dims.get(rule["dimension"], {"score": 50, "confidence": 0.5})
-        old_score = dim.get("score", 50)
         if req.exercise_correct_rate >= rule["high_threshold"]:
-            new_score = min(100, old_score + rule["high_boost"])
-            dim["score"] = new_score
-            dim["confidence"] = min(1.0, dim.get("confidence", 0.5) + 0.05)
-            updated = True
+            rule_updates.append({
+                "dimension": rule["dimension"],
+                "score_change": rule["high_boost"],
+                "reason": f"正确率{req.exercise_correct_rate:.0%}>{rule['high_threshold']:.0%}",
+            })
         elif req.exercise_correct_rate <= rule["low_threshold"]:
-            new_score = max(0, old_score + rule["low_reduce"])
-            dim["score"] = new_score
-            dim["confidence"] = min(1.0, dim.get("confidence", 0.5) + 0.05)
-            updated = True
-        dims[rule["dimension"]] = dim
+            rule_updates.append({
+                "dimension": rule["dimension"],
+                "score_change": rule["low_reduce"],
+                "reason": f"正确率{req.exercise_correct_rate:.0%}<{rule['low_threshold']:.0%}",
+            })
 
     if req.resource_access_count is not None:
         rule = UPDATE_RULES["resource_access_count"]
-        dim = dims.get(rule["dimension"], {"score": 50, "confidence": 0.5})
-        old_score = dim.get("score", 50)
         if req.resource_access_count >= rule["high_threshold"]:
-            new_score = min(100, old_score + rule["high_boost"])
-            dim["score"] = new_score
-            dim["confidence"] = min(1.0, dim.get("confidence", 0.5) + 0.05)
-            updated = True
+            rule_updates.append({
+                "dimension": rule["dimension"],
+                "score_change": rule["high_boost"],
+                "reason": f"资源访问{req.resource_access_count}次>{rule['high_threshold']}次",
+            })
         elif req.resource_access_count <= rule["low_threshold"]:
-            new_score = max(0, old_score + rule["low_reduce"])
-            dim["score"] = new_score
-            dim["confidence"] = min(1.0, dim.get("confidence", 0.5) + 0.05)
-            updated = True
-        dims[rule["dimension"]] = dim
+            rule_updates.append({
+                "dimension": rule["dimension"],
+                "score_change": rule["low_reduce"],
+                "reason": f"资源访问{req.resource_access_count}次<{rule['low_threshold']}次",
+            })
 
     if req.study_duration is not None:
         rule = UPDATE_RULES["study_duration"]
-        dim = dims.get(rule["dimension"], {"score": 50, "confidence": 0.5})
-        old_score = dim.get("score", 50)
         if req.study_duration >= rule["high_threshold"]:
-            new_score = min(100, old_score + rule["high_boost"])
-            dim["score"] = new_score
-            dim["confidence"] = min(1.0, dim.get("confidence", 0.5) + 0.05)
-            updated = True
+            rule_updates.append({
+                "dimension": rule["dimension"],
+                "score_change": rule["high_boost"],
+                "reason": f"学习时长{req.study_duration}分钟>{rule['high_threshold']}分钟",
+            })
         elif req.study_duration <= rule["low_threshold"]:
-            new_score = max(0, old_score + rule["low_reduce"])
-            dim["score"] = new_score
-            dim["confidence"] = min(1.0, dim.get("confidence", 0.5) + 0.05)
-            updated = True
-        dims[rule["dimension"]] = dim
+            rule_updates.append({
+                "dimension": rule["dimension"],
+                "score_change": rule["low_reduce"],
+                "reason": f"学习时长{req.study_duration}分钟<{rule['low_threshold']}分钟",
+            })
 
-    if updated:
-        profile.dimensions = dims
-        await db.commit()
-        logger.info(f"[profile] Updated profile for user {current_user.id} based on behavior")
+    updated = 0
+    if rule_updates:
+        updated = await apply_rule_updates(
+            db=db,
+            student_id=str(current_user.id),
+            rule_updates=rule_updates,
+        )
 
-    return {"status": "ok", "message": "画像已更新", "updated": updated}
+    return {"status": "ok", "message": "画像已更新", "updated": updated > 0}
 
 
 class AnalyzeBehaviorRequest(BaseModel):

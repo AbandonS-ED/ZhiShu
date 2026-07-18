@@ -11,6 +11,7 @@ from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
 from app.models.learning_record import LearningRecord
 from app.services.llm_factory import get_llm_client
+from app.services.profile_service import apply_llm_updates
 from app.core.profile_dimensions import DIM_CN
 
 logger = logging.getLogger(__name__)
@@ -67,9 +68,14 @@ class BehaviorAnalysisAgent:
             current_dims=profile.dimensions or {},
         )
         
-        # 4. 应用更新
+        # 4. 应用更新（通过统一写入层，per-student 锁防并发）
         if analysis.get("updates"):
-            updated = await self._apply_updates(db, profile, analysis["updates"])
+            updated = await apply_llm_updates(
+                db=db,
+                student_id=student_id,
+                updates=analysis["updates"],
+                source=behavior_type,
+            )
             return {
                 "status": "updated",
                 "updates": analysis["updates"],
@@ -258,47 +264,6 @@ class BehaviorAnalysisAgent:
             logger.error(f"Failed to parse analysis: {e}, content: {content}")
             return {"updates": [], "summary": "解析失败"}
 
-    async def _apply_updates(
-        self, db: AsyncSession, profile: StudentProfile, updates: list
-    ) -> int:
-        """应用维度更新"""
-        dims = profile.dimensions or {}
-        updated_count = 0
-        
-        for update in updates:
-            dim_key = update.get("dimension")
-            score_change = update.get("score_change", 0)
-            reason = update.get("reason", "")
-            
-            if not dim_key or score_change == 0:
-                continue
-            
-            # 获取当前维度
-            dim = dims.get(dim_key, {"score": 50, "confidence": 0.5})
-            old_score = dim.get("score", 50)
-            
-            # 应用变化（限制范围 0-100）
-            new_score = max(0, min(100, old_score + score_change))
-            
-            # 更新置信度
-            old_conf = dim.get("confidence", 0.5)
-            new_conf = min(1.0, old_conf + 0.02)
-            
-            dim["score"] = new_score
-            dim["confidence"] = new_conf
-            dims[dim_key] = dim
-            
-            updated_count += 1
-            logger.info(
-                f"[behavior_agent] Updated {dim_key}: {old_score} -> {new_score} "
-                f"(change: {score_change:+d}, reason: {reason})"
-            )
-        
-        if updated_count > 0:
-            profile.dimensions = dims
-            await db.commit()
-        
-        return updated_count
 
 
 # 单例

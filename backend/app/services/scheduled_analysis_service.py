@@ -49,12 +49,32 @@ class ScheduledAnalysisService:
         logger.info("[scheduled_analysis] Stopped")
 
     async def _run_loop(self):
-        """主循环"""
+        """主循环（PostgreSQL advisory lock 保证多 worker 只有一个执行）"""
         # 启动后延迟 30 秒再跑第一次分析，避免和用户 API 请求抢资源
         await asyncio.sleep(30)
         while self._running:
             try:
-                await self._analyze_all_students()
+                # 尝试获取 advisory lock（多 worker 只有一个执行）
+                async with async_session() as db:
+                    result = await db.execute(
+                        __import__("sqlalchemy").text("SELECT pg_try_advisory_lock(12345)")
+                    )
+                    got_lock = result.scalar()
+                    if not got_lock:
+                        logger.debug("[scheduled_analysis] Another worker holds the lock, skipping")
+                        await asyncio.sleep(ANALYSIS_INTERVAL_HOURS * 3600)
+                        continue
+
+                try:
+                    await self._analyze_all_students()
+                finally:
+                    # 释放锁
+                    async with async_session() as db:
+                        await db.execute(
+                            __import__("sqlalchemy").text("SELECT pg_advisory_unlock(12345)")
+                        )
+                        await db.commit()
+
             except Exception as e:
                 logger.error(f"[scheduled_analysis] Error in analysis loop: {e}")
 
@@ -106,7 +126,7 @@ class ScheduledAnalysisService:
             logger.debug(f"[scheduled_analysis] Skipping {student_id}, no new behavior")
             return
 
-        # 调用 AI Agent 分析
+        # 调用 AI Agent 分析（内部通过 profile_service 写入，自带锁）
         logger.info(f"[scheduled_analysis] Analyzing student {student_id}")
         result = await behavior_analysis_agent.analyze_and_update(
             db=db,
@@ -115,11 +135,19 @@ class ScheduledAnalysisService:
             behavior_data={"analysis_type": "periodic"},
         )
 
-        # 更新最后分析时间
+        # 更新最后分析时间（用独立 session，因为 apply_llm_updates 已 commit）
         if result.get("status") in ("updated", "no_change"):
-            profile.last_analyzed_at = datetime.now(timezone.utc)
-            await db.commit()
-            logger.info(f"[scheduled_analysis] Updated last_analyzed_at for {student_id}")
+            try:
+                async with async_session() as update_db:
+                    from sqlalchemy import update as sql_update
+                    await update_db.execute(
+                        sql_update(StudentProfile)
+                        .where(StudentProfile.student_id == student_id)
+                        .values(last_analyzed_at=datetime.now(timezone.utc))
+                    )
+                    await update_db.commit()
+            except Exception as e:
+                logger.warning(f"[scheduled_analysis] Failed to update last_analyzed_at: {e}")
 
         return result
 
@@ -178,11 +206,19 @@ class ScheduledAnalysisService:
                 behavior_data={"analysis_type": "forced"},
             )
 
-            # 更新最后分析时间
-            profile = await self._get_profile(db, student_id)
-            if profile:
-                profile.last_analyzed_at = datetime.now(timezone.utc)
-                await db.commit()
+            # 更新最后分析时间（独立 session）
+            if result.get("status") in ("updated", "no_change"):
+                try:
+                    async with async_session() as update_db:
+                        from sqlalchemy import update as sql_update
+                        await update_db.execute(
+                            sql_update(StudentProfile)
+                            .where(StudentProfile.student_id == student_id)
+                            .values(last_analyzed_at=datetime.now(timezone.utc))
+                        )
+                        await update_db.commit()
+                except Exception as e:
+                    logger.warning(f"[scheduled_analysis] Failed to update last_analyzed_at: {e}")
 
             return result
 

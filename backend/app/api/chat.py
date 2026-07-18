@@ -27,104 +27,6 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-# ====================================================================
-# 画像自动更新 — 基于对话内容分析学习行为
-# ====================================================================
-
-async def _update_profile_by_conversation(
-    db: AsyncSession,
-    student_id: str,
-    user_message: str,
-    assistant_response: str,
-    intent: str,
-):
-    """基于对话内容自动更新画像（AI Agent 分析）"""
-    # 1. 获取画像
-    result = await db.execute(
-        select(StudentProfile).where(StudentProfile.student_id == uuid.UUID(student_id))
-    )
-    profile = result.scalar_one_or_none()
-    if not profile or not profile.dimensions:
-        return
-
-    dims = profile.dimensions
-    
-    # 2. 构建分析提示
-    dims_text = ""
-    for dim_key, dim_val in dims.items():
-        if isinstance(dim_val, dict):
-            score = dim_val.get("score", 50)
-            conf = dim_val.get("confidence", 0.5)
-            dims_text += f"- {dim_key}: {score}分 (置信度{conf:.0%})\n"
-
-    analysis_prompt = f"""分析以下对话，判断学生能力维度的变化。
-
-当前画像:
-{dims_text}
-
-学生消息: {user_message[:200]}
-AI回复摘要: {assistant_response[:200]}
-对话意图: {intent}
-
-请输出 JSON（只输出 JSON，不要其他内容）:
-{{"updates": [{{"dimension": "xxx", "change": 5, "reason": "原因"}}]}}
-
-规则:
-- dimension: comprehension/memory/application/imagination/focus/knowledge_base/learning_goal
-- change: -5 到 +5 的整数
-- 只输出有明显变化的维度
-- 如果没有明显变化，输出 {{"updates": []}}"""
-
-    try:
-        # 3. 调用 LLM 分析
-        response = await get_llm_client().chat(
-            messages=[{"role": "user", "content": analysis_prompt}],
-            temperature=0.2,
-            max_tokens=300,
-        )
-        
-        content = response.get("content", "")
-        
-        # 4. 解析结果
-        json_match = content.find("{")
-        if json_match >= 0:
-            json_str = content[json_match:]
-            # 找到 JSON 结束位置
-            end_match = json_str.rfind("}")
-            if end_match >= 0:
-                json_str = json_str[:end_match + 1]
-                data = json.loads(json_str)
-                updates = data.get("updates", [])
-                
-                # 5. 应用更新
-                updated_count = 0
-                for update in updates:
-                    dim_key = update.get("dimension")
-                    change = update.get("change", 0)
-                    reason = update.get("reason", "")
-                    
-                    if not dim_key or change == 0:
-                        continue
-                    
-                    dim = dims.get(dim_key, {"score": 50, "confidence": 0.5})
-                    old_score = dim.get("score", 50)
-                    new_score = max(0, min(100, old_score + change))
-                    
-                    if new_score != old_score:
-                        dim["score"] = new_score
-                        dim["confidence"] = min(1.0, dim.get("confidence", 0.5) + 0.01)
-                        dims[dim_key] = dim
-                        updated_count += 1
-                        logger.info(f"[auto_update] {dim_key}: {old_score} -> {new_score} ({reason})")
-                
-                if updated_count > 0:
-                    profile.dimensions = dims
-                    await db.commit()
-                    logger.info(f"[auto_update] 画像已更新 {updated_count} 个维度")
-                    
-    except Exception as e:
-        logger.warning(f"[auto_update] LLM 分析失败: {e}")
-
 # 流式专用 system prompt — 让 LLM 先输出人类可读文本，末尾跟 JSON
 STREAM_EXERCISE_SYSTEM = """你是一个练习题生成器。请按以下两部分输出：
 
@@ -561,18 +463,6 @@ async def _handle_state_graph_stream(
     )
     db.add(assistant_msg)
     await db.commit()
-
-    # 异步更新画像（基于本次对话内容）
-    try:
-        await _update_profile_by_conversation(
-            db=db,
-            student_id=req.student_id,
-            user_message=req.message,
-            assistant_response=final_response,
-            intent=final_state.get("intent", ""),
-        )
-    except Exception as e:
-        logger.warning(f"画像更新失败（不影响对话）: {e}")
 
     yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
 
