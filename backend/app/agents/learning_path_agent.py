@@ -1,4 +1,4 @@
-"""学习路径生成Agent - 专门负责生成详细的学习路径"""
+"""学习路径生成Agent - 根据用户输入，AI自主分析并拆分学习路径"""
 
 import logging
 from typing import Dict, Any, List, Optional
@@ -9,11 +9,10 @@ logger = logging.getLogger(__name__)
 
 
 class LearningPathAgent:
-    """学习路径生成Agent - 生成像教材目录一样详细的学习路径"""
+    """学习路径生成Agent - AI根据用户输入自主拆分学习模块，失败时自动降级到内置学科模板"""
 
     def _parse_response(self, content: str) -> dict:
-        """解析LLM响应"""
-        # fallback 用空 dict，让 caller 走 _get_default_path(target_knowledge) 学科匹配降级
+        """解析LLM响应，fallback 用空 dict 让 caller 走 _get_default_path 降级"""
         return parse_json_response(content, {})
 
     async def generate_path(
@@ -43,100 +42,50 @@ class LearningPathAgent:
                     if strong:
                         profile_info += f"学生优势: {', '.join(strong)}\n"
             
-            system_prompt = """你是一个专业的学科课程设计专家。你的任务是为用户想要学习的内容，生成一个详细的学习目录。
+            system_prompt = """你是一个专业的学习规划师。用户会告诉你一个想学习的主题，你需要：
 
-要求：
-1. 像教材目录一样，列出该学科的具体章节和知识点
-2. 知识点名称要具体、专业，是该学科真实的内容
-3. 按照学习顺序排列，从基础到进阶
-4. 共8-15个知识点
-5. 每个知识点都要有前置依赖关系
-
-示例输出：
-
-输入："高等数学"
-输出知识点：
-- 函数的概念与性质
-- 极限的定义与计算
-- 连续与间断点
-- 导数的概念与求导法则
-- 高阶导数与隐函数求导
-- 微分中值定理
-- 导数的应用（单调性、极值、凹凸性）
-- 不定积分的概念与基本积分公式
-- 换元积分法与分部积分法
-- 定积分的概念与性质
-- 定积分的应用（面积、体积、弧长）
-- 微分方程基础
-- 多元函数的偏导数
-- 重积分
-
-输入："Python编程"
-输出知识点：
-- Python环境搭建与IDE选择
-- 变量、数据类型与运算符
-- 字符串操作与格式化
-- 列表与元组
-- 字典与集合
-- 条件语句与循环语句
-- 函数定义与参数传递
-- 模块与包的使用
-- 文件操作与异常处理
-- 面向对象编程基础
-- 类的继承与多态
-- 装饰器与生成器
-- 常用内置模块
-- 虚拟环境与项目管理
-
-输入："机器学习"
-输出知识点：
-- 机器学习概述与分类
-- 线性回归与梯度下降
-- 逻辑回归与分类问题
-- 决策树与随机森林
-- 支持向量机（SVM）
-- K近邻算法（KNN）
-- 朴素贝叶斯分类器
-- 聚类算法（K-Means）
-- 降维技术（PCA）
-- 模型评估与交叉验证
-- 特征工程与数据预处理
-- 集成学习方法
-- 神经网络基础
-- 深度学习入门
+1. **深入分析**这个主题的本质——它包含哪些核心知识模块？这些模块之间的逻辑关系是什么？
+2. **自主拆分**——不要照搬任何教材目录，而是根据这个主题的实际内容，思考一个学习者从零到掌握需要经历哪些步骤
+3. **知识点要具体**——每个节点必须是一个可独立学习的具体知识点，不能是"概述"、"基础"、"进阶"这样笼统的词
+4. **依赖关系要真实**——哪些知识必须先学才能学后面的？哪些可以并行？
+5. **数量灵活**——根据主题的复杂度决定节点数量，简单主题5-8个，复杂主题10-15个
 
 输出格式（JSON）:
 {
   "name": "学习路径名称",
-  "description": "简要描述",
+  "description": "简要描述这条路径的思路和目标",
   "nodes": [
     {
       "id": "node_1",
       "knowledge_point": "具体知识点名称",
-      "category": "所属分类",
+      "category": "所属模块",
       "order": 1,
       "status": "pending",
       "prerequisites": [],
-      "description": "一句话说明"
+      "description": "一句话说明为什么学这个、学完能做什么"
     }
   ]
 }"""
 
-            user_prompt = f"""请为"{target_knowledge}"生成详细的学习目录。
+            level_map = {
+                "beginner": "零基础",
+                "intermediate": "有一定基础",
+                "advanced": "进阶水平"
+            }
+            level_desc = level_map.get(current_level, current_level)
 
+            user_prompt = f"""我想学习：{target_knowledge}
+
+当前水平：{level_desc}
 {profile_info}
-当前水平: {current_level}
-
-要求：像教材目录一样具体，不要用"概述"、"基础"、"进阶"这样笼统的词，要用该学科真实的知识点名称。
-
-请直接输出JSON格式。"""
+请根据这个主题的实际内容，自主分析应该分成哪些知识模块来学习，按逻辑顺序排列。不要套用任何模板，要针对这个具体主题思考。"""
 
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ]
             
-            response = await llm.chat(messages, max_tokens=3000, temperature=0.7)
+            response = await llm.chat(messages, max_tokens=4096, temperature=0.7)
             content = response.get("content", "")
             
             # 解析JSON
