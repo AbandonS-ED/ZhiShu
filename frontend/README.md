@@ -1,7 +1,7 @@
 # 智枢 (SmartHub) - 前端项目
 
 > 多智能体学习资源生成系统 · 前端部分（学生端 20 页 + 管理后台 9 页 + 1 子页面）
-> 最后更新：2026-07-18（全代码库死代码清理 + 文档全量同步）
+> 最后更新：2026-07-19（代码审计 26 个修复 + wyy 分支合并 + lint + build 通过）
 
 ## 技术栈
 
@@ -9,7 +9,7 @@
 - **样式**: Tailwind CSS 3.4 + 自定义 CSS（模板 1:1 复刻）
 - **状态管理**: React useState + Context（学生端 + 管理端独立 Context）+ Zustand（setting 页）
 - **路由隔离**: `/admin` 路由前缀，独立的 RootLayout 拦截
-- **Agent**: 14 个 Agent 模块协同工作
+- **Agent**: 15 个 Agent 模块协同工作
 - **学习计划模块** (合并 wyy 分支): 输入知识点 → AI 生成学习路径 (10-15 节点) → 节点学习 → AI 测验 → 综合测试
 
 ## 项目结构
@@ -40,7 +40,7 @@ src/
 │       ├── paths/          # /admin/paths 学习路径
 │       ├── chats/          # /admin/chats 对话记录
 │       ├── documents/      # /admin/documents 知识库
-│   └── agents/         # /admin/agents Agent 监控（14 Agent 模块）
+│   └── agents/         # /admin/agents Agent 监控（15 Agent 模块）
 ├── components/
 │   ├── layout/                # 学生端 Sidebar + Header
 │   └── RobotIcon.tsx          # ⭐ 极简机器人 SVG（替换 🤖 emoji）
@@ -108,7 +108,7 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 | `/admin/paths` | 学习路径 | 表格 + DAG 详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/chats` | 对话记录 | 表格 + 对话详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/documents` | 知识库 | 表格 + 类型筛选 + **批量删除** | 硬编码 |
-| `/admin/agents` | Agent 监控 | 14 Agent 模块集群卡片 + 调用统计 + 错误率 | 硬编码 |
+| `/admin/agents` | Agent 监控 | 15 Agent 模块集群卡片 + 调用统计 + 错误率 | 硬编码 |
 
 ## 开发规范
 

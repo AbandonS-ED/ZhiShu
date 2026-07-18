@@ -4,12 +4,12 @@
 
 ## 项目简介
 
-智枢 (SmartHub) 是一个面向《人工智能导论》课程的多智能体个性化学习系统。通过 14 个 AI Agent 协同工作，为学生提供对话式学习画像评估、个性化学习资源生成、智能学习路径规划、RAG 智能辅导和效果评估等服务。
+智枢 (SmartHub) 是一个面向《人工智能导论》课程的多智能体个性化学习系统。通过 15 个 AI Agent 协同工作，为学生提供对话式学习画像评估、个性化学习资源生成、智能学习路径规划、RAG 智能辅导和效果评估等服务。
 
 ### 核心功能
 
 - **F1 对话式画像 (35%)** — 7 维学生画像评估（理解力/记忆力/应用转化/想象力/专注力/知识基础/学习目标）
-- **F2 多智能体资源生成 (45%)** — 14 Agent 协同生成学习资源（含防幻觉三层验证）
+- **F2 多智能体资源生成 (45%)** — 15 Agent 协同生成学习资源（含防幻觉三层验证）
 - **F3 学习路径规划** — DAG 可视化路径 + 每日学习计划
 - **F4 智能辅导** — RAG 问答 + 多轮对话上下文
 - **F5 效果评估** — LLM 生成评估报告 + 趋势分析
@@ -83,7 +83,7 @@ ZhiShu/
 │   └── app/
 │       ├── main.py                # 应用入口 + 路由注册
 │       ├── api/                   # 11 个路由模块 (69 端点)
-│       ├── agents/                # 14 个 Agent 模块 + StateGraph 编排
+│       ├── agents/                # 15 个 Agent 模块 + StateGraph 编排
 │       │   ├── master_agent.py    # LangGraph StateGraph 10 节点
 │       │   ├── state.py           # AgentState + IntentType
 │       │   ├── communicator.py    # MessageBus pub/sub
@@ -210,7 +210,7 @@ npm run dev
 6. `/admin/paths` → 学习路径管理
 7. `/admin/chats` → 对话记录（消息详情）
 8. `/admin/documents` → 知识库文档管理
-9. `/admin/agents` → Agent 监控面板（14 Agent 模块实时调用统计 + 30s 自动刷新）
+9. `/admin/agents` → Agent 监控面板（15 Agent 模块实时调用统计 + 30s 自动刷新）
 
 ## 测试
 
@@ -234,7 +234,7 @@ npm run build
 
 ## 技术亮点
 
-- **多智能体编排**: LangGraph StateGraph 10 节点 + 14 Agent 模块协同
+- **多智能体编排**: LangGraph StateGraph 10 节点 + 15 Agent 模块协同
 - **防幻觉机制**: PatternDetector + SourceValidator + LLMValidator 三层验证
 - **流式输出**: 9 个真流式端点 (对话/资源/练习/路径/画像评估/学习包/题库出题/错题分析/对话推荐)
 - **RAG 管道**: 文档解析 → 语义切片 → Embedding → 向量检索 → LLM 重排
@@ -249,6 +249,7 @@ npm run build
 - **手机验证码**: 模拟短信服务（控制台输出），5 分钟有效期
 - **行为驱动画像**: 对话/练习/资源/路径学习自动更新 7 维画像
 - **自习模式**: TF.js + MoveNet 浏览器本地姿态检测（零上传）· 番茄钟专注 + 静默巡查 + 物理摄像头智能过滤 + 联动学习画像 focus 维度
+- **代码审计**: 26 个 bug 修复（5 Critical + 9 High + 12 Medium/Low），含 JWT 真实现、NameError 修复、静默 catch 全改 console.error、死代码清理 ~2400 行
 
 ## 环境变量
 

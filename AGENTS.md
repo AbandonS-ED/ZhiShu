@@ -97,6 +97,7 @@ cd frontend && npm run build                       # 28 页面
 - **错题本**: wrong_questions 表 + 8 端点 + AI 错因分析(5类错误: 计算/概念/审题/粗心/未分析 + Agent 4步思考链 + SSE流式) + 同类题推荐 + 掌握度算法(答对+20%上限100) + /tiku 答错自动收录
 - **学习计划**: study_plans/study_plan_steps/learning_paths 3 表 + 6 端点 + learning_path_agent (AI 自主分析拆分路径，删除硬编码模板) + learning_guide_agent (结构化学习指引：学什么/目标/重点/前置知识) + study_plan_service (758 行核心服务) + 前端 5 页面(/plan 首页+ 4 子页面) + 节点状态管理(completed/current/pending) + 测验解锁机制 + 综合测试
 - **一键启停**: `start.ps1` + `stop.ps1`，杀所有 python/node 进程解决孤儿 socket
+- **代码审计**: 26 个 bug 修复（5 Critical + 9 High + 12 Medium/Low），含 JWT 真实现、NameError 修复、静默 catch 全改 console.error、死代码清理 ~2400 行
 
 ## 踩过的坑（不修会卡住）
 
