@@ -15,6 +15,9 @@ export default function ResourceDetailPage() {
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<'knowledge' | 'code' | 'mindmap' | 'exercises'>('knowledge')
   const [showAnswers, setShowAnswers] = useState<Record<number, boolean>>({})
+  const [copiedCode, setCopiedCode] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
+  const [isFavorited, setIsFavorited] = useState(false)
 
   const studentId = getStudentId()
   const resourceId = params.id as string
@@ -29,6 +32,7 @@ export default function ResourceDetailPage() {
     try {
       const data = await resourceApi.getById(resourceId)
       setResource(data)
+      setIsFavorited(data.is_favorited)
     } catch (err: any) {
       setError(err.message || '加载失败')
     } finally {
@@ -38,6 +42,29 @@ export default function ResourceDetailPage() {
 
   const toggleAnswer = (index: number) => {
     setShowAnswers(prev => ({ ...prev, [index]: !prev[index] }))
+  }
+
+  const copyCode = async () => {
+    if (resource?.content?.code) {
+      await navigator.clipboard.writeText(resource.content.code)
+      setCopiedCode(true)
+      setTimeout(() => setCopiedCode(false), 2000)
+    }
+  }
+
+  const copyLink = async () => {
+    await navigator.clipboard.writeText(window.location.href)
+    setCopiedLink(true)
+    setTimeout(() => setCopiedLink(false), 2000)
+  }
+
+  const toggleFavorite = async () => {
+    try {
+      await resourceApi.toggleFavorite(resourceId)
+      setIsFavorited(!isFavorited)
+    } catch (err) {
+      console.error('收藏失败', err)
+    }
   }
 
   if (loading) {
@@ -72,56 +99,78 @@ export default function ResourceDetailPage() {
     { key: 'exercises', label: '练习题', icon: 'clipboard', show: hasExercises },
   ].filter(t => t.show)
 
+  const renderKnowledgeContent = (text: string) => {
+    return text.split('\n').map((line, i) => {
+      let processed = line
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code>$1</code>')
+      return <p key={i} dangerouslySetInnerHTML={{ __html: processed }} />
+    })
+  }
+
+  const getIconClass = () => {
+    switch (resource.resource_type) {
+      case '知识': return 'knowledge'
+      case '代码': return 'code'
+      case '思维导图': return 'mindmap'
+      case '练习': return 'exercise'
+      default: return 'knowledge'
+    }
+  }
+
   return (
     <div style={{ padding: '24px 32px 40px', height: 'calc(100vh - var(--header-h))', overflow: 'auto' }}>
-      {/* 头部 */}
-      <div style={{ marginBottom: 24 }}>
+      {/* Back navigation */}
+      <div className="back-nav">
         <button
           onClick={() => router.back()}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'var(--ink-3)', display: 'flex', alignItems: 'center', gap: 6,
-            fontSize: 13, marginBottom: 16, padding: 0,
-          }}
+          className="back-link"
         >
-          <Icon name="arrowLeft" size={16} />
+          <Icon name="arrowLeft" size={14} />
           返回资源列表
         </button>
+      </div>
 
-        <h1 style={{ fontSize: 24, fontWeight: 600, color: 'var(--ink)', marginBottom: 8 }}>
-          {resource.title}
-        </h1>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <span className="tag tag-warm">{resource.resource_type}</span>
-          {resource.knowledge_point && (
-            <span className="tag tag-dark">{resource.knowledge_point}</span>
-          )}
-          <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-            {new Date(resource.created_at).toLocaleDateString('zh-CN')}
-          </span>
+      {/* Resource header */}
+      <div className="res-header">
+        <div className="rh-top">
+          <div className={`rh-icon ${getIconClass()}`}>
+            <Icon name="fileText" size={24} />
+          </div>
+          <div className="rh-info">
+            <h1 className="rh-title">{resource.title}</h1>
+            <div className="rh-tags">
+              <span className="tag tag-warm">{resource.resource_type}</span>
+              {resource.knowledge_point && (
+                <span className="tag tag-info">{resource.knowledge_point}</span>
+              )}
+              <span className="rh-date">{new Date(resource.created_at).toLocaleDateString('zh-CN')}</span>
+            </div>
+          </div>
+          <div className="rh-actions">
+            <button
+              className={`rh-action ${isFavorited ? 'fav-active' : ''}`}
+              onClick={toggleFavorite}
+              title="收藏"
+            >
+              <Icon name="heart" size={16} />
+            </button>
+            <button className="rh-action" onClick={copyLink} title="复制链接">
+              <Icon name={copiedLink ? "check" : "link"} size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 标签页 */}
+      {/* Tab bar */}
       {tabs.length > 1 && (
-        <div style={{
-          display: 'flex', gap: 0, borderBottom: '1px solid var(--line)',
-          marginBottom: 24,
-        }}>
+        <div className="tabs-bar">
           {tabs.map(tab => (
             <button
               key={tab.key}
+              className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
               onClick={() => setActiveTab(tab.key as any)}
-              style={{
-                flex: 1, padding: '12px 0', border: 'none', cursor: 'pointer',
-                fontSize: 13, fontWeight: activeTab === tab.key ? 600 : 400,
-                color: activeTab === tab.key ? 'var(--ink)' : 'var(--ink-3)',
-                background: 'transparent',
-                borderBottom: activeTab === tab.key ? '2px solid var(--warm)' : '2px solid transparent',
-                transition: 'all .2s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
             >
               <Icon name={tab.icon} size={14} />
               {tab.label}
@@ -130,137 +179,123 @@ export default function ResourceDetailPage() {
         </div>
       )}
 
-      {/* 内容区域 */}
-      <div style={{ maxWidth: 800 }}>
-        {/* 知识讲解 */}
+      {/* Content area */}
+      <div className="detail-body">
+        {/* Knowledge content */}
         {activeTab === 'knowledge' && hasKnowledge && (
-          <div className="card" style={{ padding: '24px 28px' }}>
-            <div style={{ fontSize: 15, lineHeight: 1.8, color: 'var(--ink)' }}>
-              {content.knowledge!.split('\n').map((line, i) => (
-                <p key={i} style={{ marginBottom: 12 }}>{line}</p>
-              ))}
+          <div className="card">
+            <div className="knowledge-content">
+              {renderKnowledgeContent(content.knowledge!)}
             </div>
           </div>
         )}
 
-        {/* 代码示例 */}
+        {/* Code content */}
         {activeTab === 'code' && hasCode && (
-          <div className="card" style={{ padding: '24px 28px' }}>
-            <pre style={{
-              background: 'var(--bg)',
-              padding: 20,
-              borderRadius: 10,
-              fontSize: 13,
-              lineHeight: 1.6,
-              overflow: 'auto',
-              fontFamily: "'JetBrains Mono', monospace",
-              color: 'var(--ink)',
-            }}>
-              {content.code}
-            </pre>
-          </div>
-        )}
-
-        {/* 思维导图 */}
-        {activeTab === 'mindmap' && hasMindmap && (
-          <div className="card" style={{ padding: '24px 28px' }}>
-            <div style={{
-              background: 'var(--bg)',
-              padding: 20,
-              borderRadius: 10,
-              textAlign: 'center',
-            }}>
-              <pre style={{
-                fontSize: 12,
-                lineHeight: 1.6,
-                fontFamily: "'JetBrains Mono', monospace",
-                color: 'var(--ink)',
-                textAlign: 'left',
-                display: 'inline-block',
-              }}>
-                {content.mermaid_code}
-              </pre>
-              <p style={{ marginTop: 16, fontSize: 12, color: 'var(--ink-3)' }}>
-                复制以上 Mermaid 代码到 <a href="https://mermaid.live" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--warm)' }}>mermaid.live</a> 查看导图
-              </p>
+          <div className="card">
+            <div className="code-content">
+              <div className="code-header">
+                <span className="ch-label">
+                  <Icon name="code" size={13} />
+                  Python
+                </span>
+                <button className="copy-btn" onClick={copyCode}>
+                  {copiedCode ? '已复制' : '复制代码'}
+                </button>
+              </div>
+              <div className="code-block">
+                {content.code}
+              </div>
             </div>
           </div>
         )}
 
-        {/* 练习题 */}
+        {/* Mindmap */}
+        {activeTab === 'mindmap' && hasMindmap && (
+          <div className="card">
+            <div className="mindmap-content">
+              <div className="mindmap-render">
+                <pre style={{
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: 'var(--ink)',
+                  textAlign: 'left',
+                  width: '100%',
+                  margin: 0,
+                }}>
+                  {content.mermaid_code}
+                </pre>
+              </div>
+              <div className="mindmap-hint">
+                <Icon name="info" size={14} />
+                <span>
+                  如需查看完整交互式导图，可复制 Mermaid 代码到{' '}
+                  <a href="https://mermaid.live" target="_blank" rel="noopener noreferrer">
+                    mermaid.live
+                  </a>{' '}
+                  在线渲染。
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Exercises */}
         {activeTab === 'exercises' && hasExercises && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="exercise-list">
             {content.exercises!.map((exercise, index) => (
-              <div key={index} className="card" style={{ padding: '24px 28px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
-                  <span style={{
-                    width: 28, height: 28, borderRadius: '50%',
-                    background: 'var(--warm-soft)', color: 'var(--warm)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 13, fontWeight: 600, flexShrink: 0,
-                  }}>
-                    {index + 1}
-                  </span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, color: 'var(--ink)', marginBottom: 8, fontWeight: 500 }}>
-                      {exercise.question}
-                    </div>
+              <div key={index} className="exercise-card">
+                <div className="ex-head">
+                  <div className="ex-num">{index + 1}</div>
+                  <div className="ex-body">
+                    <div className="ex-question">{exercise.question}</div>
                     {exercise.type === 'choice' && exercise.options && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                      <div className="ex-options">
                         {exercise.options.map((option, optIndex) => (
-                          <div
-                            key={optIndex}
-                            style={{
-                              padding: '10px 14px',
-                              background: 'var(--bg)',
-                              borderRadius: 'var(--r-xs)',
-                              fontSize: 13,
-                              color: 'var(--ink-2)',
-                              border: '1px solid var(--line)',
-                            }}
-                          >
+                          <div key={optIndex} className="ex-opt">
+                            <span className="ex-letter">{String.fromCharCode(65 + optIndex)}</span>
                             {option}
                           </div>
                         ))}
                       </div>
                     )}
                     <button
+                      className="ex-toggle-btn"
                       onClick={() => toggleAnswer(index)}
-                      style={{
-                        background: 'none', border: '1px solid var(--line)',
-                        cursor: 'pointer', padding: '8px 16px', borderRadius: 'var(--r-xs)',
-                        fontSize: 12, color: 'var(--ink-3)', transition: 'all .2s',
-                      }}
                     >
+                      <Icon name={showAnswers[index] ? "eyeOff" : "eye"} size={13} />
                       {showAnswers[index] ? '隐藏答案' : '查看答案'}
                     </button>
-                    {showAnswers[index] && (
-                      <div style={{
-                        marginTop: 16, padding: '16px 20px',
-                        background: 'var(--success-soft)', borderRadius: 'var(--r-xs)',
-                      }}>
-                        <div style={{ fontSize: 13, color: 'var(--success)', fontWeight: 600, marginBottom: 8 }}>
-                          答案：{exercise.answer}
-                        </div>
-                        {exercise.explanation && (
-                          <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6 }}>
-                            {exercise.explanation}
-                          </div>
-                        )}
+                    <div className={`ex-answer ${showAnswers[index] ? 'show' : ''}`}>
+                      <div className="ea-head">
+                        <Icon name="checkCircle" size={14} />
+                        答案：{exercise.answer}
                       </div>
-                    )}
+                      {exercise.explanation && (
+                        <div className="ea-explain">{exercise.explanation}</div>
+                      )}
+                    </div>
                   </div>
+                  <span className="ex-type">
+                    {exercise.type === 'choice' ? '选择题' : 
+                     exercise.type === 'judge' ? '判断题' : 
+                     exercise.type === 'short_answer' ? '简答题' : '编程题'}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* 没有内容 */}
+        {/* No content */}
         {!hasKnowledge && !hasCode && !hasMindmap && !hasExercises && (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--ink-3)' }}>
-            <Icon name="inbox" size={40} style={{ opacity: 0.3 }} />
-            <p style={{ marginTop: 12, fontSize: 14 }}>暂无内容</p>
+          <div className="empty-detail">
+            <div className="ed-icon">
+              <Icon name="inbox" size={26} />
+            </div>
+            <h3>暂无内容</h3>
+            <p>该资源暂无可用内容</p>
           </div>
         )}
       </div>
