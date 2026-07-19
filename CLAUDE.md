@@ -294,6 +294,9 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ `wrong_questions.py` logger 规范化 (__import__ 改为正规 import logging)
 - ✅ 前端页面按 HTML 模板全量重写 (plan/learn/quiz/final-test 页面按 jihua 系列模板 1:1 复刻 + globals.css 模板 CSS 统一)
 - ✅ 全代码库死代码清理 (Batch 1: 删 5 个后端死服务 + 2 片段 -896行; Batch 2: 删 resources 4 组件 + 2 hooks -1449行; Batch 3: 删 requireLogin + 瘦身 appStore -54行 → 合计 ~2400 行)
+- ✅ 资源详情页按 code.html 模板重写 (返回导航 + 资源头52px图标 + 4 tab + 知识内容markdown渲染 + 代码块暗色+复制按钮 + 思维导图mermaid提示 + 练习题卡片答案展开)
+- ✅ 资源列表页统计卡片边框修复 (.res-stats .rs-card → .rs-card 选择器去除父级依赖)
+- ✅ Icon.tsx 补全 6 个图标 (fileText/heart/link/eye/eyeOff/arrowLeft)
 
 ### P2 — 清理项
 

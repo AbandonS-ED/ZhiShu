@@ -66,7 +66,7 @@ ZhiShu/
 │   │   ├── zixi/              # 自习模式 (TF.js + MoveNet 本地姿态检测)
 │   │   └── admin/             # 管理后台 (独立 Shell + 8 页面)
 │       ├── components/            # 共享组件
-│       │   ├── Icon.tsx           # 40+ SVG 图标集
+│       │   ├── Icon.tsx           # 46+ SVG 图标集
 │       │   ├── RobotIcon.tsx      # 机器人图标
 │       │   └── layout/            # Sidebar + Header + ClientShell
 │       ├── lib/                   # 工具库
