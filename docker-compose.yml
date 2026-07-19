@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: zhishu-postgres
+    environment:
+      POSTGRES_DB: zhishu
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: zhishu-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: zhishu-backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:123456@postgres:5432/zhishu
+      REDIS_URL: redis://redis:6379/0
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY}
+      MINIMAX_BASE_URL: https://api.minimax.chat/v1
+      SPARK_API_KEY: ${SPARK_API_KEY}
+      SPARK_BASE_URL: https://spark-api-open.xf-yun.com/v1
+      LLM_PROVIDER: ${LLM_PROVIDER:-minimax}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: zhishu-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: zhishu-celery
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:123456@postgres:5432/zhishu
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.core.celery_config:celery_app worker --loglevel=info
+
+volumes:
+  postgres_data:
+  redis_data:

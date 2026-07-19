@@ -1,0 +1,23 @@
+# ===== 国内 pip 镜像 =====
+# 装包时如果遇到超时/连接失败，加 -i 参数：
+#   pip install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
+# 或者一次性配置到 ~/.pip/pip.conf（推荐，全局生效）：
+#   [global]
+#   index-url = https://pypi.tuna.tsinghua.edu.cn/simple
+# ===== 项目依赖 =====
+fastapi==0.136.3
+uvicorn[standard]==0.49.0
+sqlalchemy==2.0.50
+asyncpg==0.31.0
+redis==8.0.0
+celery==5.6.3
+python-dotenv==1.2.2
+pydantic==2.13.4
+pydantic-settings>=2.0.0
+langgraph>=0.2.0
+langchain>=0.3.0
+httpx>=0.27.0
+pgvector>=0.4.0
+psycopg2-binary>=2.9.0
+bcrypt>=4.0.0
+psutil>=5.9.0

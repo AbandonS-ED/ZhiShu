@@ -1,0 +1,77 @@
+# ===== Python / Backend =====
+backend/venv/
+backend/.venv/
+backend/env/
+backend/**/__pycache__/
+backend/**/*.__pycache__/
+backend/**/*.py[cod]
+backend/**/*.pyo
+backend/**/*.pyd
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/dist/
+backend/build/
+backend/*.egg-info/
+backend/*.egg
+backend/.env
+backend/.env.*
+!.env.example
+backend/server.log
+backend/server_err.log
+
+# ===== Node / Next.js / Frontend =====
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.tsbuildinfo
+frontend/next-env.d.ts
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/.env
+frontend/.env*.local
+frontend/.eslintcache
+
+# ===== 通用 IDE / 编辑器 =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+.next/
+
+# ===== Claude Code 用户态（不该入库）=====
+.claude/
+
+# ===== 项目数据 / 临时文件 =====
+/uploads/
+/logs/
+/tmp/
+/data/
+postgres_data/
+minio_data/
+redis_data/
+.service-pids.json
+
+# ===== 测试 / 报告产物 =====
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+junit.xml
+
+# ===== 密钥 / 凭据（兜底）=====
+*.pem
+*.key
+*.p12
+secrets/
+credentials/
