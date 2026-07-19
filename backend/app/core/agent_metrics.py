@@ -11,11 +11,18 @@ class AgentMetrics:
         "initial_assessment": {"name": "InitialAssessmentAgent", "role": "画像构建"},
         "document": {"name": "DocumentAgent", "role": "知识讲解"},
         "exercise": {"name": "ExerciseAgent", "role": "练习生成"},
-
         "tutor": {"name": "TutorAgent", "role": "智能问答"},
         "mindmap": {"name": "MindMapAgent", "role": "思维导图"},
         "audio": {"name": "AudioAgent", "role": "音频脚本"},
         "master": {"name": "MasterAgent", "role": "调度中心"},
+        "learning_path": {"name": "LearningPathAgent", "role": "路径规划"},
+        "learning_guide": {"name": "LearningGuideAgent", "role": "学习指引"},
+        "behavior_analysis": {"name": "BehaviorAnalysisAgent", "role": "行为分析"},
+        "coordinator": {"name": "CoordinatorAgent", "role": "任务协调"},
+        "review": {"name": "ReviewAgent", "role": "质量审核"},
+        "resource_creator": {"name": "ResourceCreatorAgent", "role": "资源创建"},
+        "wrong_question": {"name": "WrongQuestionAgent", "role": "错题分析"},
+        "scoring": {"name": "ScoringAgent", "role": "AI评分"},
     }
 
     def __init__(self):

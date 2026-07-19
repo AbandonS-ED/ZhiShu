@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import time
 import uuid
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
@@ -13,6 +14,7 @@ from sqlalchemy import select, func, desc
 from app.core.database import get_db, async_session
 from app.core.dependencies import valid_student_id, get_current_user
 from app.core.validators import _validate_uuid
+from app.core.agent_metrics import agent_metrics
 from app.models.student import Student
 from app.models.exercise import Exercise
 from app.models.exercise_bank import ExerciseBank
@@ -257,6 +259,7 @@ def _to_dto(wq: WrongQuestion, exercise: Optional[Exercise] = None, bank_item: O
 
 async def _background_classify_error(wq_id: str, snapshot: dict, wrong_answer: str):
     """后台轻量错因分类 — 入库后异步触发，不阻塞响应"""
+    t0 = time.time()
     try:
         async with async_session() as session:
             data = await wrong_question_agent.classify_error_only(
@@ -277,8 +280,10 @@ async def _background_classify_error(wq_id: str, snapshot: dict, wrong_answer: s
             wq.error_type = data.get("error_type", "unknown")
             wq.error_analysis = data.get("error_analysis", "")
             await session.commit()
+            agent_metrics.record("wrong_question", True, (time.time() - t0) * 1000)
             logger.info("错因分类完成: %s -> %s", wq_id, wq.error_type)
     except Exception as e:
+        agent_metrics.record("wrong_question", False, (time.time() - t0) * 1000)
         logger.error("后台错因分类失败: %s — %s", wq_id, e)
 
 

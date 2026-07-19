@@ -2,11 +2,13 @@
 
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, text, update as sql_update
 
 from app.core.database import async_session
+from app.core.agent_metrics import agent_metrics
 from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.models.chat_message import ChatMessage
@@ -133,12 +135,18 @@ class ScheduledAnalysisService:
 
         # 调用 AI Agent 分析（内部通过 profile_service 写入，自带锁）
         logger.info(f"[scheduled_analysis] Analyzing student {student_id}")
-        result = await behavior_analysis_agent.analyze_and_update(
-            db=db,
-            student_id=student_id,
-            behavior_type="scheduled",
-            behavior_data={"analysis_type": "periodic"},
-        )
+        t0 = time.time()
+        try:
+            result = await behavior_analysis_agent.analyze_and_update(
+                db=db,
+                student_id=student_id,
+                behavior_type="scheduled",
+                behavior_data={"analysis_type": "periodic"},
+            )
+            agent_metrics.record("behavior_analysis", True, (time.time() - t0) * 1000)
+        except Exception as e:
+            agent_metrics.record("behavior_analysis", False, (time.time() - t0) * 1000)
+            raise
 
         # 更新最后分析时间（用独立 session，因为 apply_llm_updates 已 commit）
         if result.get("status") in ("updated", "no_change"):
@@ -203,12 +211,18 @@ class ScheduledAnalysisService:
     async def force_analyze(self, student_id: str) -> dict:
         """强制分析单个学生（用于手动触发）"""
         async with async_session() as db:
-            result = await behavior_analysis_agent.analyze_and_update(
-                db=db,
-                student_id=student_id,
-                behavior_type="manual",
-                behavior_data={"analysis_type": "forced"},
-            )
+            t0 = time.time()
+            try:
+                result = await behavior_analysis_agent.analyze_and_update(
+                    db=db,
+                    student_id=student_id,
+                    behavior_type="manual",
+                    behavior_data={"analysis_type": "forced"},
+                )
+                agent_metrics.record("behavior_analysis", True, (time.time() - t0) * 1000)
+            except Exception as e:
+                agent_metrics.record("behavior_analysis", False, (time.time() - t0) * 1000)
+                raise
 
             # 更新最后分析时间（独立 session）
             if result.get("status") in ("updated", "no_change"):

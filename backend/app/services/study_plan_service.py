@@ -10,6 +10,7 @@
 import uuid
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from sqlalchemy import select, update, delete, func, and_
@@ -18,6 +19,7 @@ from app.models.study_plan import StudyPlan, StudyPlanStep, LearningPath
 from app.models.student_profile import StudentProfile
 from app.services.llm_factory import get_llm_client
 from app.services.json_parser import parse_json_response
+from app.core.agent_metrics import agent_metrics
 from app.agents.learning_path_agent import learning_path_agent
 
 logger = logging.getLogger(__name__)
@@ -317,11 +319,17 @@ class StudyPlanService:
             profile = await self._get_student_profile(db, student_id)
             
             # 使用专门的Agent生成学习路径
-            path_data = await learning_path_agent.generate_path(
-                target_knowledge=target_knowledge,
-                current_level=current_level,
-                student_profile=profile
-            )
+            t0 = time.time()
+            try:
+                path_data = await learning_path_agent.generate_path(
+                    target_knowledge=target_knowledge,
+                    current_level=current_level,
+                    student_profile=profile
+                )
+                agent_metrics.record("learning_path", True, (time.time() - t0) * 1000)
+            except Exception as e:
+                agent_metrics.record("learning_path", False, (time.time() - t0) * 1000)
+                raise
             
             # 保存路径
             path_name = path_data.get("name", f"{target_knowledge}学习路径")

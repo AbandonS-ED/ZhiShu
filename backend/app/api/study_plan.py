@@ -6,6 +6,7 @@
 import uuid
 import json
 import logging
+import time
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.agent_metrics import agent_metrics
 from app.models.student import Student
 from app.services.study_plan_service import study_plan_service
 from app.agents.learning_guide_agent import learning_guide_agent
@@ -229,11 +231,14 @@ async def generate_learning_guide(
     req: LearningGuideRequest,
 ):
     """生成结构化学习指引（LearningGuideAgent专用）"""
+    t0 = time.time()
     try:
         guide = await learning_guide_agent.generate(
             knowledge_point=req.knowledge_point,
             path_context=req.path_context,
         )
+        agent_metrics.record("learning_guide", True, (time.time() - t0) * 1000)
         return {"success": True, "data": guide}
     except Exception as e:
+        agent_metrics.record("learning_guide", False, (time.time() - t0) * 1000)
         raise HTTPException(status_code=500, detail=f"生成学习指引失败: {str(e)}")
