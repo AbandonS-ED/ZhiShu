@@ -1,0 +1,8 @@
+INFO:     Will watch for changes in these directories: ['D:\\桌面\\软件杯项目\\ZhiShu\\backend']
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [16236] using WatchFiles
+INFO:     Started server process [16924]
+INFO:     Waiting for application startup.
+pgvector 扩展未安装，向量检索功能不可用
+INFO:     Application startup complete.
+[chat/stream] RAG 检索失败: 期望 1 个向量，实际返回 0 个
