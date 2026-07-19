@@ -87,8 +87,8 @@ export default function Home() {
       dashboardApi.getStats(sid).then(setStats).catch(console.error)
       dashboardApi.getCourses(sid).then((data) => setCourses(data.courses)).catch(console.error)
       Promise.all([
-        profileApi.getMe().then((p) => setHasProfile(!!p)).catch(() => {}),
-        resourceApi.list(sid).then((r) => setResourceCount(Array.isArray(r) ? r.length : 0)).catch(() => {}),
+        profileApi.getMe().then((p) => setHasProfile(!!p)).catch(err => console.error('[dashboard] profileApi.getMe 失败:', err)),
+        resourceApi.list(sid).then((r) => setResourceCount(Array.isArray(r) ? r.length : 0)).catch(err => console.error('[dashboard] resourceApi.list 失败:', err)),
       ]).finally(() => setLoadingUser(false))
     })
   }, [])

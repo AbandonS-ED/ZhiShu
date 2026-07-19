@@ -62,10 +62,16 @@ export default function UsersPage() {
     if (!selected.size) return
     if (!confirm(`确认禁用选中的 ${selected.size} 个用户？`)) return
     try {
-      for (const id of Array.from(selected)) {
-        await adminApi.updateUser(id, { is_active: false })
+      const results = await Promise.allSettled(
+        Array.from(selected).map(id => adminApi.updateUser(id, { is_active: false }))
+      )
+      const failed = results.filter(r => r.status === 'rejected').length
+      const succeeded = results.length - failed
+      if (failed === 0) {
+        showToast(`已禁用 ${succeeded} 个用户`)
+      } else {
+        showToast(`禁用完成：${succeeded} 成功，${failed} 失败`)
       }
-      showToast(`已禁用 ${selected.size} 个用户`)
       clear()
       loadUsers()
     } catch { showToast('批量操作失败') }

@@ -913,6 +913,19 @@ function AssessmentModal({
 
 // ═══ MAIN PAGE ═══
 
+function clearProfileCache() {
+  try {
+    const raw = localStorage.getItem('zhishu_student')
+    if (raw) {
+      const sid = JSON.parse(raw)?.id
+      if (sid) {
+        localStorage.removeItem(`profile_${sid}`)
+        localStorage.removeItem(`profile_time_${sid}`)
+      }
+    }
+  } catch { /* ignore */ }
+}
+
 export default function ProfilePage() {
   const [scores, setScores] = useState<Record<string, number>>({
     comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0, knowledge_base: 0, learning_goal: 0,
@@ -941,14 +954,14 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!studentId) return
 
-    // 检查缓存：如果4小时内已有数据，直接使用
+    // 检查缓存：5 分钟内已有数据，直接使用
     const cacheKey = `profile_${studentId}`
     const cacheTimeKey = `profile_time_${studentId}`
     const cachedTime = localStorage.getItem(cacheTimeKey)
     const cacheAge = cachedTime ? Date.now() - parseInt(cachedTime) : Infinity
-    const FOUR_HOURS = 4 * 60 * 60 * 1000
+    const FIVE_MINUTES = 5 * 60 * 1000
 
-    if (cacheAge < FOUR_HOURS) {
+    if (cacheAge < FIVE_MINUTES) {
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
         try {
@@ -1063,6 +1076,7 @@ export default function ProfilePage() {
     setScores(prev => ({ ...prev, ...finalScores }))
     setStatus('completed')
     setShowAssess(false)
+    clearProfileCache()
     // 重新加载置信度
     loadProfile()
     loadAssessmentStatus()
@@ -1083,6 +1097,7 @@ export default function ProfilePage() {
     setResetting(true)
     try {
       await profileApi.reset()
+      clearProfileCache()
       setScores({ comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0, knowledge_base: 0, learning_goal: 0 })
       setConfidence({ comprehension: 0, memory: 0, application: 0, imagination: 0, focus: 0, knowledge_base: 0, learning_goal: 0 })
       setStatus('pending')

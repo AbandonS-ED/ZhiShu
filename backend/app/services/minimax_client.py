@@ -125,13 +125,3 @@ class MiniMaxClient:
                 except (json.JSONDecodeError, IndexError, KeyError) as e:
                     logger.debug("[chat_stream] 解析跳过: %s", e)
                     continue
-
-
-# 全局实例
-minimax_client: MiniMaxClient | None = None
-
-
-def init_minimax_client(api_key: str, base_url: str = "https://api.minimax.chat/v1") -> MiniMaxClient:
-    global minimax_client
-    minimax_client = MiniMaxClient(api_key=api_key, base_url=base_url)
-    return minimax_client

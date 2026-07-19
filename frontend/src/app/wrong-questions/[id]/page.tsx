@@ -8,14 +8,7 @@ import { showToast } from '@/lib/utils'
 import { usePageTimer } from '@/hooks/usePageTimer'
 import Icon from '@/components/Icon'
 import type { WrongQuestion } from '@/types'
-
-const ERROR_TYPE_CONFIG: Record<string, { label: string; cls: string }> = {
-  calculation: { label: '计算失误', cls: 'calculation' },
-  concept: { label: '概念不清', cls: 'concept' },
-  reading: { label: '审题错误', cls: 'reading' },
-  carelessness: { label: '粗心大意', cls: 'carelessness' },
-  unknown: { label: '未分析', cls: 'unknown' },
-}
+import { ERROR_TYPE_CONFIG } from '@/lib/wrong-question-config'
 
 export default function WrongQuestionDetailPage() {
   usePageTimer('wrong_question_detail')

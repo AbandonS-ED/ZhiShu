@@ -58,6 +58,7 @@ class MiMoClient:
             "messages": all_messages,
             "max_completion_tokens": max_tokens,
             "temperature": temperature,
+            "thinking": {"type": "disabled"},
         }
 
         resp = await client.post(
@@ -101,6 +102,7 @@ class MiMoClient:
             "max_completion_tokens": max_tokens,
             "temperature": temperature,
             "stream": True,
+            "thinking": {"type": "disabled"},
         }
 
         async with client.stream(

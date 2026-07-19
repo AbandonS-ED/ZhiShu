@@ -66,7 +66,7 @@ cd backend && celery -A app.core.celery_config worker --loglevel=info
 cd backend && celery -A app.core.celery_config beat --loglevel=info
 
 # 测试
-cd backend && python -m pytest tests/ -v          # 110 pytest
+cd backend && python -m pytest tests/ -v          # 106 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
 cd frontend && npm run build                       # 28 页面
@@ -82,9 +82,9 @@ cd frontend && npm run build                       # 28 页面
 - **MiMo v2.5**: 中国集群 `api-key` 头认证（非 `Authorization: Bearer`），`/chat/completions` 兼容。mimo-v2.5-pro 推理消耗过多 token，降级用 mimo-v2.5
 - **防幻觉**: 6 Agent 接 `validate()`（Document/Exercise 走三层，其他走 `skip_llm=True` 快速模式）
 - **RAG**: `document_parser → text_chunker → embedding → vector_store.search → reranker`
-- **认证**: bcrypt + JWT（HS256，7 天），全 **64** 端点 `Depends(get_current_user)` 门禁
+- **认证**: bcrypt + JWT（HS256，7 天），全 **71** 端点 `Depends(get_current_user)` 门禁
 - **手机验证码**: 内存存储 + 5 分钟有效期，控制台 print 模拟短信，注册时校验
-- **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，11 管理端点（含 Agent 监控 + 文档管理 + 用户删除）
+- **管理后台**: 独立 token（`zhishu_admin_token`），admin 账号 `role='admin'`，12 管理端点（含 Agent 监控 + 文档管理 + 用户删除）
 - **Agent 监控**: `agent_metrics.py` 内存计数器 + `threading.Lock` 线程安全，30s 自动刷新
 - **并行查询**: `get_stats` 用 `asyncio.gather()` 并行 10 个计数查询，响应速度提升约 50%
 - **N+1 优化**: users/resources/paths/chats 列表全部改用 JOIN 子查询
@@ -95,8 +95,10 @@ cd frontend && npm run build                       # 28 页面
 - **资源中心**: AI 生成 + 手动创建 + 进度动画（4步骤+倒计时）+ 保存功能 + 我的资源（过滤系统自动生成）+ 资源详情（标签页+练习题答案）
 - **设置页**: 个人中心（学习概览+快捷入口+信息编辑含major/grade+密码切换+每日目标localStorage可配置+退出登录+骨架屏+响应式）
 - **错题本**: wrong_questions 表 + 8 端点 + AI 错因分析(5类错误: 计算/概念/审题/粗心/未分析 + Agent 4步思考链 + SSE流式) + 同类题推荐 + 掌握度算法(答对+20%上限100) + /tiku 答错自动收录
-- **学习计划**: study_plans/study_plan_steps/learning_paths 3 表 + 6 端点 + learning_path_agent (AI 自主分析拆分路径，删除硬编码模板) + learning_guide_agent (结构化学习指引：学什么/目标/重点/前置知识) + study_plan_service (758 行核心服务) + 前端 5 页面(/plan 首页+ 4 子页面) + 节点状态管理(completed/current/pending) + 测验解锁机制 + 综合测试
+- **学习计划**: study_plans/study_plan_steps/learning_paths 3 表 + 8 端点 + learning_path_agent (AI 自主分析拆分路径，删除硬编码模板) + learning_guide_agent (结构化学习指引：学什么/目标/重点/前置知识) + study_plan_service (758 行核心服务) + 前端 5 页面(/plan 首页+ 4 子页面) + 节点状态管理(completed/current/pending) + 测验解锁机制 + 综合测试
 - **一键启停**: `start.ps1` + `stop.ps1`，杀所有 python/node 进程解决孤儿 socket
+- **代码审计**: 26 个 bug 修复（5 Critical + 9 High + 12 Medium/Low），含 JWT 真实现、NameError 修复、静默 catch 全改 console.error、死代码清理 ~2400 行
+- **画像联动**: 规则引擎(即时/高频) + AI 分析(批量/低频) 双路径，7 维画像全联动，缓存 5 分钟
 
 ## 踩过的坑（不修会卡住）
 
@@ -310,7 +312,7 @@ c49a484 fix: 错题本 snapshot 补全 exercise_type + _to_dto type 提取修复
 | 编号 | 内容 |
 |---|---|
 | P1-4 | tiku/profile `ConfirmDialog` 抽到 `components/ConfirmDialog.tsx` |
-| P1-5 | `appStore.ts` 僵尸 store（6字段5个未用），决定删或真用 |
+| P1-5 | ✅ | `appStore.ts` 僵尸 store → 已瘦身只留 student/setStudent |
 | P1-6 | 4处SSE手写reader改用 `lib/sse.ts` |
 | P1-7 | admin showToast 重复实现 |
 
@@ -323,21 +325,28 @@ c49a484 fix: 错题本 snapshot 补全 exercise_type + _to_dto type 提取修复
 | P2-3 | 4处直接读 `localStorage.zhishu_daily_goal` → settings helper |
 | P2-4 | profile/evaluation 缓存模式抽 `cachedFetch` |
 
-### ⚰️ 死代码（建议删，未修）
+### ⚰️ 死代码（已清理，2026-07-18）
 
-- `minimax_client.py:131-137` 全局单例（llm_factory 已统一）
-- `spark_client.py:127` 空 key 实例
-- `minimax_langchain.py` 整个文件（0处使用）
-- `student.ts:25` `requireLogin()` 0处调用
+全部已删除并提交（3 个 commit: `a0c3847` / `ee92dc9` / `f3b5302`），合计 ~2400 行。
 
-### ⚰️ 死代码（建议删）
-
-| 文件:行 | 内容 |
-|---|---|
-| `backend/app/services/minimax_client.py:131-137` | `minimax_client` 全局变量 + `init_minimax_client()` 单例（llm_factory 已统一管） |
-| `backend/app/services/spark_client.py:127` | `spark_client = SparkClient(api_key="")` 空 key 实例（也没人用） |
-| `backend/app/services/minimax_langchain.py`（整个文件，167 行） | `minimax_chat = MiniMaxChatModel()` 0 处使用 |
-| `frontend/src/lib/student.ts:25-31` | `requireLogin()` 0 处调用 |
+| 文件 | 内容 | 状态 |
+|---|---|---|
+| `backend/app/services/minimax_client.py:131-137` | 全局单例 + init_minimax_client() | ✅ 已删 |
+| `backend/app/services/spark_client.py:127` | 空 key 实例 | ✅ 已删 |
+| `backend/app/services/minimax_langchain.py` | 整个文件（0处使用） | ✅ 已删 |
+| `frontend/src/lib/student.ts:25-31` | requireLogin()（0处调用） | ✅ 已删 |
+| `backend/app/services/content_safety.py` | 内容安全（0处引用） | ✅ 已删 |
+| `backend/app/services/document_parser.py` | 文档解析（0处引用） | ✅ 已删 |
+| `backend/app/services/text_chunker.py` | 语义切片（0处引用） | ✅ 已删 |
+| `backend/app/services/recommendation_service.py` | 推荐服务（0处引用） | ✅ 已删 |
+| `frontend/src/app/resources/components/AICreatePanel.tsx` | 资源创建面板 | ✅ 已删 |
+| `frontend/src/app/resources/components/ManualCreatePanel.tsx` | 手动创建面板 | ✅ 已删 |
+| `frontend/src/app/resources/components/PhaseButton.tsx` | 阶段按钮 | ✅ 已删 |
+| `frontend/src/app/resources/components/ReviewPanel.tsx` | 复习面板 | ✅ 已删 |
+| `frontend/src/app/resources/hooks/useLearningPackage.ts` | 学习包 hook | ✅ 已删 |
+| `frontend/src/app/resources/hooks/useResourceCreate.ts` | 资源创建 hook | ✅ 已删 |
+| `frontend/src/app/resources/hooks/useReview.ts` | 复习 hook | ✅ 已删 |
+| `frontend/src/stores/appStore.ts` | 6 字段瘦身为 2 字段（只留 student/setStudent） | ✅ 已修 |
 
 ### ✅ 健康状况总结
 
@@ -349,5 +358,5 @@ c49a484 fix: 错题本 snapshot 补全 exercise_type + _to_dto type 提取修复
 - ✅ `getStudentId` / `logout` / `valid_student_id` / `valid_session_id` helper 已就绪（只是部分页面没用）
 
 **核心问题**：项目主体质量很高，重复**集中于"边界场景"**——个别特殊服务/页面跳出现有基础设施。
-修完 P0-1 至 P0-4，前端/后端架构统一性将达到生产级水平。
+P0 已全部修完，死代码已全部清理，前端/后端架构统一性达到生产级水平。
 

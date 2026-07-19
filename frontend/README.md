@@ -1,7 +1,7 @@
 # 智枢 (SmartHub) - 前端项目
 
-> 多智能体学习资源生成系统 · 前端部分（学生端 20 页 + 管理后台 9 页 + 1 子页面）
-> 最后更新：2026-07-18（合并 wyy 分支 AI 智能评分 + 文档全量同步）
+> 多智能体学习资源生成系统 · 前端部分（学生端 20 页 + 管理后台 8 页）
+> 最后更新：2026-07-19（代码审计 26 个修复 + wyy 分支合并 + lint + build 通过）
 
 ## 技术栈
 
@@ -9,14 +9,15 @@
 - **样式**: Tailwind CSS 3.4 + 自定义 CSS（模板 1:1 复刻）
 - **状态管理**: React useState + Context（学生端 + 管理端独立 Context）+ Zustand（setting 页）
 - **路由隔离**: `/admin` 路由前缀，独立的 RootLayout 拦截
-- **Agent**: 17 个 Agent 模块协同工作
+- **Agent**: 15 个 Agent 模块协同工作
+- **画像联动**: 规则引擎 + AI 分析双路径，7 维画像全联动
 - **学习计划模块** (合并 wyy 分支): 输入知识点 → AI 生成学习路径 (10-15 节点) → 节点学习 → AI 测验 → 综合测试
 
 ## 项目结构
 
 ```
 src/
-├── app/                    # 路由页面（学生 13 + 管理 9 + 2 布局 + 1 全局 layout）
+├── app/                    # 路由页面（学生 20 + 管理 8 + 2 布局 + 1 全局 layout）
 │   ├── layout.tsx          # 全局布局（Sidebar + Header，/admin /login 跳过）
 │   ├── globals.css         # 自定义设计系统（米色/墨黑/琥珀色系 + admin-* 命名空间）
 │   ├── page.tsx            # / 仪表盘
@@ -40,7 +41,7 @@ src/
 │       ├── paths/          # /admin/paths 学习路径
 │       ├── chats/          # /admin/chats 对话记录
 │       ├── documents/      # /admin/documents 知识库
-│   └── agents/         # /admin/agents Agent 监控（14 Agent 模块）
+│   └── agents/         # /admin/agents Agent 监控（15 Agent 模块）
 ├── components/
 │   ├── layout/                # 学生端 Sidebar + Header
 │   └── RobotIcon.tsx          # ⭐ 极简机器人 SVG（替换 🤖 emoji）
@@ -55,7 +56,7 @@ src/
 │   ├── markdown.ts            # Markdown 转 HTML（marked 库隔离）
 │   ├── admin/context.tsx      # ⭐ 管理后台共享状态（AdminProvider + useAdmin）
 │   └── admin/components.tsx   # ⭐ 管理后台共享组件（AdminCheckbox + BatchDeleteBar + useSelection）
-├── stores/appStore.ts         # Zustand store（已接入 setting 页）
+├── stores/appStore.ts         # Zustand store（student/setStudent，已瘦身）
 ├── types/index.ts             # TS 13 接口定义
 └── fonts/                     # 本地字体（GeistVF, GeistMonoVF）
 ```
@@ -108,7 +109,7 @@ npm run lint      # ESLint 检查（✅ 0 errors）
 | `/admin/paths` | 学习路径 | 表格 + DAG 详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/chats` | 对话记录 | 表格 + 对话详情弹窗 + **批量删除** | 硬编码 |
 | `/admin/documents` | 知识库 | 表格 + 类型筛选 + **批量删除** | 硬编码 |
-| `/admin/agents` | Agent 监控 | 14 Agent 模块集群卡片 + 调用统计 + 错误率 | 硬编码 |
+| `/admin/agents` | Agent 监控 | 15 Agent 模块集群卡片 + 调用统计 + 错误率 | 硬编码 |
 
 ## 开发规范
 

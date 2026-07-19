@@ -172,11 +172,12 @@ class VectorStore:
         return scored_chunks[:top_k]
 
     def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
-        """计算余弦相似度"""
+        """计算余弦相似度。维度不一致时抛 ValueError，防止 silent 截断返回错误结果。"""
         if len(vec1) != len(vec2):
-            min_len = min(len(vec1), len(vec2))
-            vec1 = vec1[:min_len]
-            vec2 = vec2[:min_len]
+            raise ValueError(
+                f"embedding 维度不匹配: {len(vec1)} vs {len(vec2)}。"
+                "可能是 embedding_service 切换了模型导致，请检查配置。"
+            )
 
         dot_product = sum(a * b for a, b in zip(vec1, vec2))
         norm1 = sum(a * a for a in vec1) ** 0.5

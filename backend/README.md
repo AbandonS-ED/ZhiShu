@@ -1,17 +1,20 @@
 # 智枢(SmartHub) Backend
 
-> 最后更新：2026-07-18（合并 wyy 分支 AI 智能评分 + 文档全量同步）
+> 最后更新：2026-07-19（代码审计 26 个修复 + wyy 分支合并 + lint + build 通过）
 
-基于 FastAPI + 14 Agent 的多智能体学习资源生成系统后端。
+基于 FastAPI + 15 Agent 的多智能体学习资源生成系统后端。
+
+> **最后更新**: 2026-07-19 — 画像联动双路径 + 资源详情修复 + lint + build 通过
 
 ## 技术栈
 
 - **框架**: FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg
-- **Agent**: 14 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）
-- **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 **69** 业务端点门禁
+- **Agent**: 15 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）
+- **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 **71** 业务端点门禁
 - **角色**: `role` 字段（student / admin）+ `is_active` 软删除 + `last_login` 记录
 - **LLM**: 小米 MiMo v2.5（当前）→ MiniMax-M3 → 讯飞星火 V4（上线前切换 `LLM_PROVIDER=spark`）
-- **数据库**: PostgreSQL 18 + **15 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（Celery broker，当前未起 worker）
+- **数据库**: PostgreSQL 18 + **13 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（Celery broker，当前未起 worker）
+- **画像联动**: 规则引擎(即时/高频) + AI 分析(批量/低频) 双路径，7 维画像全联动
 - **学习计划模块** (合并 wyy 分支): 输入知识点 → AI 生成学习路径 (10-15 节点) → 节点学习 → AI 测验 → 综合测试
 
 ## 快速开始
@@ -44,7 +47,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8001
 backend/
 ├── app/
 │   ├── main.py              # 入口（11 个 router + lifespan 初始化）= 69 唯一端点
-│   ├── api/                 # 11 个 router：auth / profile / resource / path / tutor / chat / mindmap / dashboard / evaluation / admin / admin_exercises / study_plan / wrong_questions
+│   ├── api/                 # 11 个 router (71 端点)：auth / profile / resource / path / tutor / chat / mindmap / dashboard / evaluation / admin / admin_exercises / study_plan / wrong_questions
 │   ├── core/
 │   │   ├── config.py        # Settings（MINIMAX_* + SPARK_* + JWT_SECRET + LLM_PROVIDER）
 │   │   ├── database.py      # async SQLAlchemy + pgvector 可选
@@ -67,7 +70,7 @@ backend/
 │   │   ├── study_plans.py     # 学习计划
 │   │   ├── study_plan_steps.py # 学习计划步骤
 │   │   └── wrong_question.py  # 错题本
-│   ├── agents/              # 14 个 Agent（含基础设施）
+│   ├── agents/              # 15 个 Agent（含 Master Agent 编排器）
 │   │   ├── state.py           # AgentState TypedDict + IntentType（11 种意图）
 │   │   ├── communicator.py    # MessageBus pub/sub
 │   │   ├── initial_assessment_agent.py  # 对话式 7 维画像评估
@@ -82,38 +85,34 @@ backend/
 │   │   ├── scoring_agent.py   # AI 智能评分
 │   │   ├── learning_path_agent.py # 学习计划路径生成
 │   │   └── master_agent.py    # LangGraph StateGraph **10 节点**
-│   └── services/              # 18 个 Service
+│   └── services/              # 15 个 Service
 │       ├── minimax_client.py     # httpx OpenAI 兼容格式客户端
-│       ├── minimax_langchain.py  # LangChain BaseChatModel 封装
 │       ├── spark_client.py       # 讯飞星火 V4 客户端
+│       ├── mimo_client.py        # 小米 MiMo v2.5（api-key 认证 + 流式/非流式）
 │       ├── anti_hallucination.py # 防幻觉三层验证
-│       ├── content_safety.py     # 内容安全（敏感词过滤 + LLM 语义检查）
-│       ├── document_parser.py    # 文档解析器（PDF/DOCX/PPTX/MD/TXT）
-│       ├── embedding_service.py  # 向量化服务（MiniMax embeddings API）
-│       ├── evaluation_service.py # 效果评估（行为跟踪 + 统计分析）
-│       ├── json_parser.py        # JSON 解析工具
-│       ├── reranker.py           # LLM 语义重排
-│       ├── text_chunker.py       # 语义切片器（800字限制 + 重叠窗口）
-│       ├── vector_store.py       # pgvector 检索 + JSONB 降级方案
-│       ├── recommendation_service.py # 推荐服务
 │       ├── chat_recommendation_service.py # 对话推荐服务
+│       ├── embedding_service.py  # 向量化服务
+│       ├── evaluation_service.py # 效果评估（LLM 报告 + 趋势 + 规则降级）
+│       ├── json_parser.py        # JSON 解析工具
 │       ├── llm_factory.py        # LLM 客户端工厂
+│       ├── profile_service.py    # 画像统一写入层
+│       ├── reranker.py           # LLM 语义重排
 │       ├── scheduled_analysis_service.py # 定时画像分析（多 worker advisory lock）
-│       ├── profile_service.py    # 画像统一写入层（flag_modified + per-student Lock）
-│       └── study_plan_service.py # 学习计划核心服务（758 行）
+│       ├── study_plan_service.py # 学习计划核心服务（758 行）
+│       └── vector_store.py       # pgvector 检索 + JSONB 降级方案
 ├── scripts/
 │   ├── init_db.sql          # 手动建库 + 建表 SQL 脚本（**15 张表** + 14 索引 + admin 种子数据）
 │   ├── init_admin.py        # 自动 ALTER + bcrypt 哈希 + 创建/重置 admin 账号
 │   ├── migrate_schema_drift.py # 数据库 schema 漂移迁移（幂等）
 │   └── run_migration.py     # 通用迁移执行器
-├── tests/                   # smoke_test.py（端到端）+ 7 个 pytest 文件（**110** 个测试）
+├── tests/                   # smoke_test.py（端到端）+ 7 个 pytest 文件（**106** 个测试）
 ├── pytest.ini               # asyncio_mode=auto, testpaths=tests
 ├── Dockerfile               # 未实际使用，后端本地裸跑
 ├── requirements.txt
 └── .env                     # API Key（已 gitignore）
 ```
 
-## API 路由（69 个唯一端点）
+## API 路由（71 个唯一端点）
 
 > 唯一端点 = 唯一路径 + 方法组合。`backend/app/main.py` 注册 11 个 router（含 study_plan / wrong_questions），含 `/` 和 `/health` 根路由。
 
@@ -157,7 +156,7 @@ backend/
 | POST | `/api/v1/profile/force-analyze` | ✅ | **强制分析画像**（忽略缓存） |
 | GET | `/api/v1/profile/analysis-status` | ✅ | **获取分析状态**（查看分析进度） |
 
-### 资源生成（resource.py）— 15 个端点
+### 资源生成（resource.py）— 14 个端点
 
 | 方法 | 路径 | 门禁 | 说明 |
 |------|------|------|------|
@@ -235,7 +234,7 @@ backend/
 | DELETE | `/api/v1/admin/exercises/{exercise_id}` | ✅ + admin | 删除题目 |
 | GET | `/api/v1/admin/exercises/knowledge-points` | ✅ + admin | 知识点列表（含题目数） |
 
-### 管理端系统（admin.py）— 12 个端点
+### 管理端系统（admin.py）— 10 个端点
 
 | 方法 | 路径 | 门禁 | 说明 |
 |------|------|------|------|
@@ -264,26 +263,23 @@ backend/
 | 文件 | 功能 | 状态 |
 |------|------|------|
 | `services/minimax_client.py` | httpx 直接调用 MiniMax-M3（OpenAI 兼容格式） | ✅ 可用 |
-| `services/minimax_langchain.py` | LangChain BaseChatModel 封装 | ✅ 可用 |
 | `services/spark_client.py` | 讯飞星火 V4 客户端（同步 + 流式） | ✅ 已实现 |
 | `services/mimo_client.py` | 小米 MiMo v2.5 客户端（`api-key` 头认证 + 流式/非流式 + 空 choices 容错） | ✅ 已实现 |
+| `services/llm_factory.py` | LLM 客户端工厂（按 `LLM_PROVIDER` 切换 mimo/minimax/spark） | ✅ 已实现 |
 | `services/anti_hallucination.py` | 防幻觉三层验证（模式检测+来源验证+LLM语义校验） | ✅ 已实现 |
-| `services/content_safety.py` | 内容安全（敏感词过滤 + LLM 语义检查） | ✅ 已实现 |
-| `services/document_parser.py` | 文档解析器（PDF/DOCX/PPTX/MD/TXT） | ✅ 已实现 |
-| `services/embedding_service.py` | 向量化服务（MiniMax embeddings API） | ✅ 已实现 |
+| `services/embedding_service.py` | 向量化服务 | ✅ 已实现 |
 | `services/evaluation_service.py` | 效果评估（**LLM 报告生成 + 趋势 + 知识点统计 + 规则引擎降级**） | ✅ 已实现 |
 | `services/json_parser.py` | JSON 解析工具（消除重复代码） | ✅ 已实现 |
 | `services/reranker.py` | LLM 语义重排 | ✅ 已实现 |
-| `services/text_chunker.py` | 语义切片器（800字限制 + 重叠窗口） | ✅ 已实现 |
 | `services/vector_store.py` | pgvector 检索 + JSONB 降级方案 | ✅ 已实现 |
-| `services/recommendation_service.py` | 推荐服务（多维度打分推荐） | ✅ 已实现 |
 | `services/chat_recommendation_service.py` | 对话推荐服务（基于会话上下文） | ✅ 已实现 |
-| `services/llm_factory.py` | LLM 客户端工厂（MiniMax/Spark/MiMo） | ✅ 已实现 |
-| `services/scheduled_analysis_service.py` | 定时画像分析（每日自动分析） | ✅ 已实现 |
+| `services/profile_service.py` | 画像统一写入层（apply_llm_updates + flag_modified + per-student Lock） | ✅ 已实现 |
+| `services/scheduled_analysis_service.py` | 定时画像分析（多 worker advisory lock） | ✅ 已实现 |
+| `services/study_plan_service.py` | 学习计划核心服务（758 行：AI 生成计划 + AI 生成路径 + 步骤完成 + 进度追踪） | ✅ 已实现 |
 
 ## 数据库
 
-**15 张表 + 14 个索引**（开发阶段去掉外键约束）：
+**13 张表 + 14 个索引**（开发阶段去掉外键约束）：
 
 | 表名 | 用途 | 索引 |
 |------|------|------|
@@ -299,12 +295,15 @@ backend/
 | `learning_records` | 学习行为记录（F5 评估） | `idx_learning_records_student_id` + `idx_learning_records_action` + `idx_learning_records_created_at` |
 | `learning_activity_logs` | 学习行为日志 | — |
 | `evaluation_reports` | **预生成评估报告缓存**（Celery daily 4 点跑） | `idx_evaluation_reports_student_id` + 复合索引 `(student_id, report_date)` |
+| `wrong_questions` | 错题本（含 mastery_level/error_type/similar_exercises） | — |
+| `study_plans` | 学习计划主表 | — |
+| `study_plan_steps` | 学习计划步骤 | — |
 
 ## 认证与权限
 
 - **密码哈希**：`bcrypt`（`core/security.py`）
 - **JWT**：HS256，7 天过期，密钥从 `JWT_SECRET` 环境变量读取
-- **门禁**：69 个业务端点全部加 `Depends(get_current_user)` + `student_id` 所有权校验
+- **门禁**：71 个业务端点全部加 `Depends(get_current_user)` + `student_id` 所有权校验
 - **角色隔离**：`students.role` 字段（`student` / `admin`），管理员通过 `_require_admin()` 额外校验
 - **软删除**：`is_active=false` 时登录返回 403
 - **登录审计**：登录成功后自动 `last_login = now()`
@@ -326,7 +325,7 @@ cd backend
 # ⭐ 端到端冒烟测试 (9 API 验证，七次 9/9 PASS)
 python -m tests.smoke_test
 
-# 单元 + 集成（**110** 个 pytest 测试）
+# 单元 + 集成（**106** 个 pytest 测试）
 pytest tests/ -v
 ```
 
@@ -342,7 +341,7 @@ pytest tests/ -v
 | `test_message_bus.py` | 12 |
 | `test_state_graph.py` | 22 |
 | `test_strip_think.py` | 11 |
-| **合计** | **110** |
+| **合计** | **106** |
 
 最新测试报告见 `../SMOKE_TEST_REPORT.md`。
 

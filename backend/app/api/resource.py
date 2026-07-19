@@ -3,6 +3,7 @@
 import uuid
 import json
 import logging
+import time
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator, Field
@@ -12,6 +13,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, valid_student_id
 from app.core.validators import _validate_uuid
+from app.core.agent_metrics import agent_metrics
 from app.models.student import Student
 from app.models.resource import Resource
 from app.models.student_profile import StudentProfile
@@ -136,11 +138,17 @@ async def create_resource_stream(
             yield _sse("progress", progress=0.6, step="reviewing", message="正在进行四维度质量审核...")
 
             knowledge_point = req.message[:50]
-            review_result = await review_agent.review(
-                content=generated,
-                knowledge_point=knowledge_point,
-                student_profile=student_profile,
-            )
+            t0 = time.time()
+            try:
+                review_result = await review_agent.review(
+                    content=generated,
+                    knowledge_point=knowledge_point,
+                    student_profile=student_profile,
+                )
+                agent_metrics.record("review", True, (time.time() - t0) * 1000)
+            except Exception as e:
+                agent_metrics.record("review", False, (time.time() - t0) * 1000)
+                raise
 
             yield _sse("progress", progress=1.0, step="completed", message="生成完成")
 
@@ -276,11 +284,17 @@ async def review_resource(
     user: Student = Depends(get_current_user),
 ):
     """对学习资源内容进行四维度智能审核"""
-    result = await review_agent.review(
-        content=req.content,
-        knowledge_point=req.knowledge_point,
-    )
-    return result
+    t0 = time.time()
+    try:
+        result = await review_agent.review(
+            content=req.content,
+            knowledge_point=req.knowledge_point,
+        )
+        agent_metrics.record("review", True, (time.time() - t0) * 1000)
+        return result
+    except Exception as e:
+        agent_metrics.record("review", False, (time.time() - t0) * 1000)
+        raise
 
 
 # ====================================================================
@@ -320,6 +334,44 @@ async def list_resources(
         }
         for r in resources
     ]
+
+
+# ====================================================================
+# 4b. GET /{resource_id} — 单个资源详情
+# ====================================================================
+
+@router.get("/{resource_id}")
+async def get_resource(
+    resource_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: Student = Depends(get_current_user),
+):
+    """获取单个资源详情"""
+    try:
+        rid = uuid.UUID(resource_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="无效的资源 ID")
+
+    result = await db.execute(
+        select(Resource).where(Resource.id == rid)
+    )
+    r = result.scalar_one_or_none()
+    if not r:
+        raise HTTPException(status_code=404, detail="资源不存在")
+    if r.student_id != user.id and not r.is_preset:
+        raise HTTPException(status_code=403, detail="只能查看自己的资源")
+
+    return {
+        "resource_id": str(r.id),
+        "title": r.title,
+        "resource_type": r.resource_type,
+        "content": r.content,
+        "knowledge_point": r.knowledge_point,
+        "difficulty": r.difficulty,
+        "is_favorited": r.is_favorited,
+        "is_preset": r.is_preset,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+    }
 
 
 # ====================================================================
@@ -733,6 +785,7 @@ async def score_answer(
     user: Student = Depends(get_current_user),
 ):
     """AI 智能评分简答题"""
+    t0 = time.time()
     try:
         result = await scoring_agent.score_answer(
             question=req.question,
@@ -740,7 +793,9 @@ async def score_answer(
             student_answer=req.student_answer,
             knowledge_point=req.knowledge_point,
         )
+        agent_metrics.record("scoring", True, (time.time() - t0) * 1000)
         return result
     except Exception as e:
+        agent_metrics.record("scoring", False, (time.time() - t0) * 1000)
         logger.exception("[score-answer] 异常")
         raise HTTPException(status_code=500, detail=f"评分失败: {str(e)}")

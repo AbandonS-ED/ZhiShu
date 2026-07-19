@@ -58,13 +58,6 @@ interface Session {
 
 const SESSION_STORAGE_KEY = 'zhishu_chat_session'
 
-const defaultSuggestions = [
-  { text: '讲解 A* 搜索算法的原理', tag: '搜索', tagClass: 'tag-info' },
-  { text: 'CNN 卷积神经网络原理', tag: 'CV', tagClass: 'tag-green' },
-  { text: '监督学习 vs 无监督学习', tag: 'ML', tagClass: 'tag-dark' },
-  { text: '出 5 道搜索算法练习题', tag: '练习', tagClass: 'tag-warm' },
-]
-
 export default function DuihuaPage() {
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [input, setInput] = useState('')
@@ -263,7 +256,7 @@ export default function DuihuaPage() {
           if (newSid) {
             setSessionId(newSid)
             localStorage.setItem(SESSION_STORAGE_KEY, newSid)
-            chatApi.getSessions(studentId).then(setSessions).catch(() => {})
+            chatApi.getSessions(studentId).then(setSessions).catch(err => console.error('[duihua] getSessions 失败:', err))
           }
         }
         if (e.type === 'progress' && e.message) setStatus(e.message)
@@ -313,14 +306,14 @@ export default function DuihuaPage() {
             student_id: studentId,
             action: 'chat',
             knowledge_point: userMsg,
-          }).catch(() => {})
-          
+          }).catch(err => console.error('[duihua] recordAction 失败:', err))
+
           // 使用 AI Agent 分析对话行为并更新画像
           if (e.type === 'done' && (streamContent || isStructuredResult)) {
             profileApi.analyzeBehavior('chat', {
               message: userMsg,
               response_length: streamContent.length,
-            }).catch(() => {})
+            }).catch(err => console.error('[duihua] analyzeBehavior 失败:', err))
           }
           if (e.type === 'error') {
             setMessages((prev) => {
@@ -586,7 +579,7 @@ export default function DuihuaPage() {
                           btn.style.color = 'var(--brand)'
                           btn.style.background = 'var(--brand-soft)'
                           if (dislikeBtn) { dislikeBtn.style.color = ''; dislikeBtn.style.background = ''; dislikeBtn.classList.remove('active') }
-                          evaluationApi.recordAction({ student_id: studentId, action: 'like', knowledge_point: 'feedback' }).catch(() => {})
+                          evaluationApi.recordAction({ student_id: studentId, action: 'like', knowledge_point: 'feedback' }).catch(err => console.error('[duihua] like 反馈记录失败:', err))
                         } else {
                           btn.style.color = ''
                           btn.style.background = ''
@@ -610,7 +603,7 @@ export default function DuihuaPage() {
                           btn.style.color = 'var(--danger)'
                           btn.style.background = 'var(--danger-soft)'
                           if (likeBtn) { likeBtn.style.color = ''; likeBtn.style.background = ''; likeBtn.classList.remove('active') }
-                          evaluationApi.recordAction({ student_id: studentId, action: 'dislike', knowledge_point: 'feedback' }).catch(() => {})
+                          evaluationApi.recordAction({ student_id: studentId, action: 'dislike', knowledge_point: 'feedback' }).catch(err => console.error('[duihua] dislike 反馈记录失败:', err))
                         } else {
                           btn.style.color = ''
                           btn.style.background = ''

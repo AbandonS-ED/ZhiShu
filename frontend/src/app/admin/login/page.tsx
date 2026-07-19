@@ -10,8 +10,10 @@ export default function AdminLoginPage() {
   const { login } = useAdmin()
   const noRef = useRef<HTMLInputElement>(null)
 
-  const [no, setNo] = useState('admin')
-  const [pw, setPw] = useState('admin123')
+  // 仅开发环境预填默认管理员凭据，生产环境强制手动输入
+  const isDev = process.env.NODE_ENV === 'development'
+  const [no, setNo] = useState(isDev ? 'admin' : '')
+  const [pw, setPw] = useState(isDev ? 'admin123' : '')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
 

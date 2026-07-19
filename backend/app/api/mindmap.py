@@ -46,6 +46,22 @@ async def generate_mindmap(req: MindMapGenRequest, db: AsyncSession = Depends(ge
         student_profile=student_profile,
     )
 
+    # 画像联动：思维导图创建 → imagination 维度
+    try:
+        from app.services.profile_service import apply_rule_updates
+        await apply_rule_updates(
+            db=db,
+            student_id=req.student_id,
+            rule_updates=[{
+                "dimension": "imagination",
+                "score_change": 1,
+                "reason": f"创建思维导图：{req.knowledge_point}",
+            }],
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"[mindmap] 画像更新失败: {e}")
+
     return {
         "knowledge_point": req.knowledge_point,
         "mindmap": result,

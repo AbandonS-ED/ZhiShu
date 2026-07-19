@@ -56,9 +56,3 @@ def get_llm_client():
         logger.info("LLM provider: minimax (%s)", settings.MINIMAX_BASE_URL)
 
     return _client
-
-
-def reset_client():
-    """重置客户端（用于测试或热切换）"""
-    global _client
-    _client = None

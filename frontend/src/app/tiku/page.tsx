@@ -14,7 +14,7 @@ const HIDDEN_KEY = 'zhishu_hidden_exercises'
 // 与 api.ts / types/index.ts 保持一致
 interface Exercise {
   exercise_id: string
-  type: 'choice' | 'short_answer'
+  type: 'choice' | 'judge' | 'short_answer' | 'coding'
   question: string
   options?: string[]
   answer?: string
@@ -38,11 +38,11 @@ interface RecentItem {
 }
 
 function getTypeLabel(type: string) {
-  return { choice: '选择题', short_answer: '简答题' }[type] || type
+  return { choice: '选择题', judge: '判断题', short_answer: '简答题', coding: '编程题' }[type] || type
 }
 
 function getTypeClass(type: string) {
-  return { choice: 'type-choice', short_answer: 'type-short' }[type] || ''
+  return { choice: 'type-choice', judge: 'type-judge', short_answer: 'type-short', coding: 'type-code' }[type] || ''
 }
 
 function getDiffLabel(d?: number) {
@@ -123,6 +123,19 @@ export default function TikuPage() {
   const msgQueueRef = useRef<string[]>([])
   const msgTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastMsgTimeRef = useRef(0)
+
+  // AI 分析节流：每 5 题调一次 analyzeBehavior
+  const analyzeCountRef = useRef(0)
+  const maybeAnalyzeBehavior = useCallback((ex: Exercise, correct: boolean) => {
+    analyzeCountRef.current++
+    if (analyzeCountRef.current % 5 !== 0) return
+    profileApi.analyzeBehavior('exercise', {
+      knowledge_point: ex.knowledge_point,
+      correct,
+      question_type: ex.type,
+      total_answered: analyzeCountRef.current,
+    }).catch(err => console.error('[tiku] analyzeBehavior 失败:', err))
+  }, [])
 
   // 从 URL 读取 ?kp=xxx，自动填入知识点输入框
   useEffect(() => {
@@ -227,7 +240,7 @@ export default function TikuPage() {
             resource_type: 'exercise',
             knowledge_point: data.knowledge_point || genInput.trim(),
             detail: { count: data.count || newExs.length },
-          }).catch(() => {})
+          }).catch(err => console.error('[tiku] recordAction 失败:', err))
         }
         if (e.type === 'error') {
           clearMsgQueue()
@@ -289,17 +302,23 @@ export default function TikuPage() {
       resource_type: 'exercise',
       knowledge_point: ex.knowledge_point,
       score: correct ? 100 : 0,
-    }).catch(() => {})
-    // 使用 AI Agent 分析练习行为并更新画像
-    profileApi.analyzeBehavior('exercise', {
-      knowledge_point: ex.knowledge_point,
-      correct: correct,
-      question_type: ex.type,
-    }).catch(() => {})
+    }).catch(err => console.error('[tiku] 后台上报失败:', err))
+    // 规则引擎：答题正确率 → 应用转化维度
+    const newAnswers = { ...answers, [id]: { selected, correct } }
+    const total = Object.keys(newAnswers).length
+    const correctCount = Object.values(newAnswers).filter(a => a.correct === true).length
+    if (total >= 3) {
+      profileApi.updateBehavior({ exercise_correct_rate: correctCount / total })
+        .catch(err => console.error('[tiku] updateBehavior 失败:', err))
+    }
+    // AI Agent 分析：每 5 题批量调一次
+    maybeAnalyzeBehavior(ex, correct)
     // 答错自动加入错题本
     if (!correct) {
+      const sid = getStudentId()
+      if (!sid) return
       wrongQuestionsApi.add({
-        student_id: getStudentId()!,
+        student_id: sid,
         exercise_id: id,
         wrong_answer: String.fromCharCode(65 + selected),
       }).then(() => {
@@ -309,7 +328,7 @@ export default function TikuPage() {
         showToast('加入错题本失败')
       })
     }
-  }, [answers, exercises, addRecent])
+  }, [answers, exercises, addRecent, maybeAnalyzeBehavior])
 
   const answerJudge = useCallback((id: string, selected: boolean) => {
     if (answers[id]) return
@@ -324,17 +343,23 @@ export default function TikuPage() {
       resource_type: 'exercise',
       knowledge_point: ex.knowledge_point,
       score: correct ? 100 : 0,
-    }).catch(() => {})
-    // 使用 AI Agent 分析练习行为并更新画像
-    profileApi.analyzeBehavior('exercise', {
-      knowledge_point: ex.knowledge_point,
-      correct: correct,
-      question_type: ex.type,
-    }).catch(() => {})
+    }).catch(err => console.error('[tiku] 后台上报失败:', err))
+    // 规则引擎：答题正确率 → 应用转化维度
+    const newAnswers = { ...answers, [id]: { selected, correct } }
+    const total = Object.keys(newAnswers).length
+    const correctCount = Object.values(newAnswers).filter(a => a.correct === true).length
+    if (total >= 3) {
+      profileApi.updateBehavior({ exercise_correct_rate: correctCount / total })
+        .catch(err => console.error('[tiku] updateBehavior 失败:', err))
+    }
+    // AI Agent 分析：每 5 题批量调一次
+    maybeAnalyzeBehavior(ex, correct)
     // 答错自动加入错题本
     if (!correct) {
+      const sid = getStudentId()
+      if (!sid) return
       wrongQuestionsApi.add({
-        student_id: getStudentId()!,
+        student_id: sid,
         exercise_id: id,
         wrong_answer: selected ? '对' : '错',
       }).then(() => {
@@ -344,7 +369,7 @@ export default function TikuPage() {
         showToast('加入错题本失败')
       })
     }
-  }, [answers, exercises, addRecent])
+  }, [answers, exercises, addRecent, maybeAnalyzeBehavior])
 
   const answerShort = useCallback(async (id: string, value: string) => {
     if (!value.trim()) return
@@ -644,7 +669,7 @@ export default function TikuPage() {
         <div className="ex-main">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <div className="ex-tabs">
-              {(['all', 'choice', 'short_answer'] as const).map((t) => (
+              {(['all', 'choice', 'judge', 'short_answer', 'coding'] as const).map((t) => (
                 <button
                   key={t}
                   className={`ex-tab${tab === t ? ' active' : ''}`}
@@ -768,9 +793,6 @@ export default function TikuPage() {
                           <strong>参考答案：</strong>{ex.answer}
                         </div>
                       )}
-                      {ex.explanation}
-                    </div>
-                  )}
                       {ex.explanation}
                     </div>
                   )}

@@ -34,6 +34,20 @@ import { clearStudentIdCache } from './student'
 
 export type { ChatEvent }
 
+// 清除画像缓存（行为更新后调用，确保下次进画像页读最新数据）
+function clearProfileCache() {
+  try {
+    const raw = localStorage.getItem('zhishu_student')
+    if (raw) {
+      const sid = JSON.parse(raw)?.id
+      if (sid) {
+        localStorage.removeItem(`profile_${sid}`)
+        localStorage.removeItem(`profile_time_${sid}`)
+      }
+    }
+  } catch { /* ignore */ }
+}
+
 // 学习包生成 SSE 事件类型
 export interface GenerationEvent {
   type: 'progress' | 'token' | 'result' | 'error' | 'done'
@@ -146,7 +160,7 @@ export const profileApi = {
     request<{ status: string; message: string; updated: boolean }>('/profile/update-behavior', {
       method: 'POST',
       body: JSON.stringify(data),
-    }),
+    }).then(r => { clearProfileCache(); return r }),
 
   analyzeBehavior: (behavior_type: string, behavior_data: Record<string, unknown> = {}) =>
     request<{ status: string; updates?: Array<{ dimension: string; score_change: number; reason: string }>; summary?: string; updated_count?: number }>(
@@ -155,13 +169,13 @@ export const profileApi = {
         method: 'POST',
         body: JSON.stringify({ behavior_type, behavior_data }),
       }
-    ),
+    ).then(r => { clearProfileCache(); return r }),
 
   forceAnalyze: () =>
     request<{ status: string; updates?: Array<{ dimension: string; score_change: number; reason: string }>; summary?: string; updated_count?: number }>(
       '/profile/force-analyze',
       { method: 'POST' }
-    ),
+    ).then(r => { clearProfileCache(); return r }),
 
   getAnalysisStatus: () =>
     request<{ has_profile: boolean; last_analyzed_at: string | null; assessment_status: string }>(
@@ -243,10 +257,6 @@ export const exerciseApi = {
           types: types || ['choice', 'judge', 'short_answer']
         }),
       }
-    ),
-  list: (student_id: string) =>
-    request<Array<Exercise & { created_at: string }>>(
-      `/resource/exercises/${student_id}`
     ),
 }
 
@@ -335,9 +345,9 @@ export interface CourseProgress {
 }
 
 export const dashboardApi = {
-  getStats: (student_id: string = '00000000-0000-0000-0000-000000000001') =>
+  getStats: (student_id: string) =>
     request<DashboardStats>(`/dashboard/stats?student_id=${student_id}`),
-  getCourses: (student_id: string = '00000000-0000-0000-0000-000000000001') =>
+  getCourses: (student_id: string) =>
     request<{ courses: CourseProgress[] }>(`/dashboard/courses?student_id=${student_id}`),
 }
 
@@ -361,14 +371,11 @@ export const resourceApi = {
       body: JSON.stringify(data),
     }),
 
-  review: (data: ReviewRequest) =>
-    request<ReviewResult>('/resource/review', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
   list: (studentId: string) =>
     request<ResourceItem[]>(`/resource/list?student_id=${studentId}`),
+
+  getById: (resourceId: string) =>
+    request<ResourceItem>(`/resource/${resourceId}`),
 
   save: (data: SaveResourceRequest) =>
     request<ResourceItem>('/resource/save', {
@@ -519,11 +526,6 @@ export const authApi = {
     request<{ message: string }>('/auth/send-code', {
       method: 'POST',
       body: JSON.stringify({ phone }),
-    }),
-  verifyCode: (phone: string, code: string) =>
-    request<{ message: string }>('/auth/verify-code', {
-      method: 'POST',
-      body: JSON.stringify({ phone, code }),
     }),
   getMe: () => request<AuthStudent>('/auth/me', { method: 'GET' }),
   updateMe: (data: { name?: string; email?: string; major?: string; grade?: string }) =>
@@ -791,33 +793,6 @@ export interface LearningPath {
 }
 
 export const studyPlanApi = {
-  // 创建学习计划
-  create: (data: { knowledge_point: string; difficulty?: string; prerequisites?: string[] }) =>
-    request<{ success: boolean; data: StudyPlan }>('/study-plan/create', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  // 获取学习计划列表
-  list: (status?: string) => {
-    const params = status ? `?status=${status}` : ''
-    return request<{ success: boolean; data: StudyPlan[] }>(`/study-plan/list${params}`)
-  },
-
-  // 获取学习计划详情
-  get: (planId: string) =>
-    request<{ success: boolean; data: StudyPlan }>(`/study-plan/${planId}`),
-
-  // 完成学习步骤
-  completeStep: (planId: string, stepId: string) =>
-    request<{ success: boolean; data: { completed_steps: number; total_steps: number; all_completed: boolean; plan_status: string } }>(
-      `/study-plan/${planId}/complete-step`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ step_id: stepId }),
-      }
-    ),
-
   // 生成学习路径
   generatePath: (data: { target_knowledge: string; current_level?: string }) =>
     request<{ success: boolean; data: LearningPath }>('/study-plan/generate-path', {

@@ -2,7 +2,7 @@
 
 > **时长**: 7分钟  
 > **重点**: 应用价值 + AI技术融合 + 创新点 + 核心功能  
-> **最后更新**: 2026-07-18（文档同步版本 — 实际 7 维画像 / 14 Agent / 28 页面 / 69 端点 / 18 Service / 15 张表 / 110 pytest / 9 真流式）
+> **最后更新**: 2026-07-19（文档同步版本 — 实际 7 维画像 / 15 Agent / 28 页面 / 71 端点 / 15 Service / 13 表 / 26 个审计修复 + 画像联动双路径）
 >
 > **最后同步**: 2026-07-17 — 实际演示建议：增加 ① 自习模式 v1.5 演示（TF.js + MoveNet 摄像头本地姿态检测）② 评估报告 LLM 演示（/pinggu 优势/弱项/易错区）③ 管理后台 9 页面概览（admin/admin123）④ 统一 SSE 工具的真实流式过程 ⑤ 公共题库 / AI 出题题池合并演示 ⑥ 设置页个人中心演示 ⑦ **学习计划模块** 演示（/plan + AI 生成路径 + 节点学习 + AI 测验 + 综合测试）
 
@@ -90,7 +90,7 @@
 ```
 
 **技术亮点**：
-- **17 个 Agent 模块** + Master Agent 编排器（LangGraph StateGraph 10 节点）
+- **15 个 Agent 模块** + Master Agent 编排器（LangGraph StateGraph 10 节点）
 - 双层路由：关键词快路由 + LLM 意图分类
 - RAG 检索增强 + 防幻觉三层验证
 
@@ -98,7 +98,7 @@
 
 ### 第5页：核心功能1 — 对话式画像（50秒）
 
-**标题**：F1: 六维学习画像，对话式构建
+**标题**：F1: 七维学习画像，对话式构建
 
 **演示要点**：
 1. 打开 `/profile` 页面，点 "🤖 AI 对话式画像" 弹窗
@@ -114,6 +114,7 @@ knowledge_mastery | learning_style | cognitive_level | interests | weak_topics |
 **创新点**：
 - 非表单式，自然对话构建
 - 随学随新，画像持续更新（`is_current` 指向最新版本）
+- **画像联动双路径**：规则引擎(即时/高频/确定性) + AI 分析(批量/低频/LLM 深度洞察)，7 维全联动
 
 ---
 
@@ -232,7 +233,7 @@ knowledge_mastery | learning_style | cognitive_level | interests | weak_topics |
 |------|------|
 | 前端 | Next.js 14.2.5 + TailwindCSS 3.4 + 自定义 CSS（米色/墨黑/琥珀） |
 | 后端 | FastAPI 0.136 + SQLAlchemy 2.0 async + asyncpg |
-| 多智能体 | 17 个 Agent 模块 + Master Agent（LangGraph StateGraph 10 节点） |
+| 多智能体 | 15 个 Agent 模块 + Master Agent（LangGraph StateGraph 10 节点） |
 | 大模型 | **小米 MiMo v2.5**（当前） / MiniMax-M3 / 讯飞星火 V4（比赛前切换） |
 | 向量库 | pgvector（Python 包已装，扩展未装） / JSONB fallback |
 | 关系库 | PostgreSQL 18 |
@@ -344,7 +345,7 @@ Q&A
 
 | 评委可能问 | 答 |
 |---|---|
-| 为什么不用 LangGraph？ | 已用 LangGraph StateGraph 10 节点编排 17 个 Agent 模块，状态图模型天然支持多Agent协同的条件路由和并行执行 |
+| 为什么不用 LangGraph？ | 已用 LangGraph StateGraph 10 节点编排 15 个 Agent 模块，状态图模型天然支持多Agent协同的条件路由和并行执行 |
 | 流式真的是逐 token 吗？ | 是。tutor/chat 是真逐 token；⭐ 2026-06-09 新增 dual-format 协议，练习题也升级为真流式 |
 | 讯飞星火 V4 怎么切换？ | `.env` 配 `LLM_PROVIDER=spark` + `SPARK_API_KEY`，lifespan 自动切换客户端 |
 | 防幻觉如何验证？ | 三个层面：模式正则、引用验证、LLM 语义校验。详见 anti_hallucination.py |

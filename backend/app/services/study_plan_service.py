@@ -10,6 +10,7 @@
 import uuid
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from sqlalchemy import select, update, delete, func, and_
@@ -17,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.study_plan import StudyPlan, StudyPlanStep, LearningPath
 from app.models.student_profile import StudentProfile
 from app.services.llm_factory import get_llm_client
+from app.services.json_parser import parse_json_response
+from app.core.agent_metrics import agent_metrics
 from app.agents.learning_path_agent import learning_path_agent
 
 logger = logging.getLogger(__name__)
@@ -316,11 +319,17 @@ class StudyPlanService:
             profile = await self._get_student_profile(db, student_id)
             
             # 使用专门的Agent生成学习路径
-            path_data = await learning_path_agent.generate_path(
-                target_knowledge=target_knowledge,
-                current_level=current_level,
-                student_profile=profile
-            )
+            t0 = time.time()
+            try:
+                path_data = await learning_path_agent.generate_path(
+                    target_knowledge=target_knowledge,
+                    current_level=current_level,
+                    student_profile=profile
+                )
+                agent_metrics.record("learning_path", True, (time.time() - t0) * 1000)
+            except Exception as e:
+                agent_metrics.record("learning_path", False, (time.time() - t0) * 1000)
+                raise
             
             # 保存路径
             path_name = path_data.get("name", f"{target_knowledge}学习路径")
@@ -464,22 +473,15 @@ class StudyPlanService:
             ]
             
             response = await llm.chat(messages, max_tokens=2000, temperature=0.7)
-            
-            # 解析响应
+
+            # 解析响应（统一用 parse_json_response，支持 think 标签/裸数组/JSON 代码块）
             content = response.get("content", "")
-            
-            # 尝试提取JSON
-            try:
-                # 查找JSON块
-                json_start = content.find("{")
-                json_end = content.rfind("}") + 1
-                if json_start >= 0 and json_end > json_start:
-                    json_str = content[json_start:json_end]
-                    plan_data = json.loads(json_str)
-                    return plan_data
-            except json.JSONDecodeError:
-                pass
-            
+            plan_data = parse_json_response(content)
+
+            # 检查解析结果是否有效（必须有 steps/title 等字段）
+            if plan_data and (plan_data.get("steps") or plan_data.get("title")):
+                return plan_data
+
             # 如果解析失败，返回默认计划
             return self._get_default_plan(knowledge_point, difficulty)
             
@@ -487,120 +489,8 @@ class StudyPlanService:
             logger.warning("AI生成计划失败，使用默认计划: %s", e)
             return self._get_default_plan(knowledge_point, difficulty)
 
-    async def _generate_path_with_ai(
-        self,
-        target_knowledge: str,
-        current_level: str,
-        profile: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """调用AI生成学习路径"""
-        try:
-            llm = get_llm_client()
-            
-            profile_info = ""
-            if profile.get("dimensions"):
-                dims = profile["dimensions"]
-                strong_points = [k for k, v in dims.items() if v >= 70]
-                weak_points = [k for k, v in dims.items() if v < 50]
-                if strong_points:
-                    profile_info += f"学生优势: {', '.join(strong_points)}\n"
-                if weak_points:
-                    profile_info += f"学生薄弱点: {', '.join(weak_points)}"
-            
-            system_prompt = """你是一个专业的学科规划专家，精通各学科的知识体系。你需要根据学生要学习的内容，生成该学科的详细知识目录，就像教材的目录一样具体。
-
-输出格式（JSON）:
-{
-  "name": "学习路径名称",
-  "description": "路径描述",
-  "nodes": [
-    {
-      "id": "node_1",
-      "knowledge_point": "具体知识点名称（如：函数与极限、导数与微分、不定积分）",
-      "category": "分类（如：基础篇、进阶篇、应用篇）",
-      "order": 1,
-      "status": "pending",
-      "prerequisites": [],
-      "description": "简要说明"
-    }
-  ]
-}
-
-示例 - 如果学习"高等数学"，应该生成：
-[
-  {"knowledge_point": "函数与极限", "category": "基础篇"},
-  {"knowledge_point": "导数与微分", "category": "基础篇"},
-  {"knowledge_point": "微分中值定理与导数应用", "category": "基础篇"},
-  {"knowledge_point": "不定积分", "category": "积分篇"},
-  {"knowledge_point": "定积分", "category": "积分篇"},
-  {"knowledge_point": "定积分的应用", "category": "积分篇"},
-  {"knowledge_point": "微分方程", "category": "微分方程篇"},
-  {"knowledge_point": "空间解析几何", "category": "多元篇"},
-  {"knowledge_point": "多元函数微分学", "category": "多元篇"},
-  {"knowledge_point": "重积分", "category": "多元篇"},
-  {"knowledge_point": "曲线积分与曲面积分", "category": "多元篇"},
-  {"knowledge_point": "无穷级数", "category": "级数篇"}
-]
-
-示例 - 如果学习"Python编程"，应该生成：
-[
-  {"knowledge_point": "Python环境搭建与基础语法", "category": "入门篇"},
-  {"knowledge_point": "变量、数据类型与运算符", "category": "入门篇"},
-  {"knowledge_point": "流程控制语句", "category": "基础篇"},
-  {"knowledge_point": "函数与模块", "category": "基础篇"},
-  {"knowledge_point": "列表与元组", "category": "数据结构篇"},
-  {"knowledge_point": "字典与集合", "category": "数据结构篇"},
-  {"knowledge_point": "字符串处理", "category": "数据结构篇"},
-  {"knowledge_point": "面向对象编程", "category": "进阶篇"},
-  {"knowledge_point": "异常处理与文件操作", "category": "进阶篇"},
-  {"knowledge_point": "常用标准库", "category": "进阶篇"},
-  {"knowledge_point": "装饰器与生成器", "category": "高级篇"},
-  {"knowledge_point": "并发编程基础", "category": "高级篇"}
-]
-
-要求:
-1. 知识点要具体、专业，是该学科真实的知识点名称
-2. 按照学习顺序排列，从基础到进阶
-3. 共10-15个知识点
-4. 每个知识点都要有明确的前置依赖
-5. 体现该学科的完整知识体系"""
-
-            user_prompt = f"""请为"{target_knowledge}"生成详细的学习路径目录。
-
-要求：像教材目录一样，列出该学科的具体知识点名称，不要用笼统的概括。
-
-{profile_info}
-
-请直接输出JSON。"""
-
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
-            
-            response = await llm.chat(messages, max_tokens=2000, temperature=0.7)
-            
-            content = response.get("content", "")
-            
-            # 解析JSON
-            try:
-                json_start = content.find("{")
-                json_end = content.rfind("}") + 1
-                if json_start >= 0 and json_end > json_start:
-                    json_str = content[json_start:json_end]
-                    path_data = json.loads(json_str)
-                    return path_data
-            except json.JSONDecodeError:
-                pass
-            
-            return self._get_default_path(target_knowledge)
-            
-        except Exception as e:
-            logger.warning("AI生成路径失败，使用默认路径: %s", e)
-            return self._get_default_path(target_knowledge)
-
     def _get_default_plan(
-        self, 
+        self,
         knowledge_point: str, 
         difficulty: str
     ) -> Dict[str, Any]:

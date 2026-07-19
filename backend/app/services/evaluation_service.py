@@ -240,6 +240,27 @@ class EvaluationService:
         # 计算近期趋势
         trend = await self._calculate_trend(db, student_id)
 
+        # 学习路径进度（取最新一条 LearningPath 的节点完成情况）
+        from app.models.study_plan import LearningPath
+        latest_path_result = await db.execute(
+            select(LearningPath.nodes)
+            .where(LearningPath.student_id == uuid.UUID(student_id))
+            .order_by(LearningPath.updated_at.desc())
+            .limit(1)
+        )
+        latest_nodes = latest_path_result.scalar() or []
+        if isinstance(latest_nodes, str):
+            try:
+                latest_nodes = json.loads(latest_nodes)
+            except Exception:
+                latest_nodes = []
+        total_nodes = len(latest_nodes) if isinstance(latest_nodes, list) else 0
+        completed_nodes = (
+            sum(1 for n in latest_nodes if isinstance(n, dict) and n.get("status") == "completed")
+            if isinstance(latest_nodes, list)
+            else 0
+        )
+
         # 尝试用 LLM 生成报告，失败则降级到规则引擎
         llm_report = await self._generate_llm_report(
             student_name=student_name,
@@ -281,6 +302,30 @@ class EvaluationService:
             db.add(cached_record)
             await db.commit()
             logger.info(f"报告已缓存: student_id={student_id}, date={today}")
+
+            # 画像联动：评估分数 → comprehension + knowledge_base
+            try:
+                from app.services.profile_service import apply_rule_updates
+                score = report_data["overall_score"]
+                if score >= 80:
+                    boost = 3
+                elif score >= 60:
+                    boost = 2
+                elif score < 40:
+                    boost = -1
+                else:
+                    boost = 0
+                if boost != 0:
+                    await apply_rule_updates(
+                        db=db,
+                        student_id=student_id,
+                        rule_updates=[
+                            {"dimension": "comprehension", "score_change": boost, "reason": f"评估分数{score:.0f}"},
+                            {"dimension": "knowledge_base", "score_change": boost, "reason": f"评估分数{score:.0f}"},
+                        ],
+                    )
+            except Exception as e:
+                logger.warning(f"[evaluation] 画像更新失败: {e}")
         except Exception as e:
             logger.warning(f"报告缓存失败: {e}")
             await db.rollback()

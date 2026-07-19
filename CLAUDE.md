@@ -15,10 +15,10 @@
 |---|---|---|---|
 | 前端 | Next.js (App Router) + Tailwind CSS + TypeScript | 14.2.5 | 本地 woff 字体，无 Google Fonts |
 | 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 | Python 3.11 |
-| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 14 Agent 模块 |
+| Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 15 Agent 模块 |
 | LLM | 三客户端: MimoClient (当前) / MiniMaxClient / SparkClient | - | `LLM_PROVIDER=mimo\|minimax\|spark` 切换 |
 | 向量库 | pgvector (JSONB 降级方案) | - | embedding 用 JSONB 占位 |
-| 数据库 | PostgreSQL 18 + Redis | - | 14 张表 |
+| 数据库 | PostgreSQL 18 + Redis | - | 13 张表 |
 | 异步任务 | Celery (Redis broker) | - | 每日 4 点预生成评估报告 |
 
 ## 项目结构
@@ -46,13 +46,13 @@ ZhiShu/
 │   └── src/hooks/usePageTimer.ts    # 页面停留计时器
 ├── backend/                         # FastAPI 后端
 │   ├── app/main.py                  # 应用入口 + 路由注册
-│   ├── app/api/                     # 11 个路由模块 (69 端点)
-│   ├── app/agents/                  # 14 个 Agent 文件 + StateGraph 编排
-│   ├── app/services/                # 18 个服务模块
-│   ├── app/models/                  # 14 个数据模型
+│   ├── app/api/                     # 11 个路由模块 (71 端点)
+│   ├── app/agents/                  # 15 个 Agent 文件 + StateGraph 编排
+│   ├── app/services/                # 15 个服务模块
+│   ├── app/models/                  # 13 个数据模型
 │   ├── app/tasks/                   # Celery 异步任务
 │   └── app/core/                    # 核心模块 (配置/数据库/安全)
-├── tests/                           # 110 pytest + 冒烟测试
+├── tests/                           # 106 pytest + 冒烟测试
 ├── docs/                            # 设计文档
 ├── scripts/                         # 数据库初始化脚本
 ├── docker-compose.yml               # Docker 编排
@@ -97,7 +97,7 @@ cd backend && celery -A app.core.celery_config worker --loglevel=info
 cd backend && celery -A app.core.celery_config beat --loglevel=info
 
 # 测试
-cd backend && python -m pytest tests/ -v          # 110 pytest
+cd backend && python -m pytest tests/ -v          # 106 pytest
 cd backend && python -m tests.smoke_test           # 端到端 9 API
 cd frontend && npm run lint                        # 0 errors
 cd frontend && npm run build                       # 28 页面
@@ -166,7 +166,28 @@ study_patrol / study_session_end → learning_records
 | `/api/v1/resource/exercises/pool` | GET | 题池加载 |
 | `/api/v1/wrong-questions/{id}/analyze/stream` | ✅ 真流式 | Agent 4 步思考链 |
 
-### 数据库表关系 (15 张表)
+### 画像更新双路径架构
+
+```
+规则引擎 apply_rule_updates（即时/高频/确定性规则）:
+  每次答题 → application（正确率映射）
+  每次学习 → memory + focus（学习时长映射）
+  节点完成 → learning_goal（每节点 +2，全完成 +5）
+  评估报告 → comprehension + knowledge_base（≥80 +3 / ≥60 +2 / <40 -1）
+  错题回顾 → memory（答对 +1 / 掌握 +3 / 答错 -1）
+  思维导图 → imagination（每次 +1）
+
+AI 分析 analyzeBehavior（批量/低频/LLM 深度洞察）:
+  tiku 每 5 题 → 全 7 维 AI 推断
+  zixi 结束时 → 全 7 维 AI 推断
+  resources 学习 → analyzeBehavior('study')
+  duihua 对话 → analyzeBehavior('chat')
+  定时分析 → 每 4 小时 scheduled_analysis_service
+
+画像缓存 5 分钟 + 行为更新后自动清 localStorage
+```
+
+### 数据库表关系 (13 张表)
 
 `students` 1:N `student_profiles` / `chat_sessions` / `resources` / `learning_paths` / `exercises` / `learning_records` / `evaluation_reports` / `wrong_questions` / `study_plans` / `learning_activity_logs`
 
@@ -219,7 +240,7 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 对话页刷新修复 (sessionId 持久化 + loadSession 渲染)
 - ✅ 骨架屏 loading (4 页面 shimmer 动画)
 - ✅ 评估报告 AI 化 + 预生成缓存 + 定时生成
-- ✅ 管理后台 API 增强 (18 端点 + 14 Agent 模块 + 并行查询 + N+1 优化)
+- ✅ 管理后台 API 增强 (18 端点 + 15 Agent 模块 + 并行查询 + N+1 优化)
 - ✅ 手机验证码注册 (控制台输出 + 5 分钟有效期 + 手机号唯一)
 - ✅ 三页面接入真实 API (paths/chats/documents)
 - ✅ forEach async 批量操作修复 (users/page.tsx)
@@ -272,6 +293,10 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 错题分析 Agent 化 (WrongQuestionAgent 4步思考链 + SSE 流式 + 5+3 轮 Review 修复)
 - ✅ `wrong_questions.py` logger 规范化 (__import__ 改为正规 import logging)
 - ✅ 前端页面按 HTML 模板全量重写 (plan/learn/quiz/final-test 页面按 jihua 系列模板 1:1 复刻 + globals.css 模板 CSS 统一)
+- ✅ 全代码库死代码清理 (Batch 1: 删 5 个后端死服务 + 2 片段 -896行; Batch 2: 删 resources 4 组件 + 2 hooks -1449行; Batch 3: 删 requireLogin + 瘦身 appStore -54行 → 合计 ~2400 行)
+- ✅ 资源详情页按 code.html 模板重写 (返回导航 + 资源头52px图标 + 4 tab + 知识内容markdown渲染 + 代码块暗色+复制按钮 + 思维导图mermaid提示 + 练习题卡片答案展开)
+- ✅ 资源列表页统计卡片边框修复 (.res-stats .rs-card → .rs-card 选择器去除父级依赖)
+- ✅ Icon.tsx 补全 6 个图标 (fileText/heart/link/eye/eyeOff/arrowLeft)
 
 ### P2 — 清理项
 

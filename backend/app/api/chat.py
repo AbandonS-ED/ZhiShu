@@ -768,14 +768,3 @@ async def recommend_questions(
         count=req.count,
     )
     return {"questions": questions}
-    """从用户消息中提取知识点（与 master_agent._extract_intent_params 同步）"""
-    import re
-    kp = msg.strip()
-    # 去掉常见动词前缀
-    kp = re.sub(r"^(请|帮我|帮忙|给我想?|给我)?(讲解|解释|说明|介绍|生成|出|写|做|画|规划)?(一下|个|份)?\s*", "", kp)
-    # 去掉尾部修饰
-    kp = re.sub(r"(的原理|的代码|的练习|的思维导图|的学习路径|相关内容|相关知识)?\s*$", "", kp)
-    kp = kp.strip()
-    if len(kp) < 2:
-        kp = msg[:50]
-    return kp

@@ -1,6 +1,7 @@
 """Profile API — 7-dimension personal ability profile."""
 import json
 import logging
+import time
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.sse_utils import sse_stream_response
+from app.core.agent_metrics import agent_metrics
 from app.models.student import Student
 from app.models.student_profile import StudentProfile
 from app.agents.initial_assessment_agent import initial_assessment_agent
@@ -78,34 +80,40 @@ async def assess_stream(
 
     async def event_generator():
         from app.core.database import async_session as db_async_session
+        t0 = time.time()
+        success = False
 
-        async for event in initial_assessment_agent.stream_llm_response(session_id, is_initial):
-            yield event
+        try:
+            async for event in initial_assessment_agent.stream_llm_response(session_id, is_initial):
+                yield event
 
-            # 每轮都保存中间状态，防止用户中途退出丢失数据
-            if '"type": "result"' in event:
-                try:
-                    data = json.loads(event[6:].strip())
-                    dims = data.get("dimensions", {})
-                    is_done = data.get("done", False)
+                # 每轮都保存中间状态，防止用户中途退出丢失数据
+                if '"type": "result"' in event:
+                    try:
+                        data = json.loads(event[6:].strip())
+                        dims = data.get("dimensions", {})
+                        is_done = data.get("done", False)
 
-                    # 检查是否有有效的维度数据
-                    has_valid_dims = any(
-                        d.get("score", 0) > 0 for d in dims.values()
-                    ) if dims else False
+                        # 检查是否有有效的维度数据
+                        has_valid_dims = any(
+                            d.get("score", 0) > 0 for d in dims.values()
+                        ) if dims else False
 
-                    if has_valid_dims:
-                        # 通过统一写入层合并维度（保留高置信度）
-                        async with db_async_session() as db:
-                            await merge_and_save_assessment(
-                                db=db,
-                                student_id=str(current_user.id),
-                                new_dims=dims,
-                                assessment_status="completed" if is_done else "in_progress",
-                            )
+                        if has_valid_dims:
+                            # 通过统一写入层合并维度（保留高置信度）
+                            async with db_async_session() as db:
+                                await merge_and_save_assessment(
+                                    db=db,
+                                    student_id=str(current_user.id),
+                                    new_dims=dims,
+                                    assessment_status="completed" if is_done else "in_progress",
+                                )
 
-                except Exception as e:
-                    logger.error(f"Failed to save profile: {e}")
+                    except Exception as e:
+                        logger.error(f"Failed to save profile: {e}")
+            success = True
+        finally:
+            agent_metrics.record("initial_assessment", success, (time.time() - t0) * 1000)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -368,13 +376,19 @@ async def analyze_behavior(
     db: AsyncSession = Depends(get_db),
 ):
     """使用 AI Agent 分析学习行为并更新画像"""
-    result = await behavior_analysis_agent.analyze_and_update(
-        db=db,
-        student_id=str(current_user.id),
-        behavior_type=req.behavior_type,
-        behavior_data=req.behavior_data,
-    )
-    return result
+    t0 = time.time()
+    try:
+        result = await behavior_analysis_agent.analyze_and_update(
+            db=db,
+            student_id=str(current_user.id),
+            behavior_type=req.behavior_type,
+            behavior_data=req.behavior_data,
+        )
+        agent_metrics.record("behavior_analysis", True, (time.time() - t0) * 1000)
+        return result
+    except Exception as e:
+        agent_metrics.record("behavior_analysis", False, (time.time() - t0) * 1000)
+        raise
 
 
 @router.post("/force-analyze")

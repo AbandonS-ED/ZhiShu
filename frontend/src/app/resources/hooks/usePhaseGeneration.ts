@@ -33,7 +33,6 @@ export function usePhaseGeneration() {
     const studentId = getStudentId()
     if (!studentId) return
 
-    // 清理之前的定时器
     if (progressTimerRef.current) {
       clearInterval(progressTimerRef.current)
       progressTimerRef.current = null
@@ -48,7 +47,6 @@ export function usePhaseGeneration() {
       result: null,
     })
 
-    // 模拟进度：每2秒推进一次，从10%到80%
     let simulatedProgress = 10
     progressTimerRef.current = setInterval(() => {
       simulatedProgress = Math.min(simulatedProgress + Math.random() * 8 + 4, 80)
@@ -72,7 +70,6 @@ export function usePhaseGeneration() {
     }, 2000)
 
     try {
-      // 调用 JSON 端点（后端先生成完再返回）
       const data = await resourceApi.generateLearningPackage(studentId, knowledge_point, phase)
 
       if (progressTimerRef.current) {

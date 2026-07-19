@@ -161,7 +161,7 @@ class MindMapAgent:
 
     def _validate_mermaid(self, code: str) -> str:
         if not code:
-            return "mindmap\n  root((学习主题))\n    概念1\n      细节A\n      细节B\n    概念2\n      细节C\n      细节D"
+            return self.FALLBACK_MERMAID
 
         code = code.strip()
         if code.startswith("```"):
@@ -182,7 +182,7 @@ class MindMapAgent:
     def _parse_response(self, content: str) -> dict:
         return parse_json_response(content, {
             "title": "知识思维导图",
-            "mermaid_code": "mindmap\n  root((学习主题))\n    概念1\n      细节A\n      细节B\n    概念2\n      细节C\n      细节D",
+            "mermaid_code": self.FALLBACK_MERMAID,
             "nodes": [],
             "description": content,
         })
