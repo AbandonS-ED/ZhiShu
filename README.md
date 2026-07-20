@@ -2,6 +2,14 @@
 
 > 第十五届中国软件杯 A3 赛题。基于大模型的个性化资源生成与学习多智能体系统。
 
+## 评委交付（双击即用）
+
+1. 解压 `智枢-SmartHub-v1.0.zip`
+2. 确保已安装 **Python 3.11+** 和 **Node.js 18+**
+3. 双击 `启动智枢.bat`，浏览器自动打开 `http://localhost:3000`
+4. 学生端：注册新账号；管理端：`/admin/login` → admin / admin123
+5. 停止：双击 `停止智枢.bat`
+
 ## 项目简介
 
 智枢 (SmartHub) 是一个面向《人工智能导论》课程的多智能体个性化学习系统。通过 15 个 AI Agent 协同工作，为学生提供对话式学习画像评估、个性化学习资源生成、智能学习路径规划、RAG 智能辅导和效果评估等服务。
@@ -26,7 +34,7 @@
 | 前端 | Next.js (App Router) + Tailwind CSS + TypeScript | 14.2.5 |
 | 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 |
 | Agent | LangGraph StateGraph (10 节点编排 + MessageBus 通信) | 15 Agent |
-| LLM | 三客户端：小米 MiMo v2.5 (当前) / MiniMax-M3 / 讯飞星火 V4 | - |
+| LLM | 三客户端：MiniMax-M3 (当前) / 小米 MiMo v2.5 / 讯飞星火 V4 | - |
 | 数据库 | PostgreSQL 18 (13 张表) + Redis | - |
 | 向量库 | pgvector (JSONB 降级方案) | - |
 | 异步任务 | Celery (Redis broker) | - |
@@ -140,8 +148,8 @@ python scripts/init_admin.py
 cp backend/.env.example backend/.env
 
 # 编辑 .env 填入你的 API Key
-# MIMO_API_KEY=your_key_here  (当前用 MiMo v2.5)
-# 或切换到 MiniMax: LLM_PROVIDER=minimax + MINIMAX_API_KEY=your_key_here
+# MINIMAX_API_KEY=your_key_here  (当前用 MiniMax-M3)
+# 或切换到 MiMo: LLM_PROVIDER=mimo + MIMO_API_KEY=your_key_here
 # 或切换到讯飞星火: LLM_PROVIDER=spark + SPARK_API_KEY=your_key_here
 ```
 
@@ -260,7 +268,7 @@ npm run build
 | `MIMO_API_KEY` | 小米 MiMo API Key | - |
 | `MIMO_BASE_URL` | MiMo 中国集群地址 | https://token-plan-cn.xiaomimimo.com/v1 |
 | `MIMO_MODEL` | MiMo 模型名 | mimo-v2.5 |
-| `LLM_PROVIDER` | LLM 选择 (mimo/minimax/spark) | mimo |
+| `LLM_PROVIDER` | LLM 选择 (minimax/mimo/spark) | minimax |
 | `DATABASE_URL` | PostgreSQL 连接串 | postgresql+asyncpg://postgres:123456@localhost:5432/zhishu |
 | `REDIS_URL` | Redis 连接串 | redis://localhost:6379/0 |
 | `JWT_SECRET` | JWT 密钥 | your_jwt_secret_here |

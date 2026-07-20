@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # LLM 选择: "minimax" / "spark" / "mimo"
     LLM_PROVIDER: str = "mimo"
 
-    CORS_ORIGINS: List[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
 
     # JWT 签名密钥。生产环境 .env 必须设置；开发环境若无则用强随机密钥兜底
     JWT_SECRET: str = ""

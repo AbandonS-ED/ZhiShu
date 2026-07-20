@@ -16,7 +16,7 @@
 | 前端 | Next.js (App Router) + Tailwind CSS + TypeScript | 14.2.5 | 本地 woff 字体，无 Google Fonts |
 | 后端 | FastAPI + SQLAlchemy 2.0 async + asyncpg | 0.136 | Python 3.11 |
 | Agent | LangGraph StateGraph + MessageBus | - | 10 节点编排 + 15 Agent 模块 |
-| LLM | 三客户端: MimoClient (当前) / MiniMaxClient / SparkClient | - | `LLM_PROVIDER=mimo\|minimax\|spark` 切换 |
+| LLM | 三客户端: MiniMaxClient (当前) / MimoClient / SparkClient | - | `LLM_PROVIDER=minimax\|mimo\|spark` 切换 |
 | 向量库 | pgvector (JSONB 降级方案) | - | embedding 用 JSONB 占位 |
 | 数据库 | PostgreSQL 18 + Redis | - | 13 张表 |
 | 异步任务 | Celery (Redis broker) | - | 每日 4 点预生成评估报告 |
@@ -62,12 +62,13 @@ ZhiShu/
 
 ## 硬约束
 
-- **LLM**: 当前用小米 MiMo v2.5（`LLM_PROVIDER=mimo`，`api-key` 头认证）。备选：MiniMax-M3（`minimax`）/ 讯飞星火 V4（`spark`）。比赛前切星火：`LLM_PROVIDER=spark` + `SPARK_API_KEY=xxx`。讯飞鉴权只用 `Authorization: Bearer {api_key}`，不拼 api_secret。
+- **LLM**: 当前用 MiniMax-M3（`LLM_PROVIDER=minimax`，`Authorization: Bearer` 认证）。备选：MiMo v2.5（`mimo`）/ 讯飞星火 V4（`spark`）。比赛前切星火：`LLM_PROVIDER=spark` + `SPARK_API_KEY=xxx`。讯飞鉴权只用 `Authorization: Bearer {api_key}`，不拼 api_secret。
 - **禁用** Google Fonts / Vercel / Sentry / OpenAI（中国不可达）。字体走 `frontend/src/app/fonts/` 本地 woff + `next/font/local`。
 - **pip** 加 `-i https://pypi.tuna.tsinghua.edu.cn/simple`；npm 走 `frontend/.npmrc` 的 `registry.npmmirror.com`。
 - **端口**: 后端 **8001**（不要 8000），前端 3000。`api.ts:3` 的 `BASE_URL` 已同步。用 `start.ps1` 一键启动，`stop.ps1` 一键停止。
 - **bcrypt**: 只用 `import bcrypt`，**不要引入 passlib**（冲突）。
 - **勿提交** `.env` / API 密钥 / `venv/` / `node_modules/` / `.service-pids.json`。
+- **可执行文件打包**: `next.config.mjs` 开启 `output: 'standalone'`，PyInstaller 打包 launcher，`release/` 目录含完整交付包。
 
 ## 命令
 
@@ -114,6 +115,30 @@ intent_recognition → task_planning → conditional_route
 ```
 
 `master_agent.py` 实际节点: `intent_recognition` + `task_planning` + 6 个 `run_*_agent` (document / mindmap / exercise / path / tutor / audio) + `result_aggregation` + `response_generation` = **10 个节点**。另有 `coordinator_agent` / `review_agent` / `resource_creator_agent` / `initial_assessment_agent` / `behavior_analysis_agent` / `wrong_question_agent` / `scoring_agent` / `learning_path_agent` 等辅助 Agent。
+
+### 可执行文件打包（PyInstaller + Next.js standalone）
+
+**目标**：评委双击 `启动智枢.bat` 即可运行，无需 npm/uvicorn 命令。
+
+**打包方案**：
+- 前端：`next.config.mjs` 开启 `output: 'standalone'`，PyInstaller 打包 `SmartHub-Frontend.exe`（7.8MB）+ standalone 目录（30MB）
+- 后端：PyInstaller 打包 `SmartHub-Backend.exe`（7.6MB）+ 自动 `pip install` 依赖 + 复制 `app/` 源码
+- 交付包：`release/` 目录含 bat 启动脚本 + 使用说明，压缩为 `智枢-SmartHub-v1.0.zip`（23.57MB）
+
+**关键文件**：
+- `frontend/frontend_launcher.py` — 前端 PyInstaller 启动脚本
+- `backend/backend_launcher.py` — 后端 PyInstaller 启动脚本（含 `find_node()` + `find_python()` + `check_and_install_deps()` 自动依赖检测）
+- `release/启动智枢.bat` — 5 步启动流程
+- `release/停止智枢.bat` — 端口清理 + 残留进程
+
+**启动流程**（bat 内 5 步）：
+1. 检查 Node.js / Python 版本
+2. 启动后端 exe → 等待 8001 端口就绪（最长 120s）
+3. 启动前端 exe → 等待 3000 端口就绪（最长 120s）
+4. 自动打开浏览器
+5. 退出 bat 窗口
+
+**评委环境要求**：Python 3.11+ + Node.js 18+
 
 ### 7 维学生画像
 
@@ -297,6 +322,9 @@ N+1 优化: users/resources/paths/chats 列表全部改用 JOIN 子查询
 - ✅ 资源详情页按 code.html 模板重写 (返回导航 + 资源头52px图标 + 4 tab + 知识内容markdown渲染 + 代码块暗色+复制按钮 + 思维导图mermaid提示 + 练习题卡片答案展开)
 - ✅ 资源列表页统计卡片边框修复 (.res-stats .rs-card → .rs-card 选择器去除父级依赖)
 - ✅ Icon.tsx 补全 6 个图标 (fileText/heart/link/eye/eyeOff/arrowLeft)
+- ✅ **可执行文件打包交付** (PyInstaller + Next.js standalone + 自动依赖检测 + 双击 bat 启动)
+- ✅ **bat 文件 CRLF 修复** (CMD 不识别 Unix LF 行尾 → netstat 无法检测端口 → 每行 token 变成"命令")
+- ✅ **CORS 端口白名单** (CORS_ORIGINS 加入 localhost:3001，解决前端非 3000 端口时 CORS 拦截)
 
 ### P2 — 清理项
 

@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智枢 SmartHub · 业务框架</title>
+<style>
+  /* ═══ 字体：走本地/系统栈（禁用 Google Fonts，国内不可达）═══ */
+  /* 项目字体：Inter / Newsreader / JetBrains Mono */
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;font-family:'Inter',-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:#f5f5f4;color:#1c1917;overflow:hidden;font-size:14.5px;line-height:1.6;letter-spacing:-0.011em}
+
+  /* ═══ 项目色板（与 globals.css :root 同步）═══ */
+  :root{
+    --bg:#f5f5f4;--bg-subtle:#ececeb;--surface:#ffffff;
+    --ink:#1c1917;--ink-2:#57534e;--ink-3:#a8a29e;--ink-4:#d6d3d1;
+    --line:#e7e5e4;--line-2:rgba(231,229,228,0.5);
+    --accent:#78716c;--accent-soft:#e7e5e4;
+    --warm:#c47a3a;--warm-soft:rgba(196,122,58,0.12);
+    --success:#059669;--success-soft:rgba(5,150,105,0.08);
+    --info:#8a9ba8;--info-soft:rgba(138,155,168,0.08);
+    --purple:#8b5cf6;--purple-soft:rgba(139,92,246,0.08);
+    --shadow-xs:0 1px 2px rgba(0,0,0,0.03);
+    --shadow-sm:0 2px 8px rgba(0,0,0,0.04);
+    --shadow-md:0 8px 30px rgba(0,0,0,0.06);
+    --r:14px;--r-sm:10px;--r-xs:7px;--r-md:12px;
+    --ease:cubic-bezier(0.16,1,0.3,1);
+  }
+
+  /* ═══ 顶部控制栏 ═══ */
+  .bar{position:fixed;top:0;left:0;right:0;height:36px;background:rgba(255,255,255,0.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 18px;z-index:100;font-size:11.5px;color:var(--ink-3)}
+  .bar .brand{font-weight:600;color:var(--ink);letter-spacing:-0.03em;margin-right:18px}
+  .bar .info{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .bar .info span{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-2)}
+  .bar .info b{color:var(--ink);font-weight:500}
+  .bar .keys{display:flex;gap:4px;margin-left:10px}
+  .bar .keys kbd{background:var(--bg);border:1px solid var(--line);border-radius:var(--r-xs);padding:1px 6px;font-size:10px;font-family:inherit;color:var(--ink-2)}
+
+  /* ═══ Slide Container ═══ */
+  .deck{height:100vh;display:flex;align-items:center;justify-content:center;padding:48px 60px 28px;position:relative}
+  .slide{width:100%;max-width:1180px;display:none;animation:fadeIn .45s var(--ease)}
+  .slide.active{display:block}
+  .slide.cover.active{display:flex}
+  .slide.thanks.active{display:flex}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* ═══ Slide Header ═══ */
+  .slide-no{position:absolute;top:48px;right:60px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-3);letter-spacing:.1em}
+  .slide h1{font-family:'Newsreader',Georgia,serif;font-size:38px;font-weight:400;color:var(--ink);margin-bottom:6px;letter-spacing:-0.03em}
+  .slide .sub{font-size:13px;color:var(--ink-3);margin-bottom:28px;display:flex;align-items:center;gap:10px}
+  .slide .sub::before{content:'';width:20px;height:1px;background:var(--warm)}
+
+  /* ═══ Common ═══ */
+  .tag{display:inline-flex;align-items:center;font-size:10.5px;padding:2px 10px;border-radius:var(--r-xs);font-weight:500;background:var(--warm-soft);color:var(--warm);margin-right:4px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  .grid5{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;transition:all .3s var(--ease);box-shadow:var(--shadow-xs)}
+  .card:hover{box-shadow:var(--shadow-sm);border-color:var(--ink-4)}
+  .card h3{font-family:'Inter',sans-serif;font-size:14px;font-weight:600;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:6px;letter-spacing:-0.01em}
+  .card .num{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-3);font-weight:400;margin-right:2px}
+  .card p{font-size:12.5px;color:var(--ink-2);line-height:1.7}
+  .card .meta{font-size:10.5px;color:var(--ink-4);margin-top:8px;font-family:'JetBrains Mono',monospace}
+
+  /* ═══ Cover Slide ═══ */
+  .cover{text-align:center;flex-direction:column;align-items:center;justify-content:center}
+  .cover .logo{width:72px;height:72px;background:var(--ink);color:#f5f5f4;border-radius:18px;display:flex;align-items:center;justify-content:center;font-family:'Newsreader',Georgia,serif;font-size:36px;font-style:italic;margin-bottom:24px;box-shadow:0 0 60px rgba(196,122,58,0.15);transition:transform .3s var(--ease)}
+  .cover .logo:hover{transform:rotate(-4deg) scale(1.05)}
+  .cover h1{font-family:'Newsreader',Georgia,serif;font-size:64px;font-weight:300;letter-spacing:-0.03em;margin-bottom:8px;color:var(--ink)}
+  .cover h2{font-family:'Inter',sans-serif;font-size:22px;font-weight:400;color:var(--warm);margin-bottom:20px;letter-spacing:-0.01em}
+  .cover .meta-row{display:flex;gap:0;font-size:12.5px;color:var(--ink-3);margin-bottom:32px}
+  .cover .meta-row span{padding:0 18px;border-right:1px solid var(--line)}
+  .cover .meta-row span:last-child{border:none}
+  .cover .info-bar{display:flex;gap:20px;font-size:11px;color:var(--ink-3);font-family:'JetBrains Mono',monospace}
+  .cover .info-bar span{padding:4px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xs)}
+
+  /* ═══ Table ═══ */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line-2)}
+  th{font-size:10.5px;color:var(--ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.1em;background:var(--bg-subtle)}
+  td{color:var(--ink-2)}
+  td b{color:var(--ink);font-weight:600}
+  tr:hover td{background:var(--bg)}
+
+  /* ═══ Flow ═══ */
+  .flow{display:flex;align-items:stretch;gap:6px}
+  .flow .step{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:14px 12px;text-align:center;position:relative;transition:all .2s var(--ease)}
+  .flow .step:hover{border-color:var(--ink-4);box-shadow:var(--shadow-xs);transform:translateY(-1px)}
+  .flow .step::after{content:'→';position:absolute;right:-12px;top:50%;transform:translateY(-50%);color:var(--warm);font-size:14px;font-weight:600}
+  .flow .step:last-child::after{display:none}
+  .flow .step .snum{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-3)}
+  .flow .step .sname{font-family:'Inter',sans-serif;font-size:13px;font-weight:600;color:var(--ink);margin:4px 0}
+  .flow .step .sdesc{font-size:10.5px;color:var(--ink-3);line-height:1.5}
+  .flow-vertical{flex-direction:column;gap:6px}
+  .flow-vertical .step::after{content:'↓';right:50%;top:auto;bottom:-14px;transform:translateX(50%)}
+  .flow-vertical .step:last-child::after{display:none}
+
+  /* ═══ List ═══ */
+  .list{display:flex;flex-direction:column;gap:6px}
+  .list .item{display:flex;align-items:flex-start;gap:12px;padding:8px 12px;background:var(--bg);border-left:2px solid var(--warm);border-radius:0 var(--r-xs) var(--r-xs) 0;transition:all .2s var(--ease)}
+  .list .item:hover{background:var(--bg-subtle)}
+  .list .item .li-num{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--warm);font-weight:600;min-width:24px}
+  .list .item .li-text{font-size:12.5px;color:var(--ink-2);line-height:1.6;flex:1}
+  .list .item .li-text b{color:var(--ink);font-weight:600}
+
+  /* ═══ Stat Block ═══ */
+  .stat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:14px;text-align:center;transition:all .2s var(--ease)}
+  .stat:hover{border-color:var(--ink-4);box-shadow:var(--shadow-xs)}
+  .stat .sv{font-family:'Newsreader',Georgia,serif;font-size:28px;color:var(--warm);font-weight:400;line-height:1;letter-spacing:-0.03em}
+  .stat .sl{font-size:10.5px;color:var(--ink-3);margin-top:4px}
+
+  /* ═══ Pipeline Diagram ═══ */
+  .pipe{background:#1c1917;color:#d4d4d4;border-radius:var(--r-sm);padding:14px 18px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.7;white-space:pre;overflow:auto;border:1px solid var(--ink)}
+  .pipe .kw{color:#c47a3a}
+  .pipe .cm{color:#78716c;font-style:italic}
+  .pipe .nm{color:#8b5cf6}
+
+  /* ═══ Page Nav Dots ═══ */
+  .nav{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:99}
+  .nav .dot{width:18px;height:3px;border-radius:2px;background:var(--ink-4);transition:all .3s var(--ease);cursor:pointer}
+  .nav .dot.active{background:var(--warm);width:30px}
+  .nav .dot:hover{background:var(--ink-3)}
+
+  /* ═══ Section Title ═══ */
+  .section-title{font-size:10px;color:var(--warm);text-transform:uppercase;letter-spacing:.2em;font-weight:600;margin-bottom:10px}
+
+  /* ═══ Two Column Layout ═══ */
+  .cols{display:grid;grid-template-columns:1fr 1.2fr;gap:18px}
+  .cols3{display:grid;grid-template-columns:.8fr 1fr 1fr;gap:18px}
+
+  /* ═══ Warm-soft card variant ═══ */
+  .card.warm{background:var(--warm-soft);border-color:rgba(196,122,58,0.2)}
+  .card.warm h3{color:var(--warm)}
+  .card.info{background:var(--info-soft);border-color:rgba(138,155,168,0.2)}
+  .card.purple{background:var(--purple-soft);border-color:rgba(139,92,246,0.2)}
+  .card.success{background:var(--success-soft);border-color:rgba(5,150,105,0.2)}
+
+  /* ═══ Thanks Slide ═══ */
+  .thanks{text-align:center;flex-direction:column;align-items:center;justify-content:center;min-height:70vh}
+  .thanks h1{font-family:'Newsreader',Georgia,serif;font-size:64px;font-weight:300;letter-spacing:-0.03em;margin-bottom:12px;color:var(--ink)}
+  .thanks p{font-size:14px;color:var(--ink-3);margin-bottom:32px}
+  .thanks .links{display:flex;gap:24px;font-size:12px;color:var(--ink-3)}
+  .thanks .links a{color:var(--warm);text-decoration:none;font-weight:500;transition:color .2s}
+  .thanks .links a:hover{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+
+  /* ═══ Responsive ═══ */
+  @media(max-width:900px){
+    .deck{padding:48px 24px 24px}
+    .slide h1{font-size:28px}
+    .grid2,.grid3,.grid4,.grid5,.cols,.cols3{grid-template-columns:1fr}
+    .flow{flex-direction:column}
+    .flow .step::after{content:'↓';right:50%;top:auto;bottom:-16px;transform:translateX(50%)}
+    .stat-grid{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ 顶部控制栏 ═══ -->
+<div class="bar">
+  <span class="brand">智枢 SmartHub</span>
+  <span>业务框架演示</span>
+  <div class="info">
+    <span><b id="cur">1</b> / <span id="tot"></span></span>
+    <span id="title-info">封面</span>
+    <div class="keys">
+      <kbd>←</kbd><kbd>→</kbd> 切换
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 13 张幻灯片 ═══ -->
+<div class="deck">
+
+  <!-- Slide 1: 封面 -->
+  <div class="slide active cover">
+    <div class="logo">S</div>
+    <h1>智枢 SmartHub</h1>
+    <h2>业务框架</h2>
+    <div class="meta-row">
+      <span>第十五届中国软件杯</span>
+      <span>A3 赛题</span>
+      <span>科大讯飞</span>
+    </div>
+    <div class="info-bar">
+      <span>15 AGENT</span>
+      <span>71 API</span>
+      <span>13 TABLE</span>
+      <span>106 PYTEST</span>
+      <span>26 PAGES</span>
+    </div>
+  </div>
+
+  <!-- Slide 2: 项目定位 -->
+  <div class="slide">
+    <span class="slide-no">02</span>
+    <div class="section-title">PROJECT</div>
+    <h1>项目定位</h1>
+    <p class="sub">多智能体个性化学习资源生成系统</p>
+
+    <div class="grid3">
+      <div class="card">
+        <h3><span class="num">01</span>赛题</h3>
+        <p>A3：基于大模型的个性化资源生成与学习多智能体系统</p>
+        <div class="meta">科大讯飞出题</div>
+      </div>
+      <div class="card">
+        <h3><span class="num">02</span>用户</h3>
+        <p>高等教育学生（计算机 / AI 专业本科）</p>
+        <div class="meta">课程：人工智能导论</div>
+      </div>
+      <div class="card">
+        <h3><span class="num">03</span>评分</h3>
+        <p>F1 对话式画像 35% + F2 多智能体资源生成 45% + F3 + F4/F5</p>
+        <div class="meta">5 大评分项全覆盖</div>
+      </div>
+    </div>
+
+    <div class="card warm" style="margin-top:18px">
+      <h3><span style="color:var(--warm)">✦</span>核心命题</h3>
+      <p style="font-size:14px;color:var(--ink);line-height:1.8">让每个学生拥有专属 AI 学习助手 —— <b>对话式画像构建 → 多智能体资源生成 → 个性化路径规划 → 持续效果评估</b></p>
+    </div>
+  </div>
+
+  <!-- Slide 3: 业务闭环 -->
+  <div class="slide">
+    <span class="slide-no">03</span>
+    <div class="section-title">FLOW</div>
+    <h1>业务闭环</h1>
+    <p class="sub">五步走 + 持续优化</p>
+
+    <div class="flow">
+      <div class="step">
+        <div class="snum">STEP 01</div>
+        <div class="sname">对话输入</div>
+        <div class="sdesc">自然语言提问</div>
+      </div>
+      <div class="step">
+        <div class="snum">STEP 02</div>
+        <div class="sname">画像构建</div>
+        <div class="sdesc">7 维评估</div>
+      </div>
+      <div class="step">
+        <div class="snum">STEP 03</div>
+        <div class="sname">资源生成</div>
+        <div class="sdesc">多 Agent 并行</div>
+      </div>
+      <div class="step">
+        <div class="snum">STEP 04</div>
+        <div class="sname">路径规划</div>
+        <div class="sdesc">DAG 拓扑</div>
+      </div>
+      <div class="step">
+        <div class="snum">STEP 05</div>
+        <div class="sname">评估反馈</div>
+        <div class="sdesc">LLM 报告</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:24px;text-align:center;border-style:dashed;background:var(--bg)">
+      <p style="font-size:13px;color:var(--ink-2)"><span style="color:var(--warm)">↻</span> 第六步：持续优化 — 学习行为回流画像，画像反哺推荐更精准</p>
+    </div>
+
+    <div class="grid3" style="margin-top:18px">
+      <div class="card"><h3>学习场景</h3><p>题库答题 · 自习模式 · 节点学习 · 综合测试</p></div>
+      <div class="card"><h3>行为采集</h3><p>14 种学习行为 → learning_records 表</p></div>
+      <div class="card"><h3>画像更新</h3><p>规则引擎（高频） + AI 分析（低频）双路径</p></div>
+    </div>
+  </div>
+
+  <!-- Slide 4: 核心业务模块 -->
+  <div class="slide">
+    <span class="slide-no">04</span>
+    <div class="section-title">MODULES</div>
+    <h1>核心业务模块</h1>
+    <p class="sub">学生端 10 + 管理端 9</p>
+
+    <div class="cols">
+      <div>
+        <div style="font-size:11px;color:var(--warm);text-transform:uppercase;letter-spacing:.15em;font-weight:600;margin-bottom:10px">STUDENT · 10 个学生页面</div>
+        <div class="grid2">
+          <div class="card"><h3><span class="num">01</span>仪表盘</h3><p>/ 统计 + 进度 + 趋势</p></div>
+          <div class="card"><h3><span class="num">02</span>智能对话</h3><p>/duihua · SSE 流式</p></div>
+          <div class="card"><h3><span class="num">03</span>学习画像</h3><p>/profile · 7 维雷达图</p></div>
+          <div class="card"><h3><span class="num">04</span>资源中心</h3><p>/resources · AI 生成</p></div>
+          <div class="card"><h3><span class="num">05</span>学习计划</h3><p>/plan · DAG + 测验</p></div>
+          <div class="card"><h3><span class="num">06</span>练习题库</h3><p>/tiku · dual-format</p></div>
+          <div class="card"><h3><span class="num">07</span>错题本</h3><p>/wrong-questions · AI</p></div>
+          <div class="card"><h3><span class="num">08</span>自习模式</h3><p>/zixi · TF.js 姿态</p></div>
+          <div class="card"><h3><span class="num">09</span>学习评估</h3><p>/pinggu · LLM 报告</p></div>
+          <div class="card"><h3><span class="num">10</span>个人设置</h3><p>/setting · 每日目标</p></div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--warm);text-transform:uppercase;letter-spacing:.15em;font-weight:600;margin-bottom:10px">ADMIN · 9 个管理页面</div>
+        <div class="grid2">
+          <div class="card"><h3>仪表盘</h3><p>统计 + 周趋势</p></div>
+          <div class="card"><h3>用户管理</h3><p>CRUD + 批量删除</p></div>
+          <div class="card"><h3>资源管理</h3><p>列表 + 分页</p></div>
+          <div class="card"><h3>题库管理</h3><p>CRUD + 批量导入</p></div>
+          <div class="card"><h3>路径管理</h3><p>DAG 可视化</p></div>
+          <div class="card"><h3>对话记录</h3><p>消息详情</p></div>
+          <div class="card"><h3>知识库</h3><p>文档管理</p></div>
+          <div class="card"><h3>Agent 监控</h3><p>15 Agent + 30s 刷新</p></div>
+          <div class="card"><h3>登录</h3><p>admin / admin123</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 5: 多智能体编排 -->
+  <div class="slide">
+    <span class="slide-no">05</span>
+    <div class="section-title">AGENTS</div>
+    <h1>多智能体编排</h1>
+    <p class="sub">LangGraph StateGraph · 10 节点编排 15 Agent</p>
+
+    <div class="pipe" style="font-size:10.5px;line-height:1.6;padding:12px 14px">
+<span class="cm"># StateGraph 编排流程</span>
+<span class="kw">intent_recognition</span>      <span class="cm"># 1. 意图识别</span>
+       ↓
+<span class="kw">task_planning</span>            <span class="cm"># 2. 任务规划</span>
+       ↓
+<span class="kw">conditional_route</span>        <span class="cm"># 3. 条件路由</span>
+       ↓
+<span class="cm">┌─ 6 Agent 并行/串行 ─┐</span>
+<span class="cm">│</span>  <span class="nm">document</span>   知识讲解    <span class="cm">│</span>  <span class="nm">mindmap</span>    Mermaid 导图
+<span class="cm">│</span>  <span class="nm">exercise</span>   <span class="kw">⭐ 真流式</span>   <span class="cm">│</span>  <span class="nm">path</span>       DAG 路径
+<span class="cm">│</span>  <span class="nm">tutor</span>      RAG 问答    <span class="cm">│</span>  <span class="nm">audio</span>      音频脚本
+<span class="cm">└──────────────────────┘</span>
+       ↓
+<span class="kw">result_aggregation</span>        <span class="cm"># 4. 结果聚合</span>
+       ↓
+<span class="kw">response_generation</span>       <span class="cm"># 5. SSE 流式</span>
+    </div>
+
+    <div class="grid5" style="margin-top:12px">
+      <div class="card warm" style="text-align:center;padding:10px 6px"><h3 style="font-size:12.5px;color:var(--warm)">Master</h3><p style="font-size:10.5px">编排器</p></div>
+      <div class="card" style="text-align:center;padding:10px 6px"><h3 style="font-size:12.5px">Initial Assess</h3><p style="font-size:10.5px">7 维画像</p></div>
+      <div class="card" style="text-align:center;padding:10px 6px"><h3 style="font-size:12.5px">Behavior</h3><p style="font-size:10.5px">行为分析</p></div>
+      <div class="card" style="text-align:center;padding:10px 6px"><h3 style="font-size:12.5px">Learning Path</h3><p style="font-size:10.5px">路径生成</p></div>
+      <div class="card" style="text-align:center;padding:10px 6px"><h3 style="font-size:12.5px">Wrong Question</h3><p style="font-size:10.5px">4 步思考链</p></div>
+      <div class="card" style="text-align:center;padding:10px 6px"><h3 style="font-size:12.5px">Scoring</h3><p style="font-size:10.5px">AI 评分</p></div>
+      <div class="card" style="text-align:center;padding:10px 6px"><h3 style="font-size:12.5px">Review</h3><p style="font-size:10.5px">质量审核</p></div>
+      <div class="card" style="text-align:center;padding:10px 6px"><h3 style="font-size:12.5px">Coordinator</h3><p style="font-size:10.5px">任务协调</p></div>
+      <div class="card" style="text-align:center;padding:10px 6px"><h3 style="font-size:12.5px">Resource Creator</h3><p style="font-size:10.5px">资源编排</p></div>
+      <div class="card" style="text-align:center;padding:10px 6px"><h3 style="font-size:12.5px">Learning Guide</h3><p style="font-size:10.5px">学习指引</p></div>
+    </div>
+  </div>
+
+  <!-- Slide 6: 学生画像 7 维 -->
+  <div class="slide">
+    <span class="slide-no">06</span>
+    <div class="section-title">PROFILE</div>
+    <h1>学生画像 7 维度</h1>
+    <p class="sub">核心业务对象 · JSONB 存储</p>
+
+    <div class="pipe">
+<span class="cm">// student_profiles.dimensions · 7 维画像</span>
+{
+  <span class="kw">"comprehension"</span>:  { <span class="nm">"score"</span>: 75, <span class="nm">"confidence"</span>: 0.80 },  <span class="cm">// 理解力</span>
+  <span class="kw">"memory"</span>:         { <span class="nm">"score"</span>: 68, <span class="nm">"confidence"</span>: 0.70 },  <span class="cm">// 记忆力</span>
+  <span class="kw">"application"</span>:    { <span class="nm">"score"</span>: 82, <span class="nm">"confidence"</span>: 0.85 },  <span class="cm">// 应用转化</span>
+  <span class="kw">"imagination"</span>:    { <span class="nm">"score"</span>: 60, <span class="nm">"confidence"</span>: 0.60 },  <span class="cm">// 想象力</span>
+  <span class="kw">"focus"</span>:          { <span class="nm">"score"</span>: 78, <span class="nm">"confidence"</span>: 0.75 },  <span class="cm">// 专注力</span>
+  <span class="kw">"knowledge_base"</span>: { <span class="nm">"score"</span>: 70, <span class="nm">"confidence"</span>: 0.80 },  <span class="cm">// 知识基础</span>
+  <span class="kw">"learning_goal"</span>:  { <span class="nm">"score"</span>: 85, <span class="nm">"confidence"</span>: 0.90 }   <span class="cm">// 学习目标</span>
+}
+    </div>
+
+    <div class="grid2" style="margin-top:18px">
+      <div class="card warm">
+        <h3><span style="color:var(--warm)">⚡</span>规则引擎（即时）</h3>
+        <div style="font-size:12px;color:var(--ink-2);line-height:1.8;margin-top:8px">
+          • tiku 每题 → <b>application</b>（正确率映射）<br>
+          • zixi 学习 → <b>memory + focus</b>（时长映射）<br>
+          • 节点完成 → <b>learning_goal</b>（+2/节点）<br>
+          • 评估报告 → <b>comprehension + knowledge_base</b><br>
+          • 错题回顾 → <b>memory</b>（+1/+3/-1）<br>
+          • 思维导图 → <b>imagination</b>（+1/次）
+        </div>
+      </div>
+      <div class="card purple">
+        <h3><span style="color:var(--purple)">🧠</span>AI 分析（批量）</h3>
+        <div style="font-size:12px;color:var(--ink-2);line-height:1.8;margin-top:8px">
+          • tiku 每 5 题 → 全 7 维 AI 推断<br>
+          • zixi 结束 → 全 7 维 AI 推断<br>
+          • resources 学习 → analyzeBehavior('study')<br>
+          • duihua 对话 → analyzeBehavior('chat')<br>
+          • 定时分析 → 每 4 小时 scheduled_analysis<br>
+          • 缓存 5min + 行为后自动清 localStorage
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 7: 资源生成 F2 -->
+  <div class="slide">
+    <span class="slide-no">07</span>
+    <div class="section-title">F2 · 45%</div>
+    <h1>多智能体资源生成</h1>
+    <p class="sub">⭐ 评分重点 · 9 个真流式端点</p>
+
+    <div class="cols">
+      <div>
+        <div class="pipe" style="font-size:11px;line-height:1.8">
+<span class="cm">用户输入"讲解 A* 算法"</span>
+       ↓
+<span class="kw">Master Agent</span>
+<span class="cm">StateGraph 10 节点编排</span>
+       ↓
+<span class="cm">防幻觉三层验证：</span>
+  <span class="nm">①</span> PatternDetector（模式检测）
+  <span class="nm">②</span> SourceValidator（来源验证）
+  <span class="nm">③</span> LLMValidator（语义校验）
+       ↓
+<span class="kw">SSE 流式返回</span>
+<span class="cm">边收 token 边推前端</span>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--warm);text-transform:uppercase;letter-spacing:.15em;font-weight:600;margin-bottom:8px">4 类资源类型</div>
+        <div class="grid2">
+          <div class="card"><h3><span class="num">01</span>知识讲解</h3><p>Document Agent · Markdown</p></div>
+          <div class="card"><h3><span class="num">02</span>代码示例</h3><p>Document Agent · Python</p></div>
+          <div class="card"><h3><span class="num">03</span>思维导图</h3><p>MindMap Agent · Mermaid</p></div>
+          <div class="card"><h3><span class="num">04</span>练习题</h3><p>Exercise Agent · ⭐ 真流式</p></div>
+        </div>
+        <div class="card warm" style="margin-top:12px">
+          <h3><span style="color:var(--warm)">⭐</span>dual-format 流式协议</h3>
+          <p style="font-size:11.5px">LLM 一份输出 = markdown（人看）+ <code style="color:var(--warm);background:var(--bg);padding:1px 4px;border-radius:3px">---JSON_DATA---</code> 分隔 + JSON（程序用）· 题目逐行实时渲染</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 8: 学习路径 F3 -->
+  <div class="slide">
+    <span class="slide-no">08</span>
+    <div class="section-title">F3</div>
+    <h1>个性化学习路径</h1>
+    <p class="sub">DAG 拓扑排序 · 节点解锁机制</p>
+
+    <div class="cols">
+      <div>
+        <div class="pipe" style="font-size:11px;line-height:1.8">
+<span class="cm"># 算法思路</span>
+1. 获取课程知识图谱
+2. 过滤已掌握知识点
+   <span class="cm">（基于画像 knowledge_base）</span>
+3. 拓扑排序（Kahn 算法）
+   <span class="cm">确保先修在前</span>
+4. 薄弱知识点优先
+   <span class="cm">（基于弱项维度）</span>
+5. 分配每日计划
+   <span class="cm">（根据 daily_hours）</span>
+        </div>
+      </div>
+      <div>
+        <div class="flow flow-vertical">
+          <div class="step" style="text-align:left;padding:12px 16px"><div class="sname">① 输入知识点</div><div class="sdesc">如"机器学习, CNN, 深度学习"</div></div>
+          <div class="step" style="text-align:left;padding:12px 16px"><div class="sname">② AI 生成 10-15 节点路径</div><div class="sdesc">learning_path_agent 自主分析拆分</div></div>
+          <div class="step" style="text-align:left;padding:12px 16px"><div class="sname">③ 节点学习</div><div class="sdesc">AI 对话 + 学习资源双模式</div></div>
+          <div class="step" style="text-align:left;padding:12px 16px"><div class="sname">④ AI 测验解锁</div><div class="sdesc">≥60 分解锁下一节点</div></div>
+          <div class="step" style="text-align:left;padding:12px 16px"><div class="sname">⑤ 综合测试</div><div class="sdesc">所有节点完成后综合考察</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 9: 错题本 & 自习模式（创新点） -->
+  <div class="slide">
+    <span class="slide-no">09</span>
+    <div class="section-title">INNOVATION</div>
+    <h1>创新点</h1>
+    <p class="sub">错题本 Agent 化 · 自习模式 AI 视觉</p>
+
+    <div class="grid2">
+      <div class="card warm">
+        <h3><span style="color:var(--warm)">📒</span>错题本 · AI 错因分析</h3>
+        <div style="font-size:12.5px;color:var(--ink-2);line-height:1.8;margin-top:10px">
+          <p><b>4 步思考链</b>：错因分类 → 策略讲解 → 同类题推荐 → 反思重生成</p>
+          <p style="margin-top:6px"><b>SSE 真流式</b>：每步思考链日志实时输出</p>
+          <p style="margin-top:6px"><b>5 类错误标签</b>：计算 / 概念 / 审题 / 粗心 / 未分析</p>
+          <p style="margin-top:6px"><b>掌握度算法</b>：答对 +20% · 上限 100%</p>
+          <p style="margin-top:6px"><b>自动收录</b>：/tiku 答错即加入错题本</p>
+        </div>
+      </div>
+      <div class="card info">
+        <h3><span style="color:var(--info)">📷</span>自习模式 v1.5</h3>
+        <div style="font-size:12.5px;color:var(--ink-2);line-height:1.8;margin-top:10px">
+          <p><b>TF.js + MoveNet Lightning</b>：浏览器本地姿态检测</p>
+          <p style="margin-top:6px"><b>~3MB 模型</b> · CPU ~30ms/帧 · 零上传</p>
+          <p style="margin-top:6px"><b>3 个关键点</b>：鼻子 + 左肩 + 右肩</p>
+          <p style="margin-top:6px"><b>3 档巡查</b>：宽松 120s / 标准 60s / 严格 30s</p>
+          <p style="margin-top:6px"><b>3 状态机</b>：idle → running → report</p>
+          <p style="margin-top:6px"><b>联动画像</b>：专注力数据自动更新 focus 维度</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 10: 数据模型 -->
+  <div class="slide">
+    <span class="slide-no">10</span>
+    <div class="section-title">DATA</div>
+    <h1>数据模型</h1>
+    <p class="sub">13 张核心业务表</p>
+
+    <table>
+      <thead>
+        <tr><th>表名</th><th>业务实体</th><th>关键字段</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><b>students</b></td><td>学生/管理员</td><td>phone / password_hash / role / is_active</td></tr>
+        <tr><td><b>student_profiles</b></td><td>7 维画像</td><td>dimensions(JSONB) / last_analyzed_at</td></tr>
+        <tr><td><b>resources</b></td><td>学习资源</td><td>title / content / is_favorited / is_preset</td></tr>
+        <tr><td><b>learning_paths</b></td><td>DAG 路径</td><td>nodes(JSONB) / knowledge_point</td></tr>
+        <tr><td><b>study_plans</b></td><td>学习计划</td><td>goal / status / created_at</td></tr>
+        <tr><td><b>study_plan_steps</b></td><td>学习步骤</td><td>plan_id / step_order / status</td></tr>
+        <tr><td><b>exercises</b></td><td>练习题</td><td>source / exercise_type / knowledge_point</td></tr>
+        <tr><td><b>exercise_bank</b></td><td>公共题库</td><td>created_by(admin) / knowledge_point</td></tr>
+        <tr><td><b>wrong_questions</b></td><td>错题本</td><td>mastery_level / error_type / similar_exercises</td></tr>
+        <tr><td><b>learning_records</b></td><td>行为日志</td><td>action / duration_seconds / knowledge_point</td></tr>
+        <tr><td><b>evaluation_reports</b></td><td>评估报告</td><td>report_date / summary / dimensions</td></tr>
+        <tr><td><b>chat_sessions</b></td><td>聊天会话</td><td>student_id / title / created_at</td></tr>
+        <tr><td><b>document_chunks</b></td><td>RAG 文档</td><td>content / embedding(JSONB) / metadata</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Slide 11: 技术栈 -->
+  <div class="slide">
+    <span class="slide-no">11</span>
+    <div class="section-title">STACK</div>
+    <h1>技术栈</h1>
+    <p class="sub">前端 + 后端 + LLM 三客户端</p>
+
+    <div class="grid3">
+      <div>
+        <div style="font-size:11px;color:var(--warm);text-transform:uppercase;letter-spacing:.15em;font-weight:600;margin-bottom:8px">FRONTEND</div>
+        <div class="list">
+          <div class="item"><span class="li-num">▸</span><span class="li-text">Next.js 14.2.5 (App Router)</span></div>
+          <div class="item"><span class="li-num">▸</span><span class="li-text">TailwindCSS + 自定义 CSS</span></div>
+          <div class="item"><span class="li-num">▸</span><span class="li-text">TypeScript 5.x</span></div>
+          <div class="item"><span class="li-num">▸</span><span class="li-text">本地字体 woff（国内不可达）</span></div>
+          <div class="item"><span class="li-num">▸</span><span class="li-text"><b>@tensorflow/tfjs</b> · MoveNet</span></div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--warm);text-transform:uppercase;letter-spacing:.15em;font-weight:600;margin-bottom:8px">BACKEND</div>
+        <div class="list">
+          <div class="item"><span class="li-num">▸</span><span class="li-text">FastAPI 0.136</span></div>
+          <div class="item"><span class="li-num">▸</span><span class="li-text">SQLAlchemy 2.0 async + asyncpg</span></div>
+          <div class="item"><span class="li-num">▸</span><span class="li-text">LangGraph StateGraph 10 节点</span></div>
+          <div class="item"><span class="li-num">▸</span><span class="li-text">Celery 定时任务（每日 4 点）</span></div>
+          <div class="item"><span class="li-num">▸</span><span class="li-text">PostgreSQL 18 + Redis</span></div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--warm);text-transform:uppercase;letter-spacing:.15em;font-weight:600;margin-bottom:8px">LLM 三客户端</div>
+        <div class="card warm" style="margin-bottom:8px;padding:10px 12px">
+          <h3 style="font-size:13px"><span style="color:var(--warm)">★</span>MiMo v2.5</h3>
+          <p style="font-size:11px">api-key 头 · 当前默认</p>
+        </div>
+        <div class="card" style="margin-bottom:8px;padding:10px 12px">
+          <h3 style="font-size:13px">MiniMax-M3</h3>
+          <p style="font-size:11px">Authorization: Bearer · 备选</p>
+        </div>
+        <div class="card purple" style="padding:10px 12px">
+          <h3 style="font-size:13px"><span style="color:var(--purple)">★</span>讯飞星火 V4</h3>
+          <p style="font-size:11px">Bearer · 比赛必用</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 12: 核心指标 -->
+  <div class="slide">
+    <span class="slide-no">12</span>
+    <div class="section-title">METRICS</div>
+    <h1>核心指标</h1>
+    <p class="sub">系统规模 + 业务指标</p>
+
+    <div class="stat-grid">
+      <div class="stat"><div class="sv">26</div><div class="sl">页面总数</div></div>
+      <div class="stat"><div class="sv">71</div><div class="sl">API 端点</div></div>
+      <div class="stat"><div class="sv">15</div><div class="sl">Agent 模块</div></div>
+      <div class="stat"><div class="sv">13</div><div class="sl">数据表</div></div>
+      <div class="stat"><div class="sv">106</div><div class="sl">pytest 测试</div></div>
+    </div>
+
+    <div class="grid4" style="margin-top:18px">
+      <div class="card warm" style="text-align:center"><h3 style="color:var(--warm)">5/5</h3><p>评分项全覆盖</p></div>
+      <div class="card warm" style="text-align:center"><h3 style="color:var(--warm)">9</h3><p>真流式 SSE 端点</p></div>
+      <div class="card warm" style="text-align:center"><h3 style="color:var(--warm)">3</h3><p>防幻觉验证层</p></div>
+      <div class="card warm" style="text-align:center"><h3 style="color:var(--warm)">7</h3><p>画像维度</p></div>
+      <div class="card purple" style="text-align:center"><h3 style="color:var(--purple)">2</h3><p>画像联动路径</p></div>
+      <div class="card success" style="text-align:center"><h3 style="color:var(--success)">26</h3><p>代码审计修复</p></div>
+      <div class="card success" style="text-align:center"><h3 style="color:var(--success)">2400</h3><p>死代码清理行</p></div>
+      <div class="card success" style="text-align:center"><h3 style="color:var(--success)">9/9</h3><p>冒烟测试通过</p></div>
+    </div>
+
+    <div class="card" style="margin-top:18px;background:var(--bg-subtle);font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink-3)">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <span><span style="color:var(--warm)">▸</span> 端口：8001 / 3000</span>
+        <span><span style="color:var(--warm)">▸</span> 启动：start.ps1</span>
+        <span><span style="color:var(--warm)">▸</span> 模式：生产（默认） / -Dev</span>
+        <span><span style="color:var(--warm)">▸</span> 默认账号：admin / admin123</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 13: 致谢 -->
+  <div class="slide thanks">
+    <h1>感谢观看</h1>
+    <p>欢迎评委老师提问与交流</p>
+    <div class="links">
+      <a href="https://github.com/AbandonS-ED/ZhiShu" target="_blank">GitHub · AbandonS-ED/ZhiShu</a>
+      <span style="color:var(--ink-4)">·</span>
+      <span>中国软件杯 A3 赛题</span>
+      <span style="color:var(--ink-4)">·</span>
+      <span>2026.07</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ 导航点 ═══ -->
+<div class="nav" id="nav"></div>
+
+<script>
+  const slides = document.querySelectorAll('.slide')
+  const titles = ['封面','项目定位','业务闭环','核心业务模块','多智能体编排','学生画像7维','资源生成F2','学习路径F3','创新点','数据模型','技术栈','核心指标','致谢']
+  let cur = 0
+
+  // Build nav dots
+  const nav = document.getElementById('nav')
+  document.getElementById('tot').textContent = slides.length
+  slides.forEach((_, i) => {
+    const dot = document.createElement('div')
+    dot.className = 'dot' + (i === 0 ? ' active' : '')
+    dot.onclick = () => go(i)
+    nav.appendChild(dot)
+  })
+
+  function go(n){
+    if(n < 0 || n >= slides.length) return
+    slides[cur].classList.remove('active')
+    cur = n
+    slides[cur].classList.add('active')
+    document.getElementById('cur').textContent = cur + 1
+    document.getElementById('title-info').textContent = titles[cur]
+    document.querySelectorAll('.dot').forEach((d, i) => {
+      d.classList.toggle('active', i === cur)
+    })
+  }
+
+  document.addEventListener('keydown', e => {
+    if(e.key === 'ArrowRight' || e.key === ' ' || e.key === 'ArrowDown'){ e.preventDefault(); go(cur + 1) }
+    else if(e.key === 'ArrowLeft' || e.key === 'ArrowUp'){ e.preventDefault(); go(cur - 1) }
+    else if(e.key === 'Home'){ go(0) }
+    else if(e.key === 'End'){ go(slides.length - 1) }
+  })
+
+  // Click left/right to navigate
+  document.addEventListener('click', e => {
+    if(e.target.closest('a, button, .dot, kbd, .bar')) return
+    const w = window.innerWidth
+    if(e.clientX < w * 0.3) go(cur - 1)
+    else if(e.clientX > w * 0.7) go(cur + 1)
+  })
+
+  // Touch swipe
+  let tx = 0
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX })
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - tx
+    if(Math.abs(dx) > 50){
+      if(dx > 0) go(cur - 1)
+      else go(cur + 1)
+    }
+  })
+</script>
+
+</body>
+</html>

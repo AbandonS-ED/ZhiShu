@@ -1,0 +1,169 @@
+============================================================
+              智枢 SmartHub v1.0 · 使用说明
+       多智能体个性化学习资源生成系统
+============================================================
+
+【项目简介】
+
+  中国软件杯 A3 赛题参赛作品。基于大模型 + 多智能体协同，
+  为高等教育学生自动生成个性化、多模态学习资源。
+
+  核心特性：
+    - 7 维学习画像（理解力/记忆力/应用转化/想象力/专注力/知识基础/学习目标）
+    - 15 个智能体模块 + Master 编排器（LangGraph StateGraph 10 节点）
+    - 多模态资源生成（讲解文档/代码示例/思维导图/练习题）
+    - 真流式 SSE 输出（题目逐行实时渲染）
+    - 个性化学习路径（DAG 拓扑排序 + 节点解锁机制）
+    - RAG 防幻觉三层验证（PatternDetector + SourceValidator + LLMValidator）
+    - 自习模式（TF.js + MoveNet 浏览器本地姿态检测，零上传）
+    - 学习效果评估（LLM 报告 + Celery 定时预生成）
+
+============================================================
+
+【快速启动】
+
+  1. 双击 [启动智枢.bat]
+  2. 等待 5-10 秒，浏览器自动打开 http://localhost:3000
+  3. 体验完毕，双击 [停止智枢.bat] 关闭服务
+
+  默认账号：
+    - 学生端：手机号注册即可（验证码控制台输出）
+    - 管理端：http://localhost:3000/admin/login（admin / admin123）
+
+============================================================
+
+【环境要求】
+
+  操作系统：Windows 10 / 11 (64-bit)
+
+  必备软件：
+    - Python 3.11+     下载：https://www.python.org/downloads/
+                        安装时务必勾选 [Add Python to PATH]
+
+    - Node.js 18+      下载：https://nodejs.org/zh-cn/
+                        安装时务必勾选 [Add to PATH]
+
+    - PostgreSQL 18+   下载：https://www.postgresql.org/download/
+                        端口 5432，默认账号 postgres，密码 123456
+
+    - Redis            下载：https://github.com/tpoechtrager/redis-windows/releases
+
+  可选软件：
+    - MinIO（文件存储）  下载：https://min.io/download
+
+============================================================
+
+【目录结构】
+
+  智枢-SmartHub-v1.0/
+  ├── 启动智枢.bat           # 双击启动（评委唯一入口）
+  ├── 停止智枢.bat           # 关闭所有服务
+  ├── 使用说明.txt           # 本文档
+  ├── 前端/
+  │   ├── SmartHub-Frontend.exe
+  │   └── .next/standalone/   # Next.js 编译产物
+  └── 后端/
+      ├── SmartHub-Backend.exe
+      ├── app/                # Python 源码
+      ├── .env                # LLM API KEY 配置
+      └── .env.example        # 配置模板
+
+============================================================
+
+【LLM 配置（比赛当天必改）】
+
+  打开 [后端\.env]，修改 LLM_PROVIDER：
+
+    # 当前默认（开发阶段）
+    LLM_PROVIDER=mimo
+    MIMO_API_KEY=your_mimo_api_key_here
+
+    # 比赛当天改成下面这样
+    LLM_PROVIDER=spark
+    SPARK_API_KEY=your_spark_api_key_here
+    SPARK_BASE_URL=https://spark-api-open.xf-yun.com/v1
+    SPARK_CHAT_MODEL=generalv3.5
+
+  讯飞星火 V4 API KEY 申请：https://xinghuo.xfyun.cn/
+
+  注意：本交付包 .env 含开发阶段 KEY（MiMo/MiniMax），
+  比赛前请修改为讯飞星火 KEY。比赛结束后建议重新生成所有 KEY。
+
+============================================================
+
+【数据库初始化（首次运行）】
+
+  1. 启动 PostgreSQL 服务（默认端口 5432）
+  2. 创建数据库：
+       psql -U postgres -c "CREATE DATABASE zhishu;"
+  3. 初始化表结构：
+       psql -U postgres -d zhishu -f scripts\init_db.sql
+  4. 创建管理员账号：
+       cd 后端
+       python scripts\init_admin.py
+       （默认账号：admin / admin123）
+
+============================================================
+
+【端口冲突处理】
+
+  默认端口：
+    - 前端：3000
+    - 后端：8001
+
+  如端口被占用，启动器会自动切换到下一个可用端口：
+    3000 -> 3001 -> ... -> 3009
+    8001 -> 8002 -> ... -> 8010
+
+  切换后访问地址会变，请查看启动器窗口的实际提示。
+
+============================================================
+
+【常见问题】
+
+  Q1: 双击 exe 弹出黑窗闪退？
+  A1:  缺少 Python/Node.js 环境变量，请确认 PATH 配置。
+
+  Q2: 后端启动报 "找不到 .env"？
+  A2:  复制 [.env.example] 为 [.env]，填入自己的 API KEY。
+
+  Q3: 前端打开是空白页？
+  A3:  后端可能没起来，先看后端窗口日志，再访问 Swagger
+       http://localhost:8001/docs 检查 API 是否正常。
+
+  Q4: 评测日 StarSpark 鉴权失败？
+  A4:  检查 SPARK_API_KEY 是否填写正确，URL 是否为：
+       https://spark-api-open.xf-yun.com/v1
+
+  Q5: TF.js 模型加载失败？
+  A5:  检查浏览器是否允许加载 CDN 资源（@tensorflow-models/pose-detection）
+       或访问 https://tfhub.dev 验证网络连通性。
+
+  Q6: 杀毒软件误报？
+  A6:  PyInstaller 打包的 exe 偶尔会被杀软误判，请加入白名单。
+
+============================================================
+
+【性能与规模】
+
+  - 前端：26 个页面，Next.js 14 App Router
+  - 后端：71 个 API 端点，FastAPI 0.136 + SQLAlchemy 2.0
+  - 多智能体：15 个 Agent 模块 + LangGraph StateGraph 10 节点
+  - 数据库：13 张业务表（PG + JSONB）
+  - 测试：106 个 pytest + 9 个冒烟测试
+  - 代码审计：26 个 bug 修复 + 2400 行死代码清理
+
+============================================================
+
+【GitHub】
+
+  https://github.com/AbandonS-ED/ZhiShu
+
+============================================================
+
+  第十五届中国软件杯 A3 赛题
+  出题企业：科大讯飞股份有限公司
+  制作：智枢团队
+  版本：v1.0（2026-07）
+
+============================================================
