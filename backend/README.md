@@ -1,10 +1,10 @@
 # 智枢(SmartHub) Backend
 
-> 最后更新：2026-07-19（代码审计 26 个修复 + wyy 分支合并 + lint + build 通过）
+> 最后更新：2026-07-20（LLM 切换 MiniMax + bat CRLF 修复 + CORS 白名单 + 可执行文件交付包）
 
 基于 FastAPI + 15 Agent 的多智能体学习资源生成系统后端。
 
-> **最后更新**: 2026-07-19 — 画像联动双路径 + 资源详情修复 + lint + build 通过
+> **最后更新**: 2026-07-20 — LLM 切换 MiniMax + bat CRLF 修复 + CORS 白名单 + 可执行文件交付包
 
 ## 技术栈
 
@@ -12,7 +12,7 @@
 - **Agent**: 15 个子 Agent + Master Agent 编排器（LangGraph StateGraph **10 节点**）
 - **认证**: bcrypt 密码哈希 + JWT（7 天过期）+ 全 **71** 业务端点门禁
 - **角色**: `role` 字段（student / admin）+ `is_active` 软删除 + `last_login` 记录
-- **LLM**: 小米 MiMo v2.5（当前）→ MiniMax-M3 → 讯飞星火 V4（上线前切换 `LLM_PROVIDER=spark`）
+- **LLM**: MiniMax-M3（当前，`LLM_PROVIDER=minimax`，`Authorization: Bearer` 认证）→ MiMo v2.5（`mimo`）→ 讯飞星火 V4（上线前切换 `LLM_PROVIDER=spark`）
 - **数据库**: PostgreSQL 18 + **13 张表** + 14 索引 + JSONB（embedding 占位）+ Redis（Celery broker，当前未起 worker）
 - **画像联动**: 规则引擎(即时/高频) + AI 分析(批量/低频) 双路径，7 维画像全联动
 - **学习计划模块** (合并 wyy 分支): 输入知识点 → AI 生成学习路径 (10-15 节点) → 节点学习 → AI 测验 → 综合测试
@@ -85,7 +85,7 @@ backend/
 │   │   ├── scoring_agent.py   # AI 智能评分
 │   │   ├── learning_path_agent.py # 学习计划路径生成
 │   │   └── master_agent.py    # LangGraph StateGraph **10 节点**
-│   └── services/              # 15 个 Service
+│   └── services/              # 14 个 Service
 │       ├── minimax_client.py     # httpx OpenAI 兼容格式客户端
 │       ├── spark_client.py       # 讯飞星火 V4 客户端
 │       ├── mimo_client.py        # 小米 MiMo v2.5（api-key 认证 + 流式/非流式）
@@ -262,7 +262,7 @@ backend/
 
 | 文件 | 功能 | 状态 |
 |------|------|------|
-| `services/minimax_client.py` | httpx 直接调用 MiniMax-M3（OpenAI 兼容格式） | ✅ 可用 |
+| `services/minimax_client.py` | httpx 直接调用 MiniMax-M3（OpenAI 兼容格式） | ✅ **当前使用** |
 | `services/spark_client.py` | 讯飞星火 V4 客户端（同步 + 流式） | ✅ 已实现 |
 | `services/mimo_client.py` | 小米 MiMo v2.5 客户端（`api-key` 头认证 + 流式/非流式 + 空 choices 容错） | ✅ 已实现 |
 | `services/llm_factory.py` | LLM 客户端工厂（按 `LLM_PROVIDER` 切换 mimo/minimax/spark） | ✅ 已实现 |

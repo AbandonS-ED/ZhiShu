@@ -31,7 +31,7 @@
 
 ## 硬约束
 
-- **LLM**: 当前用小米 MiMo v2.5（`LLM_PROVIDER=mimo`，`api-key` 头认证）。备选：MiniMax-M3（`minimax`）/ 讯飞星火 V4（`spark`）。比赛前切星火：`LLM_PROVIDER=spark` + `SPARK_API_KEY=xxx`。讯飞鉴权只用 `Authorization: Bearer {api_key}`，不拼 api_secret。
+- **LLM**: 当前用 MiniMax-M3（`LLM_PROVIDER=minimax`，`Authorization: Bearer` 认证）。备选：MiMo v2.5（`mimo`）/ 讯飞星火 V4（`spark`）。比赛前切星火：`LLM_PROVIDER=spark` + `SPARK_API_KEY=xxx`。讯飞鉴权只用 `Authorization: Bearer {api_key}`，不拼 api_secret。
 - **禁用** Google Fonts / Vercel / Sentry / OpenAI（中国不可达）。字体走 `frontend/src/app/fonts/` 本地 woff + `next/font/local`。
 - **pip** 加 `-i https://pypi.tuna.tsinghua.edu.cn/simple`；npm 走 `frontend/.npmrc` 的 `registry.npmmirror.com`。
 - **端口**: 后端 **8001**（不要 8000），前端 3000。`api.ts:3` 的 `BASE_URL` 已同步。用 `start.ps1` 一键启动，`stop.ps1` 一键停止。
@@ -79,7 +79,7 @@ cd frontend && npm run build                       # 28 页面
 - **DB JSON 格式**: assistant 消息存 `{"type":"tutor","data":{"answer":"..."}}` 或 `{"type":"multi","data":{"final_response":"..."}}`
 - **前端 `loadSession`**: 解析 JSON 提取 `answer` / `final_response`，统一 `rendered=false` 让 `markdownToHtml` 渲染
 - **题库出题**: StateGraph exercise 意图 → 保存到 `exercises` 表（去重 + 限容 20 道/知识点）→ 回复追加 `[👉 点击前往题库作答](/tiku?kp=xxx)`。题型：选择题 + 简答题（已移除编程题和判断题）
-- **MiMo v2.5**: 中国集群 `api-key` 头认证（非 `Authorization: Bearer`），`/chat/completions` 兼容。mimo-v2.5-pro 推理消耗过多 token，降级用 mimo-v2.5
+- **MiMo v2.5**: 中国集群 `api-key` 头认证（非 `Authorization: Bearer`），`/chat/completions` 兼容。mimo-v2.5-pro 推理消耗过多 token，降级用 mimo-v2.5（当前未启用，LLM_PROVIDER=minimax）
 - **防幻觉**: 6 Agent 接 `validate()`（Document/Exercise 走三层，其他走 `skip_llm=True` 快速模式）
 - **RAG**: `document_parser → text_chunker → embedding → vector_store.search → reranker`
 - **认证**: bcrypt + JWT（HS256，7 天），全 **71** 端点 `Depends(get_current_user)` 门禁
